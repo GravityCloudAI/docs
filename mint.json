@@ -9,7 +9,7 @@
   "colors": {
     "primary": "#818aff",
     "light": "#07C983",
-    "dark": "#0D9373",
+    "dark": "#818aff",
     "anchors": {
       "from": "#0D9373",
       "to": "#07C983"
@@ -23,7 +23,7 @@
   ],
   "topbarCtaButton": {
     "name": "Dashboard",
-    "url": "https://console.gravitycloud.com"
+    "url": "https://console.gravitycloud.ai"
   },
   "tabs": [
     {
@@ -33,11 +33,6 @@
   ],
   "anchors": [
     {
-      "name": "Documentation",
-      "icon": "book-open-cover",
-      "url": "https://mintlify.com/docs"
-    },
-    {
       "name": "Community",
       "icon": "slack",
       "url": "https://mintlify.com/community"
@@ -45,41 +40,35 @@
     {
       "name": "Blog",
       "icon": "newspaper",
-      "url": "https://mintlify.com/blog"
+      "url": "https://gravitycloud.ai/blog"
     }
   ],
   "navigation": [
     {
-      "group": "Get Started",
+      "group": "Platform",
       "pages": [
         "introduction",
-        "quickstart",
-        "development"
+        "quickstart"
       ]
     },
     {
-      "group": "Essentials",
+      "group": "Connectors",
       "pages": [
-        "essentials/markdown",
-        "essentials/code",
-        "essentials/images",
-        "essentials/settings",
-        "essentials/navigation",
-        "essentials/reusable-snippets"
+        "connectors/aws",
+        "connectors/github",
+        "connectors/slack"
       ]
     },
     {
-      "group": "API Documentation",
+      "group": "DevOps",
       "pages": [
-        "api-reference/introduction"
+        "devops/introduction"
       ]
     },
-    {
-      "group": "Endpoint Examples",
+        {
+      "group": "FinOps",
       "pages": [
-        "api-reference/endpoint/get",
-        "api-reference/endpoint/create",
-        "api-reference/endpoint/delete"
+        "finops/introduction"
       ]
     }
   ],
