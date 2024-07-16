@@ -23,7 +23,7 @@
   "topbarLinks": [
     {
       "name": "Support",
-      "url": "vatsal@gravitycloud.ai"
+      "url": "support@gravitycloud.ai"
     }
   ],
   "topbarCtaButton": {
@@ -32,14 +32,19 @@
   },
   "anchors": [
     {
-      "name": "Community",
-      "icon": "slack",
-      "url": "https://mintlify.com/community"
+      "name": "Demo Playground",
+      "icon": "stars",
+      "url": "https://demo.gravitycloud.ai/"
     },
     {
       "name": "Blog",
       "icon": "newspaper",
       "url": "https://gravitycloud.ai/blog"
+    },
+    {
+      "name": "Github",
+      "icon": "github",
+      "url": "https://github.com/gravitycloudai"
     }
   ],
   "navigation": [
@@ -47,31 +52,65 @@
       "group": "Platform",
       "pages": [
         "introduction",
+        {
+          "group": "Use Cases",
+          "pages": [
+            "use-cases/DevOps",
+            "use-cases/FinOps",
+            "use-cases/Governance"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Getting Started",
+      "pages": [
         "quickstart"
       ]
     },
     {
-      "group": "Connectors",
-      "pages": [
-        "connectors/AWS",
-        "connectors/github",
-        "connectors/slack"
-      ]
-    },
-    {
-      "group": "DevOps",
+      "group": "Kubernetes",
       "pages": [
         "devops/introduction"
       ]
     },
     {
-      "group": "FinOps",
+      "group": "Integrations",
       "pages": [
-        "finops/introduction"
+        {
+          "group": "Cloud Providers",
+          "pages": [
+            "connectors/AWS",
+            "connectors/GCP",
+            "connectors/Azure"
+          ]
+        },
+        {
+          "group": "Code Repositories",
+          "pages": [
+            "connectors/github",
+            "connectors/gitlab"
+          ]
+        },
+        {
+          "group": "Team Messengers",
+          "pages": [
+            "connectors/slack",
+            "connectors/Microsoft Teams"
+          ]
+        },
+        {
+          "group": "Ticketing",
+          "pages": [
+            "connectors/Linear",
+            "connectors/Jira"
+          ]
+        }
       ]
     }
   ],
   "footerSocials": {
+    "website": "https://gravitycloud.ai",
     "x": "https://x.com/gravitycloudai",
     "github": "https://github.com/gravitycloudai",
     "linkedin": "https://www.linkedin.com/company/gravity-cloud-ai/"
