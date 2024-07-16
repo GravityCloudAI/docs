@@ -54,10 +54,11 @@
         "introduction",
         {
           "group": "Use Cases",
+          "icon": "lightbulb",
           "pages": [
-            "use-cases/DevOps",
-            "use-cases/FinOps",
-            "use-cases/Governance"
+            "use-cases/devops",
+            "use-cases/finops",
+            "use-cases/governance"
           ]
         }
       ]
