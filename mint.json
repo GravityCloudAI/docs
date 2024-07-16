@@ -1,18 +1,23 @@
 {
   "$schema": "https://mintlify.com/schema.json",
   "name": "Gravity Cloud Documentation",
+  "backgroundImage": "/images/doc-bg.png",
   "logo": {
-    "dark": "/logo/dark.svg",
-    "light": "/logo/light.svg"
+    "dark": "/logo/logo-doc-dark.svg",
+    "light": "/logo/logo-doc-light.svg"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.png",
   "colors": {
     "primary": "#818aff",
     "light": "#818aff",
     "dark": "#818aff",
     "anchors": {
-      "from": "#818aff",
-      "to": "#818aff"
+      "to": "#5F37FF",
+      "from": "#818aff"
+    },
+    "background": {
+      "light": "#fff",
+      "dark": "#05050A"
     }
   },
   "topbarLinks": [
@@ -25,12 +30,6 @@
     "name": "Dashboard",
     "url": "https://console.gravitycloud.ai"
   },
-  "tabs": [
-    {
-      "name": "API Reference",
-      "url": "api-reference"
-    }
-  ],
   "anchors": [
     {
       "name": "Community",
@@ -54,7 +53,7 @@
     {
       "group": "Connectors",
       "pages": [
-        "connectors/aws",
+        "connectors/AWS",
         "connectors/github",
         "connectors/slack"
       ]
@@ -65,7 +64,7 @@
         "devops/introduction"
       ]
     },
-        {
+    {
       "group": "FinOps",
       "pages": [
         "finops/introduction"
