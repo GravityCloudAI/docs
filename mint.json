@@ -111,14 +111,6 @@
       "group": "Integrations",
       "pages": [
         {
-          "group": "Cloud Providers",
-          "pages": [
-            "connectors/AWS",
-            "connectors/GCP",
-            "connectors/Azure"
-          ]
-        },
-        {
           "group": "Code Repositories",
           "pages": [
             "connectors/github",
@@ -129,7 +121,7 @@
           "group": "Team Messengers",
           "pages": [
             "connectors/slack",
-            "connectors/Microsoft Teams"
+            "connectors/ms-teams"
           ]
         },
         {

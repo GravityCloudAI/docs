@@ -1,0 +1,73 @@
+---
+title: AWS ECS
+description: 'Launch new services using Gravity Stack'
+---
+
+## What is AWS ECS?
+Amazon Elastic Container Service (ECS) is a fully managed container orchestration service that makes it easy to deploy, manage, and scale containerized applications. ECS supports Docker containers and allows you to run applications on a managed cluster of Amazon EC2 instances or with AWS Fargate, a serverless compute engine.
+
+<img
+    className="block"
+    src="/images/ecs-aws.png"
+    alt="ECS Architecture Diagram"
+/>
+
+## Steps
+
+### Services Overview
+Gravity Cloud provides a clean, actinable and detailed overview of your current and new services. Giving you insights into:
+- Total running workloads
+- State for workloads
+- Enabling CI/CD
+
+![ECS Services Overview](https://res.cloudinary.com/dor5uewzz/image/upload/v1721402369/ECS/ecs-2_n4is9q.png)
+
+### Create a new Service
+Gravity Cloud provides UI to enable task definations creation and management is safe, fast and simple in a few clicks:
+
+1. Connect `Github Repo & Select branch`
+2. Create or Select ECS cluster
+3. Select workload configuration such as `Region, VPC, CPU, RAM or GPU`
+4. Enable auto-scaling
+
+![Launch new ECS Service Part 1](https://res.cloudinary.com/dor5uewzz/image/upload/v1721402370/ECS/ecs-0_c25djd.png)
+
+5. Provide service level details such as `Name, Port, Healthcheck` etc
+6. Configure `ENV variables in Key-Value` editor or copy the .env file into YAML editor. These ENV variables can be stored in KMS or Gravity Vault
+7. Launch your service on ECS!
+
+![Launch new ECS Service Part 2](https://res.cloudinary.com/dor5uewzz/image/upload/v1721402377/ECS/ecs-1_wufbys.png)
+
+<Note>Once launched, Gravity Cloud will automatically take care of Task Definations, LoadBalancers, Target groups, Security Groups without the team needing to manage them.</Note>
+
+### Setup CI/CD
+Setup automatic CI/CD in 1-click easily with previous state management via AWS ECR.
+
+<img
+    className="block"
+    src="/images/ecs-7.png"
+    alt="ECS Architecture Diagram"
+/>
+
+
+### Update Service Configuration
+Gravity cloud provides a comprehensive view and configuration options to manage your existing or new ECS services and Tasks:
+- Scale up or down your ECS services
+- Modify and Update ENV Variable with automatic deployment triggers
+
+![ECS Services Configuration](https://res.cloudinary.com/dor5uewzz/image/upload/v1721402367/ECS/ecs-3_ibtyks.png)
+
+### Service Rollbacks
+- Check deployments status, history and perform Rollbacks
+
+![ECS Services Rollbacks](https://res.cloudinary.com/dor5uewzz/image/upload/v1721402370/ECS/ecs-4_ikvjpd.png)
+
+### Service Monitoring
+- Validate Events and Tasks for any errors
+
+![ECS Services Monitoring](https://res.cloudinary.com/dor5uewzz/image/upload/v1721402368/ECS/ecs-5_flom2x.png)
+
+### Services Domain Management
+- Attach Route53 domains or External domains in 1 click 
+
+![ECS Services  Domain Management](https://res.cloudinary.com/dor5uewzz/image/upload/v1721402368/ECS/ecs-6_mgy29u.png)
