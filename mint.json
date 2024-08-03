@@ -66,7 +66,15 @@
     {
       "group": "Getting Started",
       "pages": [
-        "quickstart"
+        {
+          "group": "QuickStart",
+          "icon": "stars",
+          "pages": [
+            "quickstart-aws",
+            "quickstart-gcp",
+            "quickstart-azure"
+          ]
+        }
       ]
     },
     {
@@ -77,10 +85,24 @@
           "icon": "layer-group",
           "pages": [
             "automation/stacks/introduction",
-            "automation/stacks/resources/vpc",
-            "automation/stacks/resources/database",
-            "automation/stacks/resources/queue",
-            "automation/stacks/resources/cache"
+            {
+              "group": "Resources",
+              "icon":"database",
+              "pages": [
+                "automation/stacks/resources/vpc",
+                "automation/stacks/resources/database",
+                "automation/stacks/resources/queue",
+                "automation/stacks/resources/cache"
+              ]
+            },
+            {
+              "group": "Workloads",
+              "icon":"server",
+              "pages": [
+                "automation/stacks/workloads/ecs",
+                "automation/stacks/workloads/kubernetes"
+              ]
+            }
           ]
         }
       ]
