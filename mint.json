@@ -27,15 +27,10 @@
     }
   ],
   "topbarCtaButton": {
-    "name": "Dashboard",
+    "name": "Get Started",
     "url": "https://console.gravitycloud.ai"
   },
   "anchors": [
-    {
-      "name": "Demo Playground",
-      "icon": "stars",
-      "url": "https://demo.gravitycloud.ai/"
-    },
     {
       "name": "Blog",
       "icon": "newspaper",
@@ -45,6 +40,11 @@
       "name": "Github",
       "icon": "github",
       "url": "https://github.com/gravitycloudai"
+    },
+    {
+      "name": "Demo Playground",
+      "icon": "stars",
+      "url": "https://demo.gravitycloud.ai/"
     }
   ],
   "navigation": [
@@ -70,9 +70,19 @@
       ]
     },
     {
-      "group": "Kubernetes",
+      "group": "Automation",
       "pages": [
-        "devops/introduction"
+        {
+          "group": "Stacks",
+          "icon": "layer-group",
+          "pages": [
+            "automation/stacks/introduction",
+            "automation/stacks/resources/vpc",
+            "automation/stacks/resources/database",
+            "automation/stacks/resources/queue",
+            "automation/stacks/resources/cache"
+          ]
+        }
       ]
     },
     {

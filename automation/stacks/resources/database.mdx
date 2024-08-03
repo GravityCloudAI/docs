@@ -1,0 +1,58 @@
+---
+title: Databases
+icon: "database"
+description: 'Launch cloud resources with pre-built configurations'
+---
+
+## 1. AWS AuroraDB (PostgresSQL)
+
+Amazon Aurora PostgreSQL is a fully managed, PostgreSQL–compatible, and ACID–compliant relational database engine that combines the speed, reliability, and manageability of Amazon Aurora with the simplicity and cost-effectiveness of open-source databases.
+
+
+## Database Stack
+
+Use Gravity **Database Stack** to create a new private and secure database.
+
+<Note>This Stack will create 1 Aurora Cluster with 1 instance. More instances can be created from the Resouces page</Note>
+
+<img
+  className="block"
+  src="/images/db/aurora-postgres.png"
+  alt="Gravity Cloud Stacks"
+/>
+
+## Steps
+
+1. Visit https://console.gravitycloud.ai/stacks and then click on Setup for Database stack. Or directly visit: https://console.gravitycloud.ai/stacks?stackId=aurora-postgres-cluster-create
+
+<img
+  className="block"
+  src="/images/db/aurora-postgres-1.png"
+  alt="Gravity Cloud Stacks"
+/>
+
+2. Enter the `Cluster Name` and `Instance Name`
+3. Select `VPC` and `Region`
+4. Select the `instance capacity type` (CPU/RAM)
+5. Select `Engine Verion`. You can also keep the default value for the latest.
+6. Enter `UserName` and `Password`. SQL default Port is 5432, do not change unless needed.
+6. Select `Security Group configuration` along with data retention and backups.
+7. `Add tags`, basic tags for user are automatically added along with `Source:GravityCloud`
+8. Click on `Run Stack →`
+
+<img
+  className="block"
+  src="/images/db/aurora-postgres-2.png"
+  alt="Gravity Cloud Stacks"
+/>
+
+<Check>It takes 10-20 mins to provision all the required resources for the Database. Upon completion, you'll get a Slack Notification</Check>
+
+<img
+  className="block"
+  src="/images/db/aurora-slack-notif.png"
+  alt="Gravity Cloud Stacks"
+/>
+
+
+

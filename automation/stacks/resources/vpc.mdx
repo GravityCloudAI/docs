@@ -1,0 +1,54 @@
+---
+title: VPC
+icon: "network-wired"
+description: 'Create a private VPC using Gravity Stack'
+---
+
+## What is VPC?
+
+With Amazon Virtual Private Cloud (Amazon VPC), you can launch AWS resources in a logically isolated virtual network that you've defined. This virtual network closely resembles a traditional network that you'd operate in your own data center, with the benefits of using the scalable infrastructure of AWS.
+
+## VPC Stack
+
+Use Gravity **VPC Stack** to create a new Private VPC.
+
+<Note>This stack contains 1 VPC with 2 private subnets with 1 NAT Gateway and 2 public subnets with 1 Internet Gateway.</Note>
+
+<img
+  className="block"
+  src="/images/vpc/vpc-example-private-subnets.png"
+  alt="Gravity Cloud Stacks"
+/>
+
+## Steps
+
+1. Visit https://console.gravitycloud.ai/stacks and then click on Setup for VPC stack. Or directly visit: https://console.gravitycloud.ai/stacks?stackId=vpc-create
+
+<img
+  className="block"
+  src="/images/vpc/vpc-stack-1.png"
+  alt="Gravity Cloud Stacks"
+/>
+
+2. Enter the `VPC Name` (this can be changed later)
+3. `Select the Region` you want the VPC to be created in (cannot be changed later)
+4. Enter the `IPv4 CIDR block` (confirm for non-conflicting values)
+5. `Add tags`, basic tags for user are automatically added along with `Source:GravityCloud`
+6. Click on `Run Stack →`
+
+<img
+  className="block"
+  src="/images/vpc/vpc-stack-2.png"
+  alt="Gravity Cloud Stacks"
+/>
+
+<Check>It takes 5-10 mins to provision all the required resources for the VPC. Upon completion, you'll get a Slack Notification</Check>
+
+<img
+  className="block"
+  src="/images/vpc/vpc-slack-notif.png"
+  alt="Gravity Cloud Stacks"
+/>
+
+
+
