@@ -1,0 +1,28 @@
+---
+title: Kubernetes
+description: 'Launch, manage and scale your Kubernetes workloads with Gravity Stack'
+---
+
+## Gravity Kubernetes Dashboard
+Gravity Cloud provides a clean, actinable and detailed overview of your current and new services.
+
+<img
+    className="block"
+    src="https://res.cloudinary.com/dor5uewzz/image/upload/v1729341041/public/kubernetes_kf4qlj.png"
+    alt="Gravity Kubernetes Dashboard"
+/>
+
+### Features
+
+- **Overview** - View all your workloads and their states
+- **Cluster** - Manage your cluster details, costs and manage nodes
+- **Workloads** - Manage all your workloads such as pods, deployments, statefulsets, cronjobs and their states with logs
+- **Pipelines** - Manage your CI/CD pipelines, custom helm charts and feature/dev branches
+
+### Setup
+1. Integrate AWS EKS just by connecting your AWS account: https://docs.gravitycloud.ai/quickstart-aws
+2. Gravity Cloud will automatically detect your EKS cluster and start scraping it. This scraping is done by external agent so your k8s cluster does not incurr any additional resources.
+3. To enable workloads data, you need to give permissions to Gravity Cloud to access your cluster. You can do this by running the following command:
+```
+eksctl create iamidentitymapping --cluster CLUSTER_NAME --region=AWS_REGION --arn arn:aws:iam::AWS_ACCOUNT_ID:role/GravityCloudRole --username gravitycloud --group system:masters --no-duplicate-arns
+```
