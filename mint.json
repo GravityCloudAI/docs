@@ -56,9 +56,8 @@
           "group": "Use Cases",
           "icon": "lightbulb",
           "pages": [
-            "use-cases/devops",
-            "use-cases/finops",
-            "use-cases/governance"
+            "use-cases/ai-code-review-agent",
+            "use-cases/devops"
           ]
         }
       ]
@@ -70,6 +69,7 @@
           "group": "QuickStart",
           "icon": "stars",
           "pages": [
+            "quickstart-ai-code-review-agent",
             "quickstart-aws",
             "quickstart-gcp",
             "quickstart-azure"
