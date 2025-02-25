@@ -3,8 +3,8 @@
   "name": "Matter Documentation",
   "backgroundImage": "/images/doc-bg.png",
   "logo": {
-    "dark": "/logo/logo-doc-dark.svg",
-    "light": "/logo/logo-doc-light.svg"
+    "dark": "/logo/logo-dark.svg",
+    "light": "/logo/logo-light.svg"
   },
   "favicon": "/favicon.png",
   "colors": {
