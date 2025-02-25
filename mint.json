@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "Gravity Cloud Documentation",
+  "name": "Matter Documentation",
   "backgroundImage": "/images/doc-bg.png",
   "logo": {
     "dark": "/logo/logo-doc-dark.svg",
@@ -8,12 +8,12 @@
   },
   "favicon": "/favicon.png",
   "colors": {
-    "primary": "#818aff",
-    "light": "#818aff",
-    "dark": "#818aff",
+    "primary": "#3AFFA3",
+    "light": "#3AFFA3",
+    "dark": "#05050A",
     "anchors": {
-      "to": "#5F37FF",
-      "from": "#818aff"
+      "to": "#147e4d",
+      "from": "#3AFFA3"
     },
     "background": {
       "light": "#fff",
@@ -27,8 +27,8 @@
     }
   ],
   "topbarCtaButton": {
-    "name": "Get Started",
-    "url": "https://console.gravitycloud.ai"
+    "type": "github",
+    "url": "https://github.com/GravityCloudAI/matter-ai"
   },
   "anchors": [
     {
@@ -39,12 +39,12 @@
     {
       "name": "Github",
       "icon": "github",
-      "url": "https://github.com/gravitycloudai"
+      "url": "https://github.com/gravitycloudai/matter-ai"
     },
     {
       "name": "Demo Playground",
       "icon": "stars",
-      "url": "https://demo.gravitycloud.ai/"
+      "url": "https://demo.gravitycloud.ai"
     }
   ],
   "navigation": [
@@ -56,8 +56,7 @@
           "group": "Use Cases",
           "icon": "lightbulb",
           "pages": [
-            "use-cases/ai-code-review-agent",
-            "use-cases/devops"
+            "use-cases/ai-code-review-agent"
           ]
         }
       ]
@@ -69,40 +68,7 @@
           "group": "QuickStart",
           "icon": "stars",
           "pages": [
-            "quickstart-ai-code-review-agent",
-            "quickstart-aws",
-            "quickstart-gcp",
-            "quickstart-azure"
-          ]
-        }
-      ]
-    },
-    {
-      "group": "Automation",
-      "pages": [
-        {
-          "group": "Stacks",
-          "icon": "layer-group",
-          "pages": [
-            "automation/stacks/introduction",
-            {
-              "group": "Resources",
-              "icon":"database",
-              "pages": [
-                "automation/stacks/resources/vpc",
-                "automation/stacks/resources/database",
-                "automation/stacks/resources/queue",
-                "automation/stacks/resources/cache"
-              ]
-            },
-            {
-              "group": "Workloads",
-              "icon":"server",
-              "pages": [
-                "automation/stacks/workloads/ecs",
-                "automation/stacks/workloads/kubernetes"
-              ]
-            }
+            "quickstart-ai-code-review-agent"
           ]
         }
       ]
