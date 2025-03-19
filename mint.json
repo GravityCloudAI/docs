@@ -40,11 +40,6 @@
       "name": "Github",
       "icon": "github",
       "url": "https://github.com/gravitycloudai/matter-ai"
-    },
-    {
-      "name": "Demo Playground",
-      "icon": "stars",
-      "url": "https://demo.gravitycloud.ai"
     }
   ],
   "navigation": [
@@ -56,7 +51,8 @@
           "group": "Use Cases",
           "icon": "lightbulb",
           "pages": [
-            "use-cases/ai-code-review-agent"
+            "use-cases/ai-code-review-agent",
+            "use-cases/ai-summary-generation"
           ]
         }
       ]
@@ -68,7 +64,8 @@
           "group": "QuickStart",
           "icon": "stars",
           "pages": [
-            "quickstart-ai-code-review-agent"
+            "quickstart-ai-code-review-agent",
+            "quickstart-ai-code-review-cli"
           ]
         }
       ]

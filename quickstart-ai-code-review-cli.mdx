@@ -1,0 +1,86 @@
+---
+title: 'AI Code Review CLI'
+icon: "terminal"
+description: 'Installation Guide for AI Code Review CLI'
+---
+## Installation
+
+<Note>
+The Matter AI CLI is a command line tool that allows you to locally generate PR Description and Checklist. Official Link: [https://www.npmjs.com/package/matter-ai-cli](https://www.npmjs.com/package/matter-ai-cli)
+</Note>
+
+<Steps>
+
+<Step title="Install the Matter AI CLI from NPM">
+```bash
+npm install -g matter-ai
+```
+</Step>
+<Step title="Generate a new Github Personal Access Token (Classic)">
+Generate a new Github Personal Access Token here [https://github.com/settings/tokens](https://github.com/settings/tokens) with the following permissions:
+<Frame>
+<img
+  className="block"
+  src="/images/cli/matter-cli-github-token.png"
+  alt="Gravity Cloud Github Connect"
+/>
+</Frame>
+</Step>
+<Step title="Run the CLI">
+1. Go to the directory of the repository you want to analyze.
+2. Run the CLI with the following command:
+```bash
+matter
+```
+3. Enter the Github Personal Access Token when prompted.
+</Step>
+<Step title="Select the Pull Request">
+Select the Pull Request you want to analyze from the list of Pull Requests.
+<Frame>
+<img
+  className="block"
+  src="/images/cli/matter-cli-pr-select.png"
+  alt="Gravity Cloud Github Connect"
+/>
+</Frame>
+</Step>
+<Step title="Select the AI Summary Generation">
+Select the AI Summary option from the list of options.
+<Frame>
+<img
+  className="block"
+  src="/images/cli/matter-cli-pr-generate-summary.png"
+  alt="Gravity Cloud Github Connect"
+/>
+</Frame>
+</Step>
+<Step title="Enter OpenAI API Key">
+Enter the OpenAI API Key when prompted. Or you can set the `OPENAI_API_KEY` environment variable.
+<Frame>
+<img
+  className="block"
+  src="/images/cli/matter-cli-open-ai.png"
+  alt="Gravity Cloud Github Connect"
+/>
+</Frame>
+</Step>
+<Step title="Your AI Generated Summary is Ready">
+Your AI Generated Summary is ready in markdown format!
+<Frame>
+<img
+  className="block"
+  src="/images/cli/matter-cli-pr-summary.png"
+  alt="Gravity Cloud Github Connect"
+/>
+</Frame>
+</Step>
+</Steps>
+
+### Pro Features
+The CLI is free to use, but you can upgrade to the Pro version to get more features:
+1. Automatic AI Summary Generation on every PR and commits
+2. AI Code Review on every PR and commits
+3. AI Explanation on every PR and commits
+4. Team-level analytics and insights
+
+> You can get started by visiting [https://matterai.dev](https://matterai.dev)
