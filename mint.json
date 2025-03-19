@@ -23,7 +23,7 @@
   "topbarLinks": [
     {
       "name": "Support",
-      "url": "support@gravitycloud.ai"
+      "url": "support@matterai.dev"
     }
   ],
   "topbarCtaButton": {
@@ -34,7 +34,7 @@
     {
       "name": "Blog",
       "icon": "newspaper",
-      "url": "https://gravitycloud.ai/blog"
+      "url": "https://matterai.dev/blog"
     },
     {
       "name": "Github",
@@ -98,9 +98,9 @@
     }
   ],
   "footerSocials": {
-    "website": "https://gravitycloud.ai",
-    "x": "https://x.com/gravitycloudai",
+    "website": "https://matterai.dev",
+    "x": "https://x.com/matteraidev",
     "github": "https://github.com/gravitycloudai",
-    "linkedin": "https://www.linkedin.com/company/gravity-cloud-ai/"
+    "linkedin": "https://www.linkedin.com/company/matter-ai-dev"
   }
 }
