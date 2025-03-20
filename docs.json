@@ -1,0 +1,152 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Matter AI | Code Reviewer Documentation",
+  "description": "Matter AI is an intelligent pull request assistant designed to streamline code reviews, enhance collaboration, and improve code quality using AI. It automatically generates detailed PR summaries, detects performance, security, and bug-related issues in code, and helps reviewers understand complex changes faster with AI-powered explanations. By integrating seamlessly into your workflow, Matter AI reduces review time, prevents costly errors, and ensures a smoother development process—so your team can focus on building, not battling PR bottlenecks.",
+  "colors": {
+    "primary": "#008a4a",
+    "light": "#3AFFA3",
+    "dark": "#05050A"
+  },
+  "fonts": {
+    "family": "Inter"
+  },
+  "seo": {
+    "metatags": {
+      "og:image": "https://res.cloudinary.com/dor5uewzz/image/upload/v1742408026/og-image-matter_qisnai.png",
+      "og:title": "Matter AI | Code Reviewer Documentation",
+      "og:description": "Matter AI is an intelligent pull request assistant designed to streamline code reviews, enhance collaboration, and improve code quality using AI. It automatically generates detailed PR summaries, detects performance, security, and bug-related issues in code, and helps reviewers understand complex changes faster with AI-powered explanations. By integrating seamlessly into your workflow, Matter AI reduces review time, prevents costly errors, and ensures a smoother development process—so your team can focus on building, not battling PR bottlenecks.",
+      "og:url": "https://docs.matterai.dev",
+      "twitter:title": "Matter AI | Code Reviewer Documentation",
+      "twitter:description": "Matter AI is an intelligent pull request assistant designed to streamline code reviews, enhance collaboration, and improve code quality using AI. It automatically generates detailed PR summaries, detects performance, security, and bug-related issues in code, and helps reviewers understand complex changes faster with AI-powered explanations. By integrating seamlessly into your workflow, Matter AI reduces review time, prevents costly errors, and ensures a smoother development process—so your team can focus on building, not battling PR bottlenecks.",
+      "twitter:image": "https://res.cloudinary.com/dor5uewzz/image/upload/v1742408026/og-image-matter_qisnai.png",
+      "twitter:url": "https://x.com/matteraidev"
+    }
+  },
+  "search": {
+    "prompt": "Search Matter AI Documentation..."
+  },
+  "integrations": {
+    "plausible": {
+      "domain": "docs.matterai.dev",
+      "server": "plausible.gravitycloud.ai"
+    }
+  },
+  "styling": {
+    "eyebrows": "breadcrumbs"
+  },
+  "favicon": "/favicon.png",
+  "navigation": {
+    "anchors": [
+      {
+        "anchor": "Documentation",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": [
+              "introduction",
+              {
+                "group": "Use Cases",
+                "icon": "lightbulb",
+                "pages": [
+                  "use-cases/ai-code-review-agent",
+                  "use-cases/ai-summary-generation"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              {
+                "group": "QuickStart",
+                "icon": "stars",
+                "pages": [
+                  "quickstart-ai-code-review-agent",
+                  "quickstart-ai-code-review-cli"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              {
+                "group": "Code Repositories",
+                "pages": [
+                  "connectors/github",
+                  "connectors/gitlab"
+                ]
+              },
+              {
+                "group": "Team Messengers",
+                "pages": [
+                  "connectors/slack",
+                  "connectors/ms-teams"
+                ]
+              },
+              {
+                "group": "Ticketing",
+                "pages": [
+                  "connectors/Linear",
+                  "connectors/Jira"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Blog",
+          "href": "https://matterai.dev/blog",
+          "icon": "newspaper"
+        },
+        {
+          "anchor": "Github",
+          "href": "https://github.com/gravitycloudai/matter-ai",
+          "icon": "github"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/logo-light.svg",
+    "dark": "/logo/logo-dark.svg"
+  },
+  "background": {
+    "decoration": "gradient",
+    "color": {
+      "light": "#fff",
+      "dark": "#05050A"
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Contact",
+        "href": "https://matterai.dev/contact"
+      },
+      {
+        "label": "Github",
+        "href": "https://github.com/GravityCloudAI/matter-ai"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Sign in",
+      "href": "https://app.matterai.dev"
+    }
+  },
+  "footer": {
+    "socials": {
+      "website": "https://matterai.dev",
+      "x": "https://x.com/matteraidev",
+      "github": "https://github.com/gravitycloudai",
+      "linkedin": "https://www.linkedin.com/company/matter-ai-dev"
+    }
+  }
+}
