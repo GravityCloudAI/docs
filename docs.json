@@ -94,6 +94,21 @@
                 ]
               }
             ]
+          },
+          {
+            "group": "Enterprise",
+            "pages": [
+              "enterprise/get-started",
+              "enterprise/create-your-own-github-app",
+              {
+                "group": "Self-Hosting Options",
+                "pages": [
+                  "enterprise/self-hosted-docker-compose",
+                  "enterprise/self-hosted-helm-chart"
+                ]
+              },
+              "enterprise/configure"
+            ]
           }
         ]
       }

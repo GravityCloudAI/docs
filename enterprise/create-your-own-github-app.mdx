@@ -1,0 +1,104 @@
+---
+title: 'Create Your Own GitHub App'
+description: 'Set up a custom GitHub App to deploy Matter AI in your own environment'
+---
+
+This guide walks you through the process of creating and configuring your own GitHub App for Matter AI, giving you complete control over permissions and data access.
+
+## Prerequisites
+
+- GitHub organization or personal account with admin privileges
+
+## Step 1: Register a New GitHub App
+
+1. Navigate to your GitHub organization settings (or personal settings)
+2. Select **Developer settings** > **GitHub Apps** > **New GitHub App**
+3. Configure the basic app settings:
+   - **GitHub App name**: Choose a descriptive name (e.g., "YourCompany Matter AI")
+   - **Homepage URL**: Your company website or internal documentation URL
+   - **Webhook URL**: The URL where Matter AI will receive webhook events (you'll configure this later)
+   - **Webhook secret**: Generate a secure random string to validate webhook payloads
+
+<Note>
+Keep your webhook secret secure. You'll need to provide this to your Matter AI instance during configuration.
+</Note>
+
+## Step 2: Set Required Permissions
+
+Matter AI requires specific permissions to function properly. Configure the following permission settings:
+
+### Repository Permissions
+
+<Frame>
+<img 
+className="block"
+src="/images/enterprise/github-app-repo-permissions-1.png" alt="GitHub App Permissions" />
+</Frame>
+
+<br />
+
+<Frame>
+<img
+  className="block"
+  src="/images/enterprise/github-app-repo-permissions-2.png" alt="GitHub App Permissions" />
+
+</Frame>
+
+### Organization Permissions
+
+<Frame>
+<img src="/images/enterprise/github-app-org-permissions-1.png" alt="GitHub App Permissions" />
+
+</Frame>
+
+### Account Permissions
+
+<Frame>
+<img src="/images/enterprise/github-app-account-permissions-1.png" alt="GitHub App Permissions" />
+</Frame>
+
+### Subscribe to Events
+
+Enable the following webhook events:
+
+<Frame>
+<img src="/images/enterprise/github-app-webhook-events-1.png" alt="GitHub App Events" />
+</Frame>
+
+<br />
+
+<Frame>
+<img src="/images/enterprise/github-app-webhook-events-2.png" alt="GitHub App Events" />
+
+</Frame>
+
+## Step 3: Generate Private Key
+
+1. After creating the app, scroll down to the "Private keys" section
+2. Click **Generate a private key**
+3. Save the downloaded `.pem` file securely
+
+<Warning>
+The private key is generated only once and cannot be recovered if lost. Store it securely as you would any sensitive credential.
+</Warning>
+
+## Step 4: Install the GitHub App
+
+1. Navigate to your GitHub App's settings page
+2. Click on **Install App** in the sidebar
+3. Choose the organization or account where you want to install the app
+4. Select the repositories you want Matter AI to have access to
+   - You can choose specific repositories or grant access to all repositories
+
+## Next Steps
+
+Now that you've created your GitHub App, you can proceed to deploy Matter AI using one of our self-hosting options:
+
+<CardGroup cols={2}>
+  <Card title="Docker Compose Deployment" icon="docker" href="/enterprise/self-hosted-docker-compose">
+    Deploy Matter AI using Docker Compose
+  </Card>
+  <Card title="Kubernetes Deployment" icon="dharmachakra" href="/enterpise/self-hosted-helm-chart">
+    Deploy Matter AI on Kubernetes using Helm charts
+  </Card>
+</CardGroup>
