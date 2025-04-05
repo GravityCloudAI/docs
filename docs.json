@@ -70,6 +70,14 @@
             ]
           },
           {
+            "group": "Product",
+            "pages": [
+              "product/security-analysis",
+              "product/code-quality",
+              "product/command-list"
+            ]
+          },
+          {
             "group": "Integrations",
             "pages": [
               {

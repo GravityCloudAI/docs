@@ -1,0 +1,178 @@
+---
+icon: shield-check
+title: 'Security Analysis'
+description: 'Learn how Matter AI helps in security analysis and fix'
+---
+
+This guide walks you through the security analysis features of Matter AI, which helps identify and fix security vulnerabilities in your code.
+
+## Static Code Analysis
+
+Understand the security vulnerabilities in your code at multiple levels from SQL injection to XSS and more with Code-Suggestion fixes.
+
+<Frame>
+<img
+  className="block"
+  src="/images/product/static-code-analysis.png"
+  alt="Matter AI Static Code Analysis"
+/>
+</Frame>
+
+### Some examples
+
+<AccordionGroup>
+  <Accordion title="Input Validation Issues" icon="shield-exclamation">
+    - Lack of proper input sanitization leading to injection attacks
+    ```python
+    # Vulnerable: directly using user input in shell commands
+    os.system("analyze_code " + user_provided_filename)
+    ```
+
+    - Failure to validate file paths or file contents before processing
+    ```java
+    // Vulnerable: path traversal vulnerability
+    File docFile = new File(basePath + userProvidedPath);
+    FileInputStream fis = new FileInputStream(docFile);
+    ```
+  </Accordion>
+
+  <Accordion title="Authentication and Authorization Flaws" icon="lock-open">
+    - Hardcoded credentials in documentation generation code
+    ```javascript
+    // Vulnerable: hardcoded credentials
+    const apiKey = "1a2b3c4d5e6f7g8h9i0j";
+    const apiSecret = "secret_token_should_not_be_here";
+    ```
+
+    - Insufficient access controls for documentation endpoints
+    ```python
+    # Vulnerable: missing permission checks
+    @app.route('/admin/update_docs', methods=['POST'])
+    def update_docs():
+        update_documentation(request.form['content'])
+        return redirect('/docs')
+    ```
+  </Accordion>
+
+  <Accordion title="Documentation Content Security" icon="code">
+    - Cross-site scripting (XSS) vulnerabilities when displaying user-contributed code examples
+    ```html
+    <!-- Vulnerable: unescaped user content -->
+    <div class="code-example">
+      <%= user_submitted_code %>
+    </div>
+    ```
+
+    - Missing content security policies for rendered documentation
+    ```html
+    <!-- Vulnerable: missing CSP headers -->
+    <head>
+      <title>Code Analysis Documentation</title>
+      <script src="https://untrusted-cdn.example.com/script.js"></script>
+    </head>
+    ```
+  </Accordion>
+
+  <Accordion title="Data Handling Issues" icon="database">
+    - Leakage of sensitive information in error messages or logs
+    ```python
+    # Vulnerable: exposing detailed errors
+    try:
+        process_code_analysis(file_path)
+    except Exception as e:
+        return jsonify({"error": str(e), "stack": traceback.format_exc()})
+    ```
+
+    - Insecure storage of user preferences or documentation settings
+    ```javascript
+    // Vulnerable: storing sensitive data in localStorage
+    localStorage.setItem("auth_token", userAuthToken);
+    localStorage.setItem("api_key", userApiKey);
+    ```
+  </Accordion>
+
+  <Accordion title="Integration Vulnerabilities" icon="link">
+    - Insecure communication with code repositories or analysis backends
+    ```python
+    # Vulnerable: unverified TLS
+    import requests
+    requests.get('https://api.codeanalysis.com/results', 
+                 verify=False)
+    ```
+
+    - Path traversal vulnerabilities when importing external content
+    ```php
+    // Vulnerable: unsanitized user input in file operations
+    $template = $_GET['template'];
+    include("templates/" . $template . ".php");
+    ```
+  </Accordion>
+
+  <Accordion title="Configuration Management" icon="gear">
+    - Insecure default settings that expose sensitive analysis results
+    ```yaml
+    # Vulnerable: overly permissive default configuration
+    security:
+      public_results: true
+      require_auth: false
+      debug_mode: true
+    ```
+
+    - Insufficient protection of configuration files containing sensitive information
+    ```bash
+    # Vulnerable: incorrect file permissions
+    chmod 777 /var/www/config/database.ini
+    chmod 777 /var/www/config/api_keys.json
+    ```
+  </Accordion>
+
+  <Accordion title="Third-Party Dependencies" icon="box-open">
+    - Use of outdated libraries with known vulnerabilities
+    ```json
+    {
+      "dependencies": {
+        "outdated-markdown-parser": "1.2.3",
+        "vulnerable-code-highlighter": "0.9.1"
+      }
+    }
+    ```
+
+    - Insufficient validation of plugin or extension integrity
+    ```javascript
+    // Vulnerable: loading extensions without verification
+    function loadExtension(extensionUrl) {
+      const script = document.createElement('script');
+      script.src = extensionUrl;
+      document.head.appendChild(script);
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Package Vulnerabilities Detection
+
+Understand the package vulnerabilities in your Pull Requests and get fixes with recommendation versions.
+
+<Frame>
+<img
+  className="block"
+  src="/images/product/package-vulnerabilities.png"
+  alt="Matter AI Package Vulnerabilities"
+/>
+</Frame>
+
+### Some examples
+
+<AccordionGroup>
+  <Accordion title="Third-Party Dependencies" icon="box-open">
+    - Use of outdated libraries with known vulnerabilities
+    ```json
+    {
+      "dependencies": {
+        "outdated-markdown-parser": "1.2.3",
+        "vulnerable-code-highlighter": "0.9.1"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
