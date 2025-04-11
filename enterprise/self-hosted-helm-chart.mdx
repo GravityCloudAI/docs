@@ -80,7 +80,7 @@ components:
             - path: /
               pathType: Prefix
       tls:
-        - secretName: matterai-tls
+        - secretName: matterai-backend-tls
           hosts:
             - matterai.example.com
   matterFrontend:
@@ -115,8 +115,8 @@ components:
     service:
       name: matter-frontend-service
       type: ClusterIP
-      port: 3000
-      targetPort: 3000
+      port: 80
+      targetPort: 80
     ingress:
       enabled: false
       className: "nginx"
@@ -128,7 +128,7 @@ components:
             - path: /
               pathType: Prefix
       tls:
-        - secretName: matterai-tls
+        - secretName: matterai-frontend-tls
           hosts:
             - matterai.example.com
   postgres:
