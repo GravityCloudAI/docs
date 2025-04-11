@@ -107,6 +107,8 @@
             "group": "Enterprise",
             "pages": [
               "enterprise/get-started",
+              "enterprise/configure",
+              "enterprise/observabilty-and-fallbacks",
               "enterprise/create-your-own-github-app",
               {
                 "group": "Self-Hosting Options",
@@ -114,8 +116,7 @@
                   "enterprise/self-hosted-docker-compose",
                   "enterprise/self-hosted-helm-chart"
                 ]
-              },
-              "enterprise/configure"
+              }
             ]
           }
         ]
