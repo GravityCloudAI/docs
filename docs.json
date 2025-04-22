@@ -76,6 +76,7 @@
               "product/code-quality",
               "product/rulesets",
               "product/memories",
+              "product/analytics",
               "product/command-list"
             ]
           },
