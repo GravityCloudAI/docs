@@ -142,6 +142,59 @@
                   "languages/vhdl",
                   "languages/zig"
                 ]
+              },
+              {
+                "group": "Security",
+                "icon": "shield-quartered",
+                "pages": [
+                  "security/injection",
+                  "security/authentication",
+                  "security/authorization",
+                  "security/cryptography",
+                  "security/data-protection",
+                  "security/input-validation",
+                  "security/session-management",
+                  "security/error-handling",
+                  "security/logging",
+                  "security/configuration",
+                  "security/file-handling",
+                  "security/memory-management",
+                  "security/api-security",
+                  "security/cross-site-scripting",
+                  "security/cross-site-request-forgery",
+                  "security/insecure-deserialization",
+                  "security/security-misconfiguration",
+                  "security/broken-access-control",
+                  "security/sensitive-data-exposure",
+                  "security/xml-vulnerabilities",
+                  "security/regex-denial-of-service"
+                ]
+              },
+              {
+                "group": "Performance",
+                "icon": "bolt",
+                "pages": [
+                  "performance/cpu-intensive-operations",
+                  "performance/memory-leaks",
+                  "performance/inefficient-algorithms",
+                  "performance/database-performance",
+                  "performance/network-bottlenecks",
+                  "performance/resource-contention",
+                  "performance/inefficient-data-structures",
+                  "performance/excessive-object-creation",
+                  "performance/synchronization-issues",
+                  "performance/io-bottlenecks",
+                  "performance/string-manipulation",
+                  "performance/inefficient-loops",
+                  "performance/lazy-loading-issues",
+                  "performance/caching-problems",
+                  "performance/ui-rendering-bottlenecks",
+                  "performance/serialization-overhead",
+                  "performance/logging-overhead",
+                  "performance/reflection-misuse",
+                  "performance/thread-pool-issues",
+                  "performance/garbage-collection-issues"
+                ]
               }
             ]
           },

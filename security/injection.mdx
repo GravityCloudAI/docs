@@ -1,0 +1,532 @@
+---
+title: 'Injection Vulnerabilities'
+description: 'Injection vulnerabilities occur when untrusted data is sent to an interpreter as part of a command or query, allowing attackers to execute unintended commands or access unauthorized data.'
+---
+
+<AccordionGroup>
+  <Accordion title="Injection Vulnerabilities Overview" icon="shield-xmark">
+    Injection vulnerabilities are among the most common and dangerous security flaws. They occur when an application sends untrusted data to an interpreter without proper validation or sanitization. This allows attackers to inject malicious code that can manipulate the interpreter into executing unintended commands or accessing data without proper authorization.
+    
+    Common types of injection vulnerabilities include SQL injection, NoSQL injection, OS command injection, LDAP injection, and template injection. These vulnerabilities can lead to data theft, data loss, data corruption, denial of service, or complete host takeover.
+  </Accordion>
+  
+  <Accordion title="SQL Injection" icon="database">
+    ```sql
+    // Anti-pattern: Concatenating user input directly into SQL queries
+    function getUserData(username) {
+      const query = "SELECT * FROM users WHERE username = '" + username + "'";
+      return db.execute(query);
+    }
+    
+    // Better approach: Using parameterized queries
+    function getUserData(username) {
+      const query = "SELECT * FROM users WHERE username = ?";
+      return db.execute(query, [username]);
+    }
+    ```
+    
+    SQL Injection occurs when user-supplied data is not properly validated and is directly included in SQL queries. This can allow attackers to manipulate the query's logic, bypass authentication, access sensitive data, or even delete data.
+    
+    To prevent SQL injection:
+    - Use parameterized queries or prepared statements
+    - Apply input validation and sanitization
+    - Use stored procedures
+    - Implement least privilege principles for database accounts
+    - Use an ORM (Object-Relational Mapping) framework that handles parameter sanitization
+  </Accordion>
+  
+  <Accordion title="NoSQL Injection" icon="database">
+    ```javascript
+    // Anti-pattern: Directly using user input in NoSQL queries
+    app.post('/login', (req, res) => {
+      const { username, password } = req.body;
+      const query = { username: username, password: password };
+      db.collection('users').findOne(query, (err, user) => {
+        // Handle login
+      });
+    });
+    
+    // Better approach: Validate and sanitize input
+    app.post('/login', (req, res) => {
+      const username = validateUsername(req.body.username);
+      const password = validatePassword(req.body.password);
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Invalid input' });
+      }
+      const query = { username: username, password: hashPassword(password) };
+      db.collection('users').findOne(query, (err, user) => {
+        // Handle login
+      });
+    });
+    ```
+    
+    NoSQL Injection attacks target applications that use NoSQL databases like MongoDB, Cassandra, or Redis. Attackers can inject operators or modify the query structure to manipulate the application's logic.
+    
+    To prevent NoSQL injection:
+    - Validate and sanitize all user inputs
+    - Use type checking
+    - Avoid using operators directly from user input
+    - Implement proper authentication and authorization
+    - Use MongoDB's aggregation framework instead of direct queries when possible
+  </Accordion>
+  
+  <Accordion title="OS Command Injection" icon="terminal">
+    ```python
+    # Anti-pattern: Directly using user input in system commands
+    def ping_host(host):
+        command = "ping -c 1 " + host
+        return os.system(command)
+    
+    # Better approach: Validate input and use safer alternatives
+    def ping_host(host):
+        if not re.match(r'^[a-zA-Z0-9.]+$', host):
+            raise ValueError("Invalid hostname")
+        return subprocess.run(["ping", "-c", "1", host], capture_output=True, text=True)
+    ```
+    
+    OS Command Injection occurs when an application passes unsafe user-supplied data to a system shell for execution. Attackers can inject additional commands to be executed with the privileges of the application.
+    
+    To prevent OS Command Injection:
+    - Avoid calling OS commands directly when possible
+    - Use safer library alternatives instead of shell commands
+    - If OS commands must be used, validate and sanitize all inputs
+    - Use allowlists for permitted characters or commands
+    - Implement proper privilege separation
+    - Use subprocess modules with arrays instead of string commands
+  </Accordion>
+  
+  <Accordion title="LDAP Injection" icon="sitemap">
+    ```java
+    // Anti-pattern: Directly using user input in LDAP queries
+    String username = request.getParameter("username");
+    String filter = "(uid=" + username + ")";
+    NamingEnumeration<SearchResult> results = ctx.search("ou=users,dc=example,dc=com", filter, searchControls);
+    
+    // Better approach: Escape special characters in LDAP filters
+    String username = request.getParameter("username");
+    String escapedUsername = LdapEncoder.filterEncode(username);
+    String filter = "(uid=" + escapedUsername + ")";
+    NamingEnumeration<SearchResult> results = ctx.search("ou=users,dc=example,dc=com", filter, searchControls);
+    ```
+    
+    LDAP Injection occurs when an application fails to properly sanitize user input before using it in LDAP statements. This can allow attackers to modify LDAP statements to bypass authentication or access unauthorized information.
+    
+    To prevent LDAP Injection:
+    - Validate and sanitize all user inputs
+    - Use LDAP-specific encoding functions to escape special characters
+    - Implement proper authentication and authorization
+    - Use bind variables where possible
+    - Apply the principle of least privilege for LDAP accounts
+  </Accordion>
+  
+  <Accordion title="Template Injection" icon="code">
+    ```javascript
+    // Anti-pattern: Directly using user input in template engines
+    app.get('/greet', (req, res) => {
+      const name = req.query.name;
+      const template = `<h1>Hello, ${name}!</h1>`;
+      res.send(template);
+    });
+    
+    // Better approach: Use a template engine with context-specific escaping
+    app.get('/greet', (req, res) => {
+      const name = req.query.name;
+      res.render('greeting', { name: name });
+    });
+    ```
+    
+    Template Injection occurs when user input is embedded directly into templates before they are rendered. If the template engine evaluates expressions, attackers can inject code that will be executed by the template engine.
+    
+    To prevent Template Injection:
+    - Never allow users to modify or submit templates
+    - Use a template engine that automatically escapes output
+    - Apply context-specific escaping
+    - Sandbox template execution environments
+    - Minimize the use of dangerous template features (like eval or execute)
+  </Accordion>
+  
+  <Accordion title="XML Injection" icon="file-code">
+    ```java
+    // Anti-pattern: Directly using user input in XML documents
+    String username = request.getParameter("username");
+    String xml = "<user><username>" + username + "</username></user>";
+    Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
+    
+    // Better approach: Use proper XML encoding
+    String username = request.getParameter("username");
+    Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+    Element root = doc.createElement("user");
+    Element usernameElement = doc.createElement("username");
+    usernameElement.setTextContent(username);
+    root.appendChild(usernameElement);
+    doc.appendChild(root);
+    ```
+    
+    XML Injection occurs when untrusted data is inserted into an XML document without proper encoding. This can lead to malformed XML documents or, in some cases, the execution of malicious code.
+    
+    To prevent XML Injection:
+    - Use XML libraries to create XML documents instead of string concatenation
+    - Apply proper XML encoding for special characters
+    - Validate XML against a strict schema
+    - Implement XML parser hardening
+    - Disable external entity processing
+  </Accordion>
+  
+  <Accordion title="Code Injection" icon="code">
+    ```php
+    // Anti-pattern: Using eval with user input
+    function calculate($expression) {
+      return eval("return " . $expression . ";");
+    }
+    
+    // Better approach: Use a safer alternative
+    function calculate($expression) {
+      $allowed_chars = '/^[0-9+\-*\/()\. ]+$/';
+      if (!preg_match($allowed_chars, $expression)) {
+        throw new Exception("Invalid expression");
+      }
+      return eval("return " . $expression . ";");
+    }
+    
+    // Even better: Use a dedicated expression evaluator library
+    function calculate($expression) {
+      $calculator = new MathCalculator();
+      return $calculator->evaluate($expression);
+    }
+    ```
+    
+    Code Injection occurs when an application executes user-supplied code. This is often done through functions like `eval()` in various programming languages. This vulnerability can lead to complete system compromise.
+    
+    To prevent Code Injection:
+    - Avoid using dynamic code execution functions like `eval()`
+    - If dynamic code execution is necessary, implement strict input validation
+    - Use safer alternatives like expression evaluators or template engines
+    - Implement proper sandboxing and isolation
+    - Apply the principle of least privilege
+  </Accordion>
+  
+  <Accordion title="HTTP Header Injection" icon="globe">
+    ```php
+    // Anti-pattern: Directly using user input in HTTP headers
+    $redirect_url = $_GET['url'];
+    header("Location: " . $redirect_url);
+    
+    // Better approach: Validate the URL and use absolute URLs
+    $redirect_url = $_GET['url'];
+    if (!filter_var($redirect_url, FILTER_VALIDATE_URL)) {
+      $redirect_url = '/default-page.php';
+    }
+    header("Location: " . $redirect_url);
+    ```
+    
+    HTTP Header Injection occurs when an application includes untrusted data in HTTP response headers. This can lead to response splitting attacks, cache poisoning, or cross-site scripting.
+    
+    To prevent HTTP Header Injection:
+    - Validate and sanitize all user inputs used in HTTP headers
+    - Remove or encode CR and LF characters (\r, \n)
+    - Use framework functions that handle header encoding
+    - Implement proper output encoding
+    - Use allowlists for redirect URLs
+  </Accordion>
+  
+  <Accordion title="Path Traversal Injection" icon="folder-tree">
+    ```java
+    // Anti-pattern: Directly using user input in file paths
+    String fileName = request.getParameter("filename");
+    File file = new File("/var/data/" + fileName);
+    FileInputStream fis = new FileInputStream(file);
+    
+    // Better approach: Validate and sanitize file paths
+    String fileName = request.getParameter("filename");
+    if (!fileName.matches("[a-zA-Z0-9_-]+\\.[a-zA-Z0-9]+")) {
+      throw new SecurityException("Invalid filename");
+    }
+    File file = new File("/var/data/" + fileName);
+    if (!file.getCanonicalPath().startsWith("/var/data/")) {
+      throw new SecurityException("Access denied");
+    }
+    FileInputStream fis = new FileInputStream(file);
+    ```
+    
+    Path Traversal (Directory Traversal) allows attackers to access files and directories outside of the intended directory by manipulating variables that reference files with "dot-dot-slash (../)" sequences or absolute file paths.
+    
+    To prevent Path Traversal:
+    - Validate and sanitize file paths
+    - Use allowlists for permitted files or extensions
+    - Convert relative paths to absolute paths and validate them
+    - Implement proper access controls
+    - Use file system permissions as an additional layer of defense
+  </Accordion>
+  
+  <Accordion title="Email Header Injection" icon="envelope">
+    ```php
+    // Anti-pattern: Directly using user input in email headers
+    $to = $_POST['to'];
+    $subject = $_POST['subject'];
+    $headers = "From: " . $_POST['from'];
+    mail($to, $subject, $message, $headers);
+    
+    // Better approach: Validate and sanitize email headers
+    $to = filter_var($_POST['to'], FILTER_VALIDATE_EMAIL);
+    $subject = str_replace(["\r", "\n"], "", $_POST['subject']);
+    $from = filter_var($_POST['from'], FILTER_VALIDATE_EMAIL);
+    $headers = "From: " . $from;
+    mail($to, $subject, $message, $headers);
+    ```
+    
+    Email Header Injection occurs when an application uses untrusted data in email headers. Attackers can inject additional headers to send spam, phishing emails, or perform other malicious activities.
+    
+    To prevent Email Header Injection:
+    - Validate and sanitize all user inputs used in email headers
+    - Remove or encode CR and LF characters (\r, \n)
+    - Use email libraries or frameworks that handle header encoding
+    - Implement proper output encoding
+    - Use allowlists for email addresses
+  </Accordion>
+  
+  <Accordion title="Format String Injection" icon="file-lines">
+    ```c
+    // Anti-pattern: Directly using user input in format strings
+    void print_user_data(char *user_data) {
+      printf(user_data);
+    }
+    
+    // Better approach: Use format specifiers correctly
+    void print_user_data(char *user_data) {
+      printf("%s", user_data);
+    }
+    ```
+    
+    Format String Injection occurs when an application passes untrusted data to a format string parameter in certain functions. This can lead to information disclosure, memory corruption, or code execution.
+    
+    To prevent Format String Injection:
+    - Always use format specifiers (%s, %d, etc.) in format strings
+    - Never pass user input directly as a format string
+    - Validate and sanitize all user inputs
+    - Use safer alternatives to format string functions when possible
+    - Implement proper compiler protections
+  </Accordion>
+  
+  <Accordion title="Log Injection" icon="file-lines">
+    ```java
+    // Anti-pattern: Directly logging user input
+    logger.info("User login: " + username);
+    
+    // Better approach: Sanitize user input before logging
+    String sanitizedUsername = username.replaceAll("[\r\n]", "");
+    logger.info("User login: {}" sanitizedUsername);
+    ```
+    
+    Log Injection occurs when an application logs untrusted data without proper sanitization. This can lead to log forgery, log file corruption, or cross-site scripting if logs are displayed in web interfaces.
+    
+    To prevent Log Injection:
+    - Sanitize all user inputs before logging
+    - Remove or encode CR and LF characters (\r, \n)
+    - Use logging frameworks that handle encoding
+    - Implement proper output encoding
+    - Use structured logging formats like JSON
+  </Accordion>
+  
+  <Accordion title="Server-Side Includes (SSI) Injection" icon="server">
+    ```html
+    <!-- Anti-pattern: Directly using user input in SSI directives -->
+    <div>
+      <!-- #include virtual="/includes/header.html" -->
+      <h1>Welcome, <!--#echo var="QUERY_STRING" --></h1>
+    </div>
+    
+    <!-- Better approach: Validate and sanitize user input -->
+    <div>
+      <!-- #include virtual="/includes/header.html" -->
+      <h1>Welcome, <!--#echo var="sanitized_query_string" --></h1>
+    </div>
+    ```
+    
+    Server-Side Includes (SSI) Injection occurs when an application embeds untrusted data into SSI directives. This can allow attackers to execute commands, access sensitive information, or perform other malicious activities.
+    
+    To prevent SSI Injection:
+    - Validate and sanitize all user inputs used in SSI directives
+    - Disable unnecessary SSI directives
+    - Use allowlists for permitted SSI directives
+    - Implement proper access controls
+    - Consider using alternative technologies to SSI
+  </Accordion>
+  
+  <Accordion title="CRLF Injection" icon="file-lines">
+    ```java
+    // Anti-pattern: Directly using user input in HTTP headers
+    String location = request.getParameter("url");
+    response.addHeader("Location", location);
+    
+    // Better approach: Remove CRLF characters
+    String location = request.getParameter("url");
+    location = location.replaceAll("[\r\n]", "");
+    response.addHeader("Location", location);
+    ```
+    
+    CRLF (Carriage Return Line Feed) Injection occurs when an application includes untrusted data in HTTP headers without proper sanitization. This can lead to response splitting attacks, cache poisoning, or cross-site scripting.
+    
+    To prevent CRLF Injection:
+    - Remove or encode CR and LF characters (\r, \n) in user inputs
+    - Use framework functions that handle header encoding
+    - Implement proper output encoding
+    - Validate and sanitize all user inputs
+    - Use allowlists for permitted characters
+  </Accordion>
+  
+  <Accordion title="XPath Injection" icon="code">
+    ```java
+    // Anti-pattern: Directly using user input in XPath queries
+    String username = request.getParameter("username");
+    String password = request.getParameter("password");
+    String query = "//user[username='" + username + "' and password='" + password + "']";
+    XPathExpression expr = xpath.compile(query);
+    
+    // Better approach: Use parameterized XPath queries
+    String username = request.getParameter("username");
+    String password = request.getParameter("password");
+    String query = "//user[username=$username and password=$password]";
+    XPathExpression expr = xpath.compile(query);
+    SimpleBindings bindings = new SimpleBindings();
+    bindings.put("username", username);
+    bindings.put("password", password);
+    ```
+    
+    XPath Injection occurs when an application uses untrusted data in XPath queries without proper sanitization. This can allow attackers to bypass authentication or access unauthorized information.
+    
+    To prevent XPath Injection:
+    - Use parameterized XPath queries
+    - Validate and sanitize all user inputs
+    - Implement proper authentication and authorization
+    - Use XPath 2.0 or later, which supports parameterized queries
+    - Apply the principle of least privilege
+  </Accordion>
+  
+  <Accordion title="JSON Injection" icon="brackets-curly">
+    ```javascript
+    // Anti-pattern: Directly using user input in JSON
+    app.get('/api/user', (req, res) => {
+      const userId = req.query.id;
+      const userData = getUserData(userId);
+      res.send(`{ "user": { "id": "${userId}", "name": "${userData.name}" } }`);
+    });
+    
+    // Better approach: Use JSON serialization
+    app.get('/api/user', (req, res) => {
+      const userId = req.query.id;
+      const userData = getUserData(userId);
+      res.json({ user: { id: userId, name: userData.name } });
+    });
+    ```
+    
+    JSON Injection occurs when an application constructs JSON strings manually using string concatenation with untrusted data. This can lead to malformed JSON, data corruption, or in some cases, security vulnerabilities like XSS.
+    
+    To prevent JSON Injection:
+    - Use JSON serialization functions instead of string concatenation
+    - Validate and sanitize all user inputs
+    - Implement proper output encoding
+    - Use Content-Type headers with charset
+    - Consider using JSON schema validation
+  </Accordion>
+  
+  <Accordion title="HTML Injection" icon="code">
+    ```javascript
+    // Anti-pattern: Directly using user input in HTML
+    app.get('/profile', (req, res) => {
+      const username = req.query.username;
+      res.send(`<h1>Profile for ${username}</h1>`);
+    });
+    
+    // Better approach: Use proper HTML encoding
+    app.get('/profile', (req, res) => {
+      const username = req.query.username;
+      const encodedUsername = escapeHtml(username);
+      res.send(`<h1>Profile for ${encodedUsername}</h1>`);
+    });
+    ```
+    
+    HTML Injection occurs when an application includes untrusted data in HTML output without proper encoding. This can lead to cross-site scripting (XSS) attacks, where attackers can inject client-side scripts.
+    
+    To prevent HTML Injection:
+    - Use proper HTML encoding for all user inputs
+    - Implement Content Security Policy (CSP)
+    - Use template engines that automatically escape output
+    - Validate and sanitize all user inputs
+    - Use allowlists for permitted HTML tags and attributes
+  </Accordion>
+  
+  <Accordion title="CSS Injection" icon="palette">
+    ```javascript
+    // Anti-pattern: Directly using user input in CSS
+    app.get('/theme', (req, res) => {
+      const color = req.query.color;
+      res.send(`<style>body { background-color: ${color}; }</style>`);
+    });
+    
+    // Better approach: Validate and sanitize CSS values
+    app.get('/theme', (req, res) => {
+      const color = req.query.color;
+      if (!color.match(/^[a-zA-Z0-9#]+$/)) {
+        return res.status(400).send('Invalid color');
+      }
+      res.send(`<style>body { background-color: ${color}; }</style>`);
+    });
+    ```
+    
+    CSS Injection occurs when an application includes untrusted data in CSS code without proper sanitization. This can lead to style manipulation, data exfiltration, or in some cases, cross-site scripting.
+    
+    To prevent CSS Injection:
+    - Validate and sanitize all user inputs used in CSS
+    - Use allowlists for permitted CSS properties and values
+    - Implement Content Security Policy (CSP)
+    - Use separate CSS files instead of inline styles
+    - Consider using CSS sanitization libraries
+  </Accordion>
+  
+  <Accordion title="Shell Metacharacter Injection" icon="terminal">
+    ```python
+    # Anti-pattern: Directly using user input in shell commands
+    def backup_file(filename):
+        os.system("tar -czf /backup/" + filename + ".tar.gz /data/" + filename)
+    
+    # Better approach: Use safer alternatives and validate input
+    def backup_file(filename):
+        if not re.match(r'^[a-zA-Z0-9_-]+$', filename):
+            raise ValueError("Invalid filename")
+        subprocess.run(["tar", "-czf", f"/backup/{filename}.tar.gz", f"/data/{filename}"], check=True)
+    ```
+    
+    Shell Metacharacter Injection occurs when an application passes untrusted data to a system shell without proper sanitization. This can allow attackers to execute arbitrary commands with the privileges of the application.
+    
+    To prevent Shell Metacharacter Injection:
+    - Avoid calling shell commands directly
+    - Use safer alternatives like subprocess modules with arrays
+    - Validate and sanitize all user inputs
+    - Use allowlists for permitted characters
+    - Implement proper privilege separation
+  </Accordion>
+  
+  <Accordion title="OGNL Injection" icon="code">
+    ```java
+    // Anti-pattern: Directly using user input in OGNL expressions
+    String userInput = request.getParameter("expression");
+    Object value = Ognl.getValue(userInput, context, root);
+    
+    // Better approach: Validate and restrict OGNL expressions
+    String userInput = request.getParameter("expression");
+    if (!isValidExpression(userInput)) {
+        throw new SecurityException("Invalid expression");
+    }
+    Object value = Ognl.getValue(userInput, context, root);
+    ```
+    
+    OGNL (Object-Graph Navigation Language) Injection occurs when an application uses untrusted data in OGNL expressions without proper validation. This vulnerability is particularly relevant to applications using frameworks like Apache Struts.
+    
+    To prevent OGNL Injection:
+    - Validate and sanitize all user inputs used in OGNL expressions
+    - Use allowlists for permitted expressions
+    - Implement proper access controls
+    - Keep frameworks up-to-date
+    - Consider using alternatives to OGNL
+  </Accordion>
+</AccordionGroup>

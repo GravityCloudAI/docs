@@ -1,0 +1,685 @@
+---
+title: 'Cryptography Vulnerabilities'
+description: 'Cryptography vulnerabilities arise from improper implementation, weak algorithms, or mismanagement of cryptographic functions, potentially exposing sensitive data.'
+---
+
+<AccordionGroup>
+  <Accordion title="Cryptography Vulnerabilities Overview" icon="shield-xmark">
+    Cryptography is essential for protecting sensitive data and ensuring secure communications. However, cryptographic vulnerabilities can arise from using weak algorithms, improper implementation, or mismanagement of keys and certificates.
+    
+    These vulnerabilities can lead to data breaches, authentication bypasses, and compromise of secure communications. Proper cryptographic practices are fundamental to maintaining the confidentiality, integrity, and authenticity of data and communications.
+  </Accordion>
+  
+  <Accordion title="Using Weak Cryptographic Algorithms" icon="lock">
+    ```javascript
+    // Anti-pattern: Using weak or outdated cryptographic algorithms
+    const crypto = require('crypto');
+    
+    function encryptData(data, key) {
+      // Using DES (weak and outdated algorithm)
+      const cipher = crypto.createCipheriv('des', key, Buffer.alloc(8, 0));
+      let encrypted = cipher.update(data, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      return encrypted;
+    }
+    
+    // Better approach: Using strong, modern algorithms
+    function encryptData(data, key) {
+      // Using AES-256-GCM (strong algorithm with authentication)
+      const iv = crypto.randomBytes(16);
+      const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+      let encrypted = cipher.update(data, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      const authTag = cipher.getAuthTag().toString('hex');
+      
+      // Return IV, encrypted data, and authentication tag
+      return {
+        iv: iv.toString('hex'),
+        encryptedData: encrypted,
+        authTag
+      };
+    }
+    ```
+    
+    Using weak or outdated cryptographic algorithms can make encrypted data vulnerable to attacks, potentially exposing sensitive information.
+    
+    To implement strong cryptography:
+    - Use modern, well-vetted algorithms (AES-256, ChaCha20-Poly1305)
+    - Avoid deprecated algorithms (DES, MD5, SHA-1, RC4)
+    - Use authenticated encryption (AEAD) modes like GCM or ChaCha20-Poly1305
+    - Follow recommendations from security standards organizations
+    - Keep cryptographic libraries updated
+  </Accordion>
+  
+  <Accordion title="Insufficient Key Length" icon="key">
+    ```javascript
+    // Anti-pattern: Using insufficient key lengths
+    const crypto = require('crypto');
+    
+    function generateRSAKeyPair() {
+      // 512-bit RSA keys are too weak
+      return crypto.generateKeyPairSync('rsa', {
+        modulusLength: 512,
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+      });
+    }
+    
+    // Better approach: Using sufficient key lengths
+    function generateRSAKeyPair() {
+      // 2048-bit or 4096-bit RSA keys are recommended
+      return crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048, // or 4096 for more security
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+      });
+    }
+    ```
+    
+    Insufficient key lengths can make cryptographic protections vulnerable to brute force attacks or other cryptanalytic techniques.
+    
+    To implement proper key lengths:
+    - Use at least 2048 bits for RSA keys (4096 bits for long-term security)
+    - Use at least 256 bits for symmetric encryption keys (AES-256)
+    - Use at least 256 bits for elliptic curve cryptography (ECC)
+    - Follow current recommendations from security standards organizations
+    - Plan for periodic key rotation and algorithm updates
+  </Accordion>
+  
+  <Accordion title="Hardcoded Cryptographic Keys" icon="key">
+    ```java
+    // Anti-pattern: Hardcoded cryptographic keys
+    public class EncryptionUtil {
+        // Hardcoded encryption key
+        private static final String ENCRYPTION_KEY = "1234567890abcdef";
+        
+        public static String encrypt(String data) {
+            try {
+                Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+                SecretKeySpec keySpec = new SecretKeySpec(ENCRYPTION_KEY.getBytes(), "AES");
+                cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(new byte[16]));
+                return Base64.getEncoder().encodeToString(cipher.doFinal(data.getBytes()));
+            } catch (Exception e) {
+                throw new RuntimeException("Encryption failed", e);
+            }
+        }
+    }
+    
+    // Better approach: Using secure key management
+    public class EncryptionUtil {
+        public static String encrypt(String data) throws Exception {
+            // Get key from a secure key management system
+            SecretKey key = KeyManager.getKey("data-encryption-key");
+            
+            // Generate a random IV for each encryption
+            byte[] iv = new byte[16];
+            SecureRandom random = new SecureRandom();
+            random.nextBytes(iv);
+            IvParameterSpec ivSpec = new IvParameterSpec(iv);
+            
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);
+            byte[] encrypted = cipher.doFinal(data.getBytes());
+            
+            // Combine IV and encrypted data
+            byte[] combined = new byte[iv.length + encrypted.length];
+            System.arraycopy(iv, 0, combined, 0, iv.length);
+            System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
+            
+            return Base64.getEncoder().encodeToString(combined);
+        }
+    }
+    ```
+    
+    Hardcoded cryptographic keys in source code are easily discoverable and cannot be rotated without code changes, creating significant security risks.
+    
+    To implement secure key management:
+    - Store keys in secure key management systems
+    - Use environment variables or configuration files for key references
+    - Implement proper access controls for keys
+    - Use key derivation functions when appropriate
+    - Implement key rotation policies
+  </Accordion>
+  
+  <Accordion title="Insecure Random Number Generation" icon="dice">
+    ```javascript
+    // Anti-pattern: Using insecure random number generation
+    function generateToken() {
+      // Math.random() is not cryptographically secure
+      return Math.random().toString(36).substring(2, 15);
+    }
+    
+    // Better approach: Using cryptographically secure random number generation
+    const crypto = require('crypto');
+    
+    function generateToken() {
+      // Using cryptographically secure random bytes
+      return crypto.randomBytes(16).toString('hex');
+    }
+    ```
+    
+    Insecure random number generation can lead to predictable tokens, IDs, or cryptographic values, potentially allowing attackers to guess or predict sensitive information.
+    
+    To implement secure random number generation:
+    - Use cryptographically secure random number generators
+    - Avoid Math.random() for security-sensitive operations
+    - Ensure proper seeding of random number generators
+    - Use platform-specific secure random APIs
+    - Consider entropy sources for critical applications
+  </Accordion>
+  
+  <Accordion title="Using ECB Mode for Encryption" icon="lock">
+    ```java
+    // Anti-pattern: Using ECB mode for encryption
+    public byte[] encryptECB(byte[] data, SecretKey key) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, key);
+        return cipher.doFinal(data);
+    }
+    
+    // Better approach: Using a secure mode like CBC or GCM
+    public byte[] encryptCBC(byte[] data, SecretKey key) throws Exception {
+        // Generate a random IV
+        byte[] iv = new byte[16];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(iv);
+        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+        
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);
+        byte[] encrypted = cipher.doFinal(data);
+        
+        // Combine IV and encrypted data
+        byte[] combined = new byte[iv.length + encrypted.length];
+        System.arraycopy(iv, 0, combined, 0, iv.length);
+        System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
+        
+        return combined;
+    }
+    
+    // Even better: Using authenticated encryption (GCM)
+    public byte[] encryptGCM(byte[] data, SecretKey key) throws Exception {
+        // Generate a random IV
+        byte[] iv = new byte[12]; // 12 bytes is recommended for GCM
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(iv);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+        
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec);
+        byte[] encrypted = cipher.doFinal(data);
+        
+        // Combine IV and encrypted data
+        byte[] combined = new byte[iv.length + encrypted.length];
+        System.arraycopy(iv, 0, combined, 0, iv.length);
+        System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
+        
+        return combined;
+    }
+    ```
+    
+    ECB (Electronic Codebook) mode encrypts each block independently, which can reveal patterns in the plaintext and is vulnerable to various attacks.
+    
+    To implement secure encryption modes:
+    - Avoid ECB mode for all but the most basic use cases
+    - Use CBC mode with a random IV for each encryption
+    - Prefer authenticated encryption modes like GCM or ChaCha20-Poly1305
+    - Ensure IVs are randomly generated for each encryption
+    - Validate message integrity when using non-authenticated modes
+  </Accordion>
+  
+  <Accordion title="Missing Certificate Validation" icon="certificate">
+    ```javascript
+    // Anti-pattern: Missing certificate validation
+    const https = require('https');
+    
+    function makeRequest(url, data) {
+      const options = {
+        // Disabling certificate validation
+        rejectUnauthorized: false
+      };
+      
+      return new Promise((resolve, reject) => {
+        const req = https.request(url, options, (res) => {
+          // Process response
+        });
+        
+        req.on('error', reject);
+        req.write(data);
+        req.end();
+      });
+    }
+    
+    // Better approach: Proper certificate validation
+    function makeRequest(url, data) {
+      // Default behavior includes certificate validation
+      return new Promise((resolve, reject) => {
+        const req = https.request(url, (res) => {
+          // Process response
+        });
+        
+        req.on('error', reject);
+        req.write(data);
+        req.end();
+      });
+    }
+    ```
+    
+    Missing certificate validation can expose applications to man-in-the-middle attacks, allowing attackers to intercept and potentially modify sensitive data.
+    
+    To implement proper certificate validation:
+    - Always validate SSL/TLS certificates
+    - Never set `rejectUnauthorized: false` in production
+    - Implement proper certificate pinning for high-security applications
+    - Keep trusted certificate authorities updated
+    - Implement proper certificate revocation checking
+  </Accordion>
+  
+  <Accordion title="Using Deprecated Hash Functions" icon="hashtag">
+    ```javascript
+    // Anti-pattern: Using deprecated hash functions
+    const crypto = require('crypto');
+    
+    function hashPassword(password) {
+      // MD5 is cryptographically broken
+      return crypto.createHash('md5').update(password).digest('hex');
+    }
+    
+    // Better approach: Using secure hash functions with salting
+    const bcrypt = require('bcrypt');
+    
+    async function hashPassword(password) {
+      // Using bcrypt with salt
+      const saltRounds = 12;
+      return await bcrypt.hash(password, saltRounds);
+    }
+    
+    async function verifyPassword(password, hash) {
+      return await bcrypt.compare(password, hash);
+    }
+    ```
+    
+    Deprecated hash functions like MD5 and SHA-1 are vulnerable to collision attacks and should not be used for security-sensitive applications.
+    
+    To implement secure hashing:
+    - Use modern hash functions (SHA-256, SHA-3)
+    - For passwords, use specialized password hashing functions (bcrypt, Argon2, PBKDF2)
+    - Always use salts with password hashes
+    - Implement proper key stretching with sufficient iterations
+    - Keep hashing libraries updated
+  </Accordion>
+  
+  <Accordion title="Insufficient Entropy for Key Generation" icon="key">
+    ```javascript
+    // Anti-pattern: Insufficient entropy for key generation
+    function generateKey() {
+      // Using a predictable seed
+      const seed = new Date().getTime();
+      const random = new Random(seed);
+      
+      const key = new Uint8Array(32);
+      for (let i = 0; i < 32; i++) {
+        key[i] = random.nextInt(256);
+      }
+      
+      return key;
+    }
+    
+    // Better approach: Using a cryptographically secure source of randomness
+    const crypto = require('crypto');
+    
+    function generateKey() {
+      // Using a cryptographically secure random number generator
+      return crypto.randomBytes(32);
+    }
+    ```
+    
+    Insufficient entropy during key generation can result in predictable or weak cryptographic keys, potentially allowing attackers to guess or derive the keys.
+    
+    To ensure sufficient entropy:
+    - Use cryptographically secure random number generators
+    - Ensure proper seeding of random number generators
+    - Consider hardware random number generators for critical applications
+    - Avoid predictable seeds like timestamps
+    - Implement proper entropy collection during key generation
+  </Accordion>
+  
+  <Accordion title="Improper Certificate and Key Storage" icon="key-skeleton">
+    ```javascript
+    // Anti-pattern: Improper certificate and key storage
+    const fs = require('fs');
+    const https = require('https');
+    
+    // Private key stored in a world-readable file
+    const privateKey = fs.readFileSync('server.key', 'utf8');
+    const certificate = fs.readFileSync('server.crt', 'utf8');
+    
+    const server = https.createServer({
+      key: privateKey,
+      cert: certificate
+    }, app);
+    
+    // Better approach: Proper key storage and permissions
+    const fs = require('fs');
+    const https = require('https');
+    
+    // Use environment variables or a secure key management system
+    const privateKeyPath = process.env.PRIVATE_KEY_PATH;
+    const certificatePath = process.env.CERTIFICATE_PATH;
+    
+    // Ensure files have proper permissions before reading
+    ensureSecurePermissions(privateKeyPath);
+    
+    const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+    const certificate = fs.readFileSync(certificatePath, 'utf8');
+    
+    const server = https.createServer({
+      key: privateKey,
+      cert: certificate
+    }, app);
+    
+    function ensureSecurePermissions(filePath) {
+      // Check and enforce secure file permissions
+      const stats = fs.statSync(filePath);
+      const permissions = stats.mode & 0o777;
+      
+      if (permissions !== 0o600) {
+        throw new Error(`Insecure permissions (${permissions.toString(8)}) for ${filePath}`);
+      }
+    }
+    ```
+    
+    Improper storage of certificates and private keys can lead to unauthorized access to these sensitive cryptographic materials.
+    
+    To implement secure certificate and key storage:
+    - Use secure key management systems
+    - Implement proper file permissions (e.g., 0600)
+    - Consider hardware security modules (HSMs) for critical keys
+    - Encrypt private keys at rest
+    - Implement proper access controls and audit logging
+  </Accordion>
+  
+  <Accordion title="Lack of Forward Secrecy" icon="shield">
+    ```javascript
+    // Anti-pattern: TLS configuration without forward secrecy
+    const https = require('https');
+    const fs = require('fs');
+    
+    const options = {
+      key: fs.readFileSync('server.key'),
+      cert: fs.readFileSync('server.crt'),
+      // Limiting to non-forward-secret cipher suites
+      ciphers: 'AES256-SHA'
+    };
+    
+    https.createServer(options, app).listen(443);
+    
+    // Better approach: Enabling forward secrecy
+    const options = {
+      key: fs.readFileSync('server.key'),
+      cert: fs.readFileSync('server.crt'),
+      // Prioritizing forward-secret cipher suites
+      ciphers: 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM',
+      // Enabling perfect forward secrecy
+      honorCipherOrder: true
+    };
+    
+    https.createServer(options, app).listen(443);
+    ```
+    
+    Lack of forward secrecy means that if a private key is compromised, past communications can also be decrypted, potentially exposing historical sensitive data.
+    
+    To implement forward secrecy:
+    - Use ephemeral Diffie-Hellman (DHE) or Elliptic Curve Diffie-Hellman (ECDHE) key exchange
+    - Prioritize cipher suites that support forward secrecy
+    - Configure servers to honor cipher order
+    - Regularly rotate long-term keys
+    - Keep TLS configurations updated with current best practices
+  </Accordion>
+  
+  <Accordion title="Weak Password-Based Key Derivation" icon="key">
+    ```javascript
+    // Anti-pattern: Weak password-based key derivation
+    const crypto = require('crypto');
+    
+    function deriveKeyFromPassword(password) {
+      // Using a simple hash for key derivation
+      return crypto.createHash('sha256').update(password).digest();
+    }
+    
+    // Better approach: Using a proper key derivation function
+    function deriveKeyFromPassword(password, salt) {
+      // Using PBKDF2 with sufficient iterations
+      return new Promise((resolve, reject) => {
+        crypto.pbkdf2(password, salt, 100000, 32, 'sha256', (err, derivedKey) => {
+          if (err) reject(err);
+          else resolve(derivedKey);
+        });
+      });
+    }
+    ```
+    
+    Weak password-based key derivation can make it easier for attackers to brute-force passwords and derive encryption keys.
+    
+    To implement secure key derivation:
+    - Use specialized key derivation functions (PBKDF2, Argon2, scrypt)
+    - Use a sufficient number of iterations or work factor
+    - Always use a unique salt for each password
+    - Use appropriate key length for the target algorithm
+    - Adjust work factors as hardware capabilities increase
+  </Accordion>
+  
+  <Accordion title="Missing Authenticated Encryption" icon="lock">
+    ```javascript
+    // Anti-pattern: Missing authenticated encryption
+    const crypto = require('crypto');
+    
+    function encrypt(data, key) {
+      const iv = crypto.randomBytes(16);
+      const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+      
+      let encrypted = cipher.update(data, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      
+      return {
+        iv: iv.toString('hex'),
+        encryptedData: encrypted
+      };
+    }
+    
+    function decrypt(encryptedData, iv, key) {
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
+      
+      let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      return decrypted;
+    }
+    
+    // Better approach: Using authenticated encryption
+    function encryptWithAuth(data, key) {
+      const iv = crypto.randomBytes(12); // 12 bytes for GCM
+      const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+      
+      let encrypted = cipher.update(data, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      const authTag = cipher.getAuthTag().toString('hex');
+      
+      return {
+        iv: iv.toString('hex'),
+        encryptedData: encrypted,
+        authTag: authTag
+      };
+    }
+    
+    function decryptWithAuth(encryptedData, iv, authTag, key) {
+      const decipher = crypto.createDecipheriv(
+        'aes-256-gcm',
+        key,
+        Buffer.from(iv, 'hex')
+      );
+      
+      decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+      
+      let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      return decrypted;
+    }
+    ```
+    
+    Missing authenticated encryption can allow attackers to modify encrypted data without detection, potentially leading to security vulnerabilities.
+    
+    To implement authenticated encryption:
+    - Use authenticated encryption modes (GCM, ChaCha20-Poly1305)
+    - Verify authentication tags before decrypting data
+    - Use libraries that implement authenticated encryption correctly
+    - Consider using higher-level cryptographic libraries
+    - Implement proper error handling for authentication failures
+  </Accordion>
+  
+  <Accordion title="Insecure Cryptographic Storage" icon="database">
+    ```javascript
+    // Anti-pattern: Insecure cryptographic storage
+    function storeCredentials(username, password) {
+      // Storing plaintext passwords
+      db.query(
+        'INSERT INTO users (username, password) VALUES (?, ?)',
+        [username, password]
+      );
+    }
+    
+    // Better approach: Secure cryptographic storage
+    async function storeCredentials(username, password) {
+      // Generate a salt and hash the password
+      const salt = await bcrypt.genSalt(12);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      
+      // Store the hashed password
+      db.query(
+        'INSERT INTO users (username, password_hash) VALUES (?, ?)',
+        [username, hashedPassword]
+      );
+    }
+    ```
+    
+    Insecure cryptographic storage can expose sensitive data if the database is compromised or if there are vulnerabilities in the application.
+    
+    To implement secure cryptographic storage:
+    - Use appropriate cryptographic techniques for different types of data
+    - Hash passwords with specialized password hashing functions
+    - Encrypt sensitive data with strong algorithms
+    - Implement proper key management
+    - Regularly rotate encryption keys
+    - Implement proper access controls for encrypted data
+  </Accordion>
+  
+  <Accordion title="Using Broken or Risky Cryptographic Libraries" icon="bug">
+    ```javascript
+    // Anti-pattern: Using broken or risky cryptographic libraries
+    const md5 = require('md5'); // Deprecated and insecure
+    
+    function hashPassword(password) {
+      return md5(password);
+    }
+    
+    // Better approach: Using well-maintained, secure libraries
+    const bcrypt = require('bcrypt'); // Modern, secure library
+    
+    async function hashPassword(password) {
+      const saltRounds = 12;
+      return await bcrypt.hash(password, saltRounds);
+    }
+    ```
+    
+    Using broken or risky cryptographic libraries can introduce vulnerabilities even if the application's logic is correct.
+    
+    To use secure cryptographic libraries:
+    - Use well-maintained, actively supported libraries
+    - Prefer libraries that have undergone security audits
+    - Keep libraries updated to the latest secure versions
+    - Monitor security advisories for cryptographic libraries
+    - Consider using higher-level cryptographic APIs when possible
+  </Accordion>
+  
+  <Accordion title="Improper Certificate Validation" icon="certificate">
+    ```javascript
+    // Anti-pattern: Improper certificate validation
+    const https = require('https');
+    
+    function makeRequest(url, data) {
+      const options = {
+        // Accepting any certificate
+        rejectUnauthorized: false,
+        // Not checking hostname
+        checkServerIdentity: () => undefined
+      };
+      
+      return new Promise((resolve, reject) => {
+        const req = https.request(url, options, (res) => {
+          // Process response
+        });
+        
+        req.on('error', reject);
+        req.write(data);
+        req.end();
+      });
+    }
+    
+    // Better approach: Proper certificate validation
+    function makeRequest(url, data) {
+      // Using default certificate validation
+      return new Promise((resolve, reject) => {
+        const req = https.request(url, (res) => {
+          // Process response
+        });
+        
+        req.on('error', reject);
+        req.write(data);
+        req.end();
+      });
+    }
+    
+    // Even better: Certificate pinning for high-security applications
+    function makeRequest(url, data) {
+      const options = {
+        // Custom certificate validation with pinning
+        checkServerIdentity: (hostname, cert) => {
+          // Default checks
+          const error = tls.checkServerIdentity(hostname, cert);
+          if (error) {
+            return error;
+          }
+          
+          // Certificate pinning
+          const expectedFingerprint = 'AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99';
+          const fingerprint = cert.fingerprint256;
+          
+          if (fingerprint !== expectedFingerprint) {
+            return new Error('Certificate fingerprint mismatch');
+          }
+        }
+      };
+      
+      return new Promise((resolve, reject) => {
+        const req = https.request(url, options, (res) => {
+          // Process response
+        });
+        
+        req.on('error', reject);
+        req.write(data);
+        req.end();
+      });
+    }
+    ```
+    
+    Improper certificate validation can expose applications to man-in-the-middle attacks, allowing attackers to intercept and potentially modify sensitive data.
+    
+    To implement proper certificate validation:
+    - Always validate SSL/TLS certificates
+    - Verify both the certificate chain and the hostname
+    - Consider implementing certificate pinning for high-security applications
+    - Keep trusted certificate authorities updated
+    - Implement proper certificate revocation checking
+  </Accordion>
+</AccordionGroup>

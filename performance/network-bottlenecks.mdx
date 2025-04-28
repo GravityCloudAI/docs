@@ -1,0 +1,1113 @@
+---
+title: 'Network Bottlenecks'
+description: 'Anti-patterns related to network operations that can cause performance issues and poor user experience.'
+---
+
+<AccordionGroup>
+  <Accordion title="Network Bottlenecks Overview" icon="network-wired">
+    Network operations are often a significant source of performance bottlenecks in modern applications. Inefficient network usage, excessive requests, and poor data transfer patterns can lead to increased latency, reduced throughput, and poor user experience.
+    
+    Common network bottlenecks include:
+    - Excessive API calls
+    - Uncompressed data transfer
+    - Inefficient request batching
+    - Poor caching strategies
+    - Synchronous network operations blocking the main thread
+    
+    This guide covers common anti-patterns related to network operations and provides best practices for optimizing network performance across different application types.
+  </Accordion>
+  
+  <Accordion title="Excessive API Calls" icon="server">
+    ```javascript
+    // Anti-pattern: Making separate API calls for related data
+    async function loadDashboardInefficiently() {
+      // Separate API calls for related data
+      const user = await fetch('/api/user').then(res => res.json());
+      const notifications = await fetch('/api/notifications').then(res => res.json());
+      const messages = await fetch('/api/messages').then(res => res.json());
+      const tasks = await fetch('/api/tasks').then(res => res.json());
+      const stats = await fetch('/api/stats').then(res => res.json());
+      
+      // Update UI with all the data
+      updateDashboard(user, notifications, messages, tasks, stats);
+    }
+    
+    // Better approach: Using a consolidated API endpoint
+    async function loadDashboardEfficiently() {
+      // Single API call that returns all needed data
+      const dashboardData = await fetch('/api/dashboard').then(res => res.json());
+      
+      // Update UI with consolidated data
+      updateDashboard(
+        dashboardData.user,
+        dashboardData.notifications,
+        dashboardData.messages,
+        dashboardData.tasks,
+        dashboardData.stats
+      );
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Multiple API calls in Android
+    private void loadUserProfileInefficiently() {
+        // Separate network calls for related data
+        apiService.getUserInfo(userId).enqueue(new Callback<User>() {
+            @Override
+            public void onResponse(Call<User> call, Response<User> response) {
+                if (response.isSuccessful()) {
+                    displayUserInfo(response.body());
+                    
+                    // Make another call after the first one completes
+                    apiService.getUserPosts(userId).enqueue(new Callback<List<Post>>() {
+                        @Override
+                        public void onResponse(Call<List<Post>> call, Response<List<Post>> response) {
+                            if (response.isSuccessful()) {
+                                displayUserPosts(response.body());
+                            }
+                        }
+                        
+                        @Override
+                        public void onFailure(Call<List<Post>> call, Throwable t) {
+                            showError("Failed to load posts");
+                        }
+                    });
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<User> call, Throwable t) {
+                showError("Failed to load user info");
+            }
+        });
+    }
+    
+    // Better approach: Using a consolidated endpoint
+    private void loadUserProfileEfficiently() {
+        // Single network call for all profile data
+        apiService.getUserProfile(userId).enqueue(new Callback<UserProfile>() {
+            @Override
+            public void onResponse(Call<UserProfile> call, Response<UserProfile> response) {
+                if (response.isSuccessful()) {
+                    UserProfile profile = response.body();
+                    displayUserInfo(profile.getUser());
+                    displayUserPosts(profile.getPosts());
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<UserProfile> call, Throwable t) {
+                showError("Failed to load user profile");
+            }
+        });
+    }
+    ```
+    
+    Making excessive API calls, especially for related data that could be fetched together, leads to increased latency, higher server load, and poor user experience.
+    
+    To reduce excessive API calls:
+    - Consolidate related API endpoints
+    - Implement batch operations for multiple resources
+    - Use GraphQL to request exactly what you need in a single request
+    - Consider using BFF (Backend for Frontend) patterns
+    - Implement proper caching strategies
+    - Use pagination and filtering to limit data transfer
+    - Consider using WebSockets for real-time updates instead of polling
+    - Implement request deduplication
+    - Use request queuing and batching for non-critical operations
+  </Accordion>
+  
+  <Accordion title="Uncompressed Data Transfer" icon="file-zipper">
+    ```javascript
+    // Anti-pattern: Sending uncompressed data
+    app.get('/api/products', (req, res) => {
+      // Sending large JSON response without compression
+      res.json(getAllProducts());
+    });
+    
+    // Better approach: Using compression middleware
+    const compression = require('compression');
+    
+    // Enable compression for all responses
+    app.use(compression());
+    
+    app.get('/api/products', (req, res) => {
+      // Response will be automatically compressed
+      res.json(getAllProducts());
+    });
+    ```
+    
+    ```java
+    // Anti-pattern: Not using GZIP in OkHttp client
+    OkHttpClient client = new OkHttpClient.Builder()
+        // No interceptors for compression
+        .build();
+    
+    // Better approach: Enabling GZIP compression
+    OkHttpClient client = new OkHttpClient.Builder()
+        .addInterceptor(new GzipRequestInterceptor()) // Custom interceptor for request compression
+        .build();
+    
+    // GzipRequestInterceptor implementation
+    public class GzipRequestInterceptor implements Interceptor {
+        @Override
+        public Response intercept(Chain chain) throws IOException {
+            Request originalRequest = chain.request();
+            
+            // Don't compress if already compressed
+            if (originalRequest.body() == null || 
+                originalRequest.header("Content-Encoding") != null) {
+                return chain.proceed(originalRequest);
+            }
+            
+            // Create compressed request
+            Request compressedRequest = originalRequest.newBuilder()
+                .header("Content-Encoding", "gzip")
+                .method(originalRequest.method(), gzip(originalRequest.body()))
+                .build();
+                
+            return chain.proceed(compressedRequest);
+        }
+        
+        private RequestBody gzip(final RequestBody body) {
+            return new RequestBody() {
+                @Override
+                public MediaType contentType() {
+                    return body.contentType();
+                }
+                
+                @Override
+                public long contentLength() {
+                    return -1; // We don't know the compressed length
+                }
+                
+                @Override
+                public void writeTo(BufferedSink sink) throws IOException {
+                    BufferedSink gzipSink = Okio.buffer(new GzipSink(sink));
+                    body.writeTo(gzipSink);
+                    gzipSink.close();
+                }
+            };
+        }
+    }
+    ```
+    
+    Transferring uncompressed data over the network leads to increased bandwidth usage, higher latency, and slower load times, especially for users with limited bandwidth or high-latency connections.
+    
+    To optimize data compression:
+    - Enable GZIP or Brotli compression on your web server
+    - Use compression middleware in your application framework
+    - Implement client-side support for compressed requests and responses
+    - Consider using binary formats like Protocol Buffers or MessagePack
+    - Compress large request payloads
+    - Optimize images and media files before transfer
+    - Use modern image formats (WebP, AVIF) with better compression
+    - Consider using HTTP/2 or HTTP/3 for better performance
+    - Monitor compression ratios and bandwidth usage
+  </Accordion>
+  
+  <Accordion title="Synchronous Network Calls Blocking the UI" icon="spinner">
+    ```javascript
+    // Anti-pattern: Blocking the UI thread with synchronous XMLHttpRequest
+    function loadDataSynchronously() {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api/data', false); // 'false' makes this synchronous
+      xhr.send();
+      
+      if (xhr.status === 200) {
+        const data = JSON.parse(xhr.responseText);
+        updateUI(data);
+      }
+    }
+    
+    // Better approach: Using asynchronous requests
+    function loadDataAsynchronously() {
+      // Show loading indicator
+      showLoadingIndicator();
+      
+      fetch('/api/data')
+        .then(response => response.json())
+        .then(data => {
+          updateUI(data);
+          hideLoadingIndicator();
+        })
+        .catch(error => {
+          showError(error);
+          hideLoadingIndicator();
+        });
+    }
+    
+    // Even better: Using async/await
+    async function loadDataModern() {
+      try {
+        showLoadingIndicator();
+        const response = await fetch('/api/data');
+        const data = await response.json();
+        updateUI(data);
+      } catch (error) {
+        showError(error);
+      } finally {
+        hideLoadingIndicator();
+      }
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Network operations on the main thread in Android
+    private void loadDataOnMainThread() {
+        try {
+            // This will block the UI thread and may cause ANR
+            URL url = new URL("https://api.example.com/data");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(connection.getInputStream()));
+            StringBuilder response = new StringBuilder();
+            String line;
+            
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+            reader.close();
+            
+            // Process response and update UI
+            updateUI(response.toString());
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    // Better approach: Using background thread
+    private void loadDataInBackground() {
+        // Show loading indicator
+        showLoadingIndicator();
+        
+        new Thread(() -> {
+            try {
+                URL url = new URL("https://api.example.com/data");
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String line;
+                
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+                
+                final String result = response.toString();
+                
+                // Update UI on the main thread
+                runOnUiThread(() -> {
+                    updateUI(result);
+                    hideLoadingIndicator();
+                });
+                
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> {
+                    showError(e.getMessage());
+                    hideLoadingIndicator();
+                });
+            }
+        }).start();
+    }
+    
+    // Even better: Using modern libraries like Retrofit with coroutines
+    private void loadDataWithRetrofit() {
+        showLoadingIndicator();
+        
+        apiService.getData()
+            .enqueue(new Callback<DataResponse>() {
+                @Override
+                public void onResponse(Call<DataResponse> call, Response<DataResponse> response) {
+                    if (response.isSuccessful() && response.body() != null) {
+                        updateUI(response.body());
+                    } else {
+                        showError("Failed to load data");
+                    }
+                    hideLoadingIndicator();
+                }
+                
+                @Override
+                public void onFailure(Call<DataResponse> call, Throwable t) {
+                    showError(t.getMessage());
+                    hideLoadingIndicator();
+                }
+            });
+    }
+    ```
+    
+    Performing network operations synchronously on the main/UI thread blocks the user interface, leading to unresponsive applications, poor user experience, and potential application crashes (ANR in Android).
+    
+    To avoid blocking the UI thread:
+    - Always use asynchronous network calls
+    - Implement proper loading indicators to inform users
+    - Use modern async patterns (Promises, async/await, coroutines)
+    - Consider using dedicated networking libraries
+    - Implement proper error handling for network failures
+    - Use background threads or workers for network operations
+    - Consider using reactive programming for complex async workflows
+    - Implement timeouts to prevent indefinite waiting
+    - Use cancelable requests to avoid unnecessary processing
+  </Accordion>
+  
+  <Accordion title="Inefficient Polling" icon="rotate">
+    ```javascript
+    // Anti-pattern: Frequent polling for updates
+    function pollForUpdatesInefficiently() {
+      // Poll the server every second
+      setInterval(() => {
+        fetch('/api/updates')
+          .then(response => response.json())
+          .then(data => {
+            if (data.hasUpdates) {
+              updateUI(data);
+            }
+          })
+          .catch(error => console.error('Polling error:', error));
+      }, 1000); // Polling every second
+    }
+    
+    // Better approach: Using WebSockets for real-time updates
+    function setupWebSocketConnection() {
+      const socket = new WebSocket('wss://example.com/updates');
+      
+      socket.onopen = () => {
+        console.log('WebSocket connection established');
+      };
+      
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        updateUI(data);
+      };
+      
+      socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+      
+      socket.onclose = () => {
+        console.log('WebSocket connection closed');
+        // Reconnect after a delay
+        setTimeout(setupWebSocketConnection, 5000);
+      };
+    }
+    
+    // Alternative: Using long polling
+    function setupLongPolling() {
+      function poll() {
+        fetch('/api/updates/long-poll')
+          .then(response => response.json())
+          .then(data => {
+            updateUI(data);
+            // Immediately poll again
+            poll();
+          })
+          .catch(error => {
+            console.error('Long polling error:', error);
+            // Wait before retrying on error
+            setTimeout(poll, 5000);
+          });
+      }
+      
+      poll();
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Frequent polling in Android
+    private void startPollingInefficiently() {
+        final Handler handler = new Handler();
+        final Runnable pollRunnable = new Runnable() {
+            @Override
+            public void run() {
+                apiService.getUpdates().enqueue(new Callback<UpdateResponse>() {
+                    @Override
+                    public void onResponse(Call<UpdateResponse> call, Response<UpdateResponse> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            if (response.body().hasUpdates()) {
+                                updateUI(response.body());
+                            }
+                        }
+                        // Schedule next poll
+                        handler.postDelayed(this, 5000); // Poll every 5 seconds
+                    }
+                    
+                    @Override
+                    public void onFailure(Call<UpdateResponse> call, Throwable t) {
+                        // Schedule next poll even on failure
+                        handler.postDelayed(this, 5000);
+                    }
+                });
+            }
+        };
+        
+        // Start polling
+        handler.post(pollRunnable);
+    }
+    
+    // Better approach: Using Firebase Cloud Messaging for push notifications
+    private void setupPushNotifications() {
+        FirebaseMessaging.getInstance().getToken()
+            .addOnCompleteListener(task -> {
+                if (!task.isSuccessful()) {
+                    Log.w(TAG, "Fetching FCM registration token failed", task.getException());
+                    return;
+                }
+                
+                // Get new FCM registration token
+                String token = task.getResult();
+                
+                // Send token to server
+                apiService.registerDevice(token).enqueue(new Callback<Void>() {
+                    @Override
+                    public void onResponse(Call<Void> call, Response<Void> response) {
+                        Log.d(TAG, "Device registered for push notifications");
+                    }
+                    
+                    @Override
+                    public void onFailure(Call<Void> call, Throwable t) {
+                        Log.e(TAG, "Failed to register device", t);
+                    }
+                });
+            });
+    }
+    ```
+    
+    Inefficient polling, especially at high frequencies, leads to excessive network traffic, server load, battery drain on mobile devices, and potential rate limiting or IP blocking.
+    
+    To optimize real-time updates:
+    - Use WebSockets for true real-time bidirectional communication
+    - Implement server-sent events (SSE) for server-to-client updates
+    - Use push notifications for mobile applications
+    - Implement long polling as a fallback
+    - Use adaptive polling intervals based on activity
+    - Consider using specialized real-time services (Firebase, Pusher, etc.)
+    - Implement exponential backoff for reconnection attempts
+    - Use multiplexing to combine multiple subscriptions
+    - Implement proper connection state management
+    - Consider using GraphQL subscriptions for data updates
+  </Accordion>
+  
+  <Accordion title="Inefficient Resource Loading" icon="download">
+    ```html
+    <!-- Anti-pattern: Loading resources inefficiently -->
+    <head>
+      <!-- Render-blocking CSS -->
+      <link rel="stylesheet" href="styles.css">
+      
+      <!-- Render-blocking JavaScript -->
+      <script src="app.js"></script>
+      
+      <!-- No resource hints -->
+    </head>
+    <body>
+      <!-- Content here -->
+    </body>
+    
+    <!-- Better approach: Optimized resource loading -->
+    <head>
+      <!-- Preload critical resources -->
+      <link rel="preload" href="critical.css" as="style">
+      <link rel="preload" href="critical-fonts.woff2" as="font" crossorigin>
+      
+      <!-- Inline critical CSS -->
+      <style>
+        /* Critical CSS here */
+      </style>
+      
+      <!-- Defer non-critical CSS -->
+      <link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'">
+      
+      <!-- Defer JavaScript -->
+      <script src="app.js" defer></script>
+      
+      <!-- Prefetch future resources -->
+      <link rel="prefetch" href="next-page.js">
+      
+      <!-- DNS prefetching -->
+      <link rel="dns-prefetch" href="https://api.example.com">
+      <link rel="preconnect" href="https://api.example.com">
+    </head>
+    <body>
+      <!-- Content here -->
+    </body>
+    ```
+    
+    ```javascript
+    // Anti-pattern: Loading all resources upfront
+    function initializeApp() {
+      // Load all possible resources at startup
+      loadAllStyles();
+      loadAllScripts();
+      loadAllImages();
+      loadAllFonts();
+    }
+    
+    // Better approach: Lazy loading resources
+    function initializeAppEfficiently() {
+      // Load only critical resources initially
+      loadCriticalResources();
+      
+      // Lazy load images
+      document.querySelectorAll('img.lazy').forEach(img => {
+        const observer = new IntersectionObserver(entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              img.src = img.dataset.src;
+              observer.disconnect();
+            }
+          });
+        });
+        observer.observe(img);
+      });
+      
+      // Lazy load non-critical scripts
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          loadNonCriticalScripts();
+        }, 1000);
+      });
+    }
+    ```
+    
+    Inefficient resource loading, such as loading all resources upfront or using render-blocking resources, leads to slower page loads, higher bandwidth usage, and poor user experience.
+    
+    To optimize resource loading:
+    - Implement lazy loading for images and non-critical resources
+    - Use resource hints (preload, prefetch, preconnect)
+    - Defer non-critical JavaScript
+    - Inline critical CSS
+    - Implement code splitting and dynamic imports
+    - Use HTTP/2 or HTTP/3 for parallel loading
+    - Implement proper caching strategies
+    - Optimize the critical rendering path
+    - Consider using CDNs for static resources
+    - Implement responsive images with appropriate sizes
+  </Accordion>
+  <Accordion title="Inefficient Caching Strategies" icon="database">
+    ```javascript
+    // Anti-pattern: Not implementing proper caching
+    function fetchUserData(userId) {
+      // Always fetch from the server, even if data hasn't changed
+      return fetch(`/api/users/${userId}`)
+        .then(response => response.json());
+    }
+    
+    // Better approach: Implementing HTTP caching
+    function fetchUserDataWithCaching(userId) {
+      return fetch(`/api/users/${userId}`, {
+        headers: {
+          'Cache-Control': 'max-age=3600' // Cache for 1 hour
+        }
+      }).then(response => response.json());
+    }
+    
+    // Even better: Implementing client-side caching with validation
+    const cache = new Map();
+    
+    async function fetchUserDataWithValidation(userId) {
+      const cacheKey = `user_${userId}`;
+      const cachedData = cache.get(cacheKey);
+      
+      if (cachedData) {
+        // If we have cached data, use If-None-Match header with ETag
+        const response = await fetch(`/api/users/${userId}`, {
+          headers: {
+            'If-None-Match': cachedData.etag
+          }
+        });
+        
+        if (response.status === 304) {
+          // Not modified, use cached data
+          return cachedData.data;
+        } else {
+          // Data changed, update cache
+          const data = await response.json();
+          cache.set(cacheKey, {
+            data,
+            etag: response.headers.get('ETag'),
+            timestamp: Date.now()
+          });
+          return data;
+        }
+      } else {
+        // No cached data, fetch from server
+        const response = await fetch(`/api/users/${userId}`);
+        const data = await response.json();
+        
+        // Store in cache with ETag
+        cache.set(cacheKey, {
+          data,
+          etag: response.headers.get('ETag'),
+          timestamp: Date.now()
+        });
+        
+        return data;
+      }
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Not using caching in Android
+    private void fetchDataWithoutCaching() {
+        apiService.getUserProfile(userId).enqueue(new Callback<UserProfile>() {
+            @Override
+            public void onResponse(Call<UserProfile> call, Response<UserProfile> response) {
+                if (response.isSuccessful()) {
+                    displayUserProfile(response.body());
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<UserProfile> call, Throwable t) {
+                showError("Failed to load profile");
+            }
+        });
+    }
+    
+    // Better approach: Using OkHttp cache
+    private OkHttpClient createCachedClient() {
+        File cacheDir = new File(context.getCacheDir(), "http_cache");
+        int cacheSize = 10 * 1024 * 1024; // 10 MB cache
+        Cache cache = new Cache(cacheDir, cacheSize);
+        
+        return new OkHttpClient.Builder()
+            .cache(cache)
+            .addNetworkInterceptor(new CacheInterceptor())
+            .build();
+    }
+    
+    private static class CacheInterceptor implements Interceptor {
+        @Override
+        public Response intercept(Chain chain) throws IOException {
+            Response originalResponse = chain.proceed(chain.request());
+            
+            return originalResponse.newBuilder()
+                .header("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+                .build();
+        }
+    }
+    
+    // Retrofit with caching
+    Retrofit retrofit = new Retrofit.Builder()
+        .baseUrl("https://api.example.com/")
+        .client(createCachedClient())
+        .addConverterFactory(GsonConverterFactory.create())
+        .build();
+    ```
+    
+    Not implementing proper caching strategies leads to unnecessary network requests, increased server load, higher bandwidth usage, and slower application performance, especially for frequently accessed resources.
+    
+    To implement effective caching:
+    - Use HTTP caching headers (Cache-Control, ETag, Last-Modified)
+    - Implement client-side caching for frequently accessed data
+    - Use service workers for offline caching in web applications
+    - Implement disk caching for mobile applications
+    - Use memory caching for frequently accessed small datasets
+    - Implement proper cache invalidation strategies
+    - Consider using CDNs for static content
+    - Use browser storage (localStorage, IndexedDB) for web applications
+    - Implement TTL (Time To Live) for cached resources
+    - Consider using specialized caching libraries or services
+  </Accordion>
+  
+  <Accordion title="Large Payload Sizes" icon="weight-hanging">
+    ```javascript
+    // Anti-pattern: Sending unnecessarily large payloads
+    function fetchUserProfile(userId) {
+      return fetch(`/api/users/${userId}`)
+        .then(response => response.json())
+        .then(user => {
+          // Server returns everything, including large unnecessary fields
+          // like full history, high-res images, etc.
+          displayUserProfile(user);
+        });
+    }
+    
+    // Better approach: Using field selection or GraphQL
+    function fetchUserProfileEfficiently(userId) {
+      // Option 1: Field selection with REST
+      return fetch(`/api/users/${userId}?fields=id,name,email,avatar_thumb`)
+        .then(response => response.json())
+        .then(user => {
+          displayUserProfile(user);
+        });
+      
+      // Option 2: Using GraphQL
+      const query = `{
+        user(id: "${userId}") {
+          id
+          name
+          email
+          avatarThumb
+        }
+      }`;
+      
+      return fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      })
+        .then(response => response.json())
+        .then(result => {
+          displayUserProfile(result.data.user);
+        });
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Sending large request bodies
+    private void sendAnalyticsData(List<AnalyticsEvent> events) {
+        // Sending all event data including unnecessary fields
+        apiService.logEvents(events).enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                Log.d(TAG, "Analytics data sent");
+            }
+            
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {
+                Log.e(TAG, "Failed to send analytics", t);
+            }
+        });
+    }
+    
+    // Better approach: Sending only necessary data
+    private void sendAnalyticsDataEfficiently(List<AnalyticsEvent> events) {
+        // Convert to minimal DTOs with only necessary fields
+        List<AnalyticsEventDTO> eventDTOs = events.stream()
+            .map(this::convertToMinimalDTO)
+            .collect(Collectors.toList());
+        
+        apiService.logEvents(eventDTOs).enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                Log.d(TAG, "Analytics data sent");
+            }
+            
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {
+                Log.e(TAG, "Failed to send analytics", t);
+            }
+        });
+    }
+    
+    private AnalyticsEventDTO convertToMinimalDTO(AnalyticsEvent event) {
+        // Extract only necessary fields
+        return new AnalyticsEventDTO(
+            event.getType(),
+            event.getTimestamp(),
+            event.getBasicProperties()
+            // Exclude large unnecessary fields like raw event data, debug info, etc.
+        );
+    }
+    ```
+    
+    Transferring unnecessarily large payloads increases bandwidth usage, slows down data processing, and degrades application performance, especially on mobile networks or devices with limited resources.
+    
+    To optimize payload sizes:
+    - Implement field selection to request only necessary data
+    - Use GraphQL to specify exactly what data you need
+    - Create specific DTOs (Data Transfer Objects) for different use cases
+    - Implement pagination for large datasets
+    - Use data compression (GZIP, Brotli)
+    - Consider using binary formats (Protocol Buffers, MessagePack)
+    - Optimize images and media with appropriate formats and compression
+    - Implement lazy loading for related data
+    - Use sparse fieldsets in REST APIs
+    - Monitor payload sizes and set performance budgets
+  </Accordion>
+  
+  <Accordion title="Inefficient API Design" icon="sitemap">
+    ```javascript
+    // Anti-pattern: Chatty API with many small requests
+    async function loadDashboardWithChattyAPI() {
+      // Multiple fine-grained API calls
+      const user = await fetch('/api/user').then(res => res.json());
+      const preferences = await fetch(`/api/user/${user.id}/preferences`).then(res => res.json());
+      const notifications = await fetch(`/api/user/${user.id}/notifications`).then(res => res.json());
+      const recentItems = await fetch(`/api/user/${user.id}/recent-items`).then(res => res.json());
+      const stats = await fetch(`/api/user/${user.id}/stats`).then(res => res.json());
+      
+      // Update UI with all the data
+      updateDashboard(user, preferences, notifications, recentItems, stats);
+    }
+    
+    // Better approach: Coarse-grained API
+    async function loadDashboardWithEfficientAPI() {
+      // Single API call that returns all needed data
+      const dashboardData = await fetch('/api/dashboard')
+        .then(res => res.json());
+      
+      // Update UI with consolidated data
+      updateDashboard(
+        dashboardData.user,
+        dashboardData.preferences,
+        dashboardData.notifications,
+        dashboardData.recentItems,
+        dashboardData.stats
+      );
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Inefficient API design in Android
+    private void loadOrderDetailsInefficiently(String orderId) {
+        // Multiple API calls for related data
+        apiService.getOrder(orderId).enqueue(new Callback<Order>() {
+            @Override
+            public void onResponse(Call<Order> call, Response<Order> response) {
+                if (response.isSuccessful()) {
+                    Order order = response.body();
+                    displayOrderBasicInfo(order);
+                    
+                    // Separate call for order items
+                    apiService.getOrderItems(orderId).enqueue(new Callback<List<OrderItem>>() {
+                        @Override
+                        public void onResponse(Call<List<OrderItem>> call, Response<List<OrderItem>> response) {
+                            if (response.isSuccessful()) {
+                                displayOrderItems(response.body());
+                                
+                                // Separate call for shipping info
+                                apiService.getOrderShipping(orderId).enqueue(new Callback<ShippingInfo>() {
+                                    @Override
+                                    public void onResponse(Call<ShippingInfo> call, Response<ShippingInfo> response) {
+                                        if (response.isSuccessful()) {
+                                            displayShippingInfo(response.body());
+                                        }
+                                    }
+                                    
+                                    @Override
+                                    public void onFailure(Call<ShippingInfo> call, Throwable t) {
+                                        showError("Failed to load shipping info");
+                                    }
+                                });
+                            }
+                        }
+                        
+                        @Override
+                        public void onFailure(Call<List<OrderItem>> call, Throwable t) {
+                            showError("Failed to load order items");
+                        }
+                    });
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<Order> call, Throwable t) {
+                showError("Failed to load order");
+            }
+        });
+    }
+    
+    // Better approach: Using a consolidated API endpoint
+    private void loadOrderDetailsEfficiently(String orderId) {
+        apiService.getOrderDetails(orderId).enqueue(new Callback<OrderDetails>() {
+            @Override
+            public void onResponse(Call<OrderDetails> call, Response<OrderDetails> response) {
+                if (response.isSuccessful()) {
+                    OrderDetails details = response.body();
+                    displayOrderBasicInfo(details.getOrder());
+                    displayOrderItems(details.getItems());
+                    displayShippingInfo(details.getShippingInfo());
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<OrderDetails> call, Throwable t) {
+                showError("Failed to load order details");
+            }
+        });
+    }
+    ```
+    
+    Inefficient API design, such as overly chatty APIs with many small requests or poorly structured endpoints, leads to increased latency, higher server load, and poor application performance.
+    
+    To design efficient APIs:
+    - Balance between fine-grained and coarse-grained endpoints
+    - Design endpoints around use cases rather than data models
+    - Implement batch operations for multiple resources
+    - Use GraphQL for flexible data fetching
+    - Consider implementing BFF (Backend for Frontend) pattern
+    - Design resource-oriented APIs with proper nesting
+    - Implement proper pagination, filtering, and sorting
+    - Use consistent error handling and status codes
+    - Consider versioning strategy for API evolution
+    - Implement proper documentation and contracts
+  </Accordion>
+  
+  <Accordion title="Inefficient Image Loading" icon="image">
+    ```html
+    <!-- Anti-pattern: Loading full-size images without optimization -->
+    <img src="large-image.jpg" alt="Product" />
+    
+    <!-- Better approach: Using responsive images -->
+    <img 
+      srcset="
+        product-small.jpg 400w,
+        product-medium.jpg 800w,
+        product-large.jpg 1200w"
+      sizes="
+        (max-width: 600px) 400px,
+        (max-width: 1200px) 800px,
+        1200px"
+      src="product-medium.jpg"
+      alt="Product"
+      loading="lazy" />
+    ```
+    
+    ```javascript
+    // Anti-pattern: Loading all images at once
+    function loadGallery(images) {
+      const gallery = document.getElementById('gallery');
+      
+      images.forEach(image => {
+        const imgElement = document.createElement('img');
+        imgElement.src = image.url; // Loads all images immediately
+        imgElement.alt = image.alt;
+        gallery.appendChild(imgElement);
+      });
+    }
+    
+    // Better approach: Lazy loading with Intersection Observer
+    function loadGalleryEfficiently(images) {
+      const gallery = document.getElementById('gallery');
+      
+      // Create observer
+      const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const imgElement = entry.target;
+            imgElement.src = imgElement.dataset.src; // Load the actual image
+            observer.unobserve(imgElement); // Stop observing once loaded
+          }
+        });
+      });
+      
+      // Create image elements with lazy loading
+      images.forEach(image => {
+        const imgElement = document.createElement('img');
+        imgElement.dataset.src = image.url; // Store URL in data attribute
+        imgElement.alt = image.alt;
+        imgElement.src = 'placeholder.svg'; // Lightweight placeholder
+        
+        gallery.appendChild(imgElement);
+        observer.observe(imgElement); // Start observing
+      });
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Loading full-size images in Android
+    private void loadImageInefficiently(String imageUrl, ImageView imageView) {
+        Picasso.get()
+            .load(imageUrl)
+            .into(imageView);
+    }
+    
+    // Better approach: Optimizing image loading
+    private void loadImageEfficiently(String imageUrl, ImageView imageView) {
+        // Get target dimensions
+        int targetWidth = imageView.getWidth();
+        int targetHeight = imageView.getHeight();
+        
+        // If dimensions are not yet available, use estimated values
+        if (targetWidth <= 0) {
+            targetWidth = imageView.getLayoutParams().width;
+        }
+        if (targetHeight <= 0) {
+            targetHeight = imageView.getLayoutParams().height;
+        }
+        
+        // Use placeholder and error images
+        Picasso.get()
+            .load(imageUrl)
+            .placeholder(R.drawable.placeholder)
+            .error(R.drawable.error_image)
+            .resize(targetWidth, targetHeight)
+            .centerCrop() // or .centerInside() depending on requirements
+            .into(imageView);
+    }
+    ```
+    
+    Inefficient image loading, such as loading full-size images for small display areas or loading all images at once, leads to excessive bandwidth usage, slower page loads, and poor user experience.
+    
+    To optimize image loading:
+    - Use responsive images with appropriate sizes for different devices
+    - Implement lazy loading for off-screen images
+    - Use modern image formats (WebP, AVIF) with better compression
+    - Implement proper image compression
+    - Use content delivery networks (CDNs) for image hosting
+    - Implement proper caching strategies for images
+    - Consider using image optimization services
+    - Implement progressive loading for large images
+    - Use appropriate image dimensions for display size
+    - Consider implementing blur-up or low-quality image placeholders
+  </Accordion>
+  
+  <Accordion title="Network Performance Checklist" icon="clipboard-check">
+    ```text
+    Network Performance Optimization Checklist:
+    
+    1. API Design and Usage
+       - Consolidate related API endpoints
+       - Implement batch operations
+       - Use GraphQL for flexible data fetching
+       - Design endpoints around use cases
+       - Implement proper pagination and filtering
+       - Minimize API chattiness
+    
+    2. Data Transfer Optimization
+       - Enable compression (GZIP, Brotli)
+       - Minimize payload sizes
+       - Use field selection to request only needed data
+       - Consider binary formats for data transfer
+       - Optimize images and media files
+       - Implement proper serialization/deserialization
+    
+    3. Caching Strategy
+       - Implement HTTP caching with proper headers
+       - Use client-side caching for frequently accessed data
+       - Implement service workers for offline caching
+       - Use CDNs for static content
+       - Implement proper cache invalidation
+       - Consider using specialized caching services
+    
+    4. Connection Optimization
+       - Use connection pooling
+       - Implement keep-alive connections
+       - Consider using HTTP/2 or HTTP/3
+       - Minimize DNS lookups
+       - Use resource hints (preconnect, dns-prefetch)
+       - Implement proper timeout handling
+    
+    5. Asynchronous Operations
+       - Use asynchronous requests
+       - Implement proper loading indicators
+       - Consider using WebSockets for real-time data
+       - Implement request cancellation
+       - Use background processing for large operations
+       - Implement retry mechanisms with exponential backoff
+    ```
+    
+    Optimizing network performance requires a systematic approach that addresses multiple aspects of network usage, from API design to resource loading and caching strategies.
+    
+    Key optimization strategies:
+    - Design efficient APIs that minimize network requests
+    - Implement proper caching at multiple levels
+    - Optimize data transfer with compression and minimal payloads
+    - Use asynchronous operations to prevent blocking
+    - Implement efficient resource loading strategies
+    - Consider using modern protocols and technologies (HTTP/2, HTTP/3, WebSockets)
+    - Monitor network performance and set performance budgets
+    - Implement proper error handling and retry mechanisms
+    - Use appropriate tools for network monitoring and optimization
+    - Consider the impact of network operations on battery life for mobile applications
+  </Accordion>
+</AccordionGroup>

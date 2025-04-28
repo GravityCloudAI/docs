@@ -1,0 +1,791 @@
+---
+title: 'Configuration Vulnerabilities'
+description: 'Configuration vulnerabilities occur when applications are improperly configured, potentially exposing sensitive information or creating security weaknesses.'
+---
+
+<AccordionGroup>
+  <Accordion title="Configuration Vulnerabilities Overview" icon="shield-xmark">
+    Configuration vulnerabilities arise when applications, frameworks, or systems are set up with insecure default settings or improper configurations. These vulnerabilities can create security weaknesses that attackers can exploit, even if the application code itself is secure.
+    
+    Proper configuration management is essential for maintaining security throughout the application lifecycle. This includes secure default settings, proper environment configuration, and regular security reviews of configuration changes.
+  </Accordion>
+  
+  <Accordion title="Hardcoded Credentials" icon="key">
+    ```javascript
+    // Anti-pattern: Hardcoded credentials
+    const dbConfig = {
+      host: 'database.example.com',
+      user: 'admin',
+      password: 'super_secret_password',
+      database: 'production_db'
+    };
+    
+    const connection = mysql.createConnection(dbConfig);
+    
+    // Better approach: Using environment variables
+    const dbConfig = {
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME
+    };
+    
+    const connection = mysql.createConnection(dbConfig);
+    ```
+    
+    Hardcoded credentials in source code are easily discoverable, especially in open-source projects or when source code is leaked.
+    
+    To avoid hardcoded credentials:
+    - Use environment variables for sensitive configuration
+    - Implement a secure configuration management system
+    - Use secrets management services (AWS Secrets Manager, HashiCorp Vault)
+    - Implement proper access controls for configuration files
+    - Regularly rotate credentials
+    - Use different credentials for different environments
+  </Accordion>
+  
+  <Accordion title="Insecure Default Configurations" icon="gears">
+    ```javascript
+    // Anti-pattern: Insecure default configuration
+    const express = require('express');
+    const app = express();
+    
+    // Using default configurations
+    app.use(express.json());
+    
+    // Better approach: Secure configuration
+    const express = require('express');
+    const helmet = require('helmet');
+    const app = express();
+    
+    // Add security headers
+    app.use(helmet());
+    
+    // Configure body parser with limits
+    app.use(express.json({ limit: '100kb' }));
+    
+    // Set secure cookie options
+    app.use(session({
+      secret: process.env.SESSION_SECRET,
+      cookie: {
+        secure: true,
+        httpOnly: true,
+        sameSite: 'strict',
+        maxAge: 3600000 // 1 hour
+      }
+    }));
+    ```
+    
+    Insecure default configurations can leave applications vulnerable to various attacks if not properly hardened.
+    
+    To implement secure configurations:
+    - Review and harden default settings
+    - Use security-focused middleware (like Helmet for Express)
+    - Set appropriate size limits for requests
+    - Configure secure cookie attributes
+    - Disable unnecessary features and modules
+    - Implement proper CORS configuration
+    - Regularly update and review security configurations
+  </Accordion>
+  
+  <Accordion title="Exposed Configuration Files" icon="file-shield">
+    ```apache
+    # Anti-pattern: Exposed configuration files in Apache
+    <Directory /var/www/html>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+    
+    # Better approach: Protecting configuration files
+    <Directory /var/www/html>
+        Options FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+    
+    # Block access to configuration files
+    <FilesMatch "\.(env|config|ini|json|xml|yml|yaml)$">
+        Require all denied
+    </FilesMatch>
+    ```
+    
+    Exposed configuration files can reveal sensitive information like database credentials, API keys, or internal infrastructure details.
+    
+    To protect configuration files:
+    - Store configuration files outside the web root
+    - Use appropriate file permissions
+    - Block access to configuration files via web server rules
+    - Use environment-specific configuration files
+    - Consider encrypting sensitive configuration values
+    - Implement proper access controls for configuration management
+  </Accordion>
+  
+  <Accordion title="Verbose Error Messages" icon="message-exclamation">
+    ```javascript
+    // Anti-pattern: Verbose error messages in configuration
+    // config.js
+    module.exports = {
+      // ...
+      showDetailedErrors: true,
+      // ...
+    };
+    
+    // app.js
+    app.use((err, req, res, next) => {
+      if (config.showDetailedErrors) {
+        return res.status(500).json({
+          error: err.message,
+          stack: err.stack,
+          details: err
+        });
+      }
+      
+      res.status(500).json({ error: 'Server error' });
+    });
+    
+    // Better approach: Environment-specific error handling
+    // config.js
+    module.exports = {
+      // ...
+      environment: process.env.NODE_ENV || 'development',
+      // ...
+    };
+    
+    // app.js
+    app.use((err, req, res, next) => {
+      // Log the error for internal use
+      console.error('Application error:', err);
+      
+      if (config.environment === 'development') {
+        return res.status(500).json({
+          error: err.message,
+          stack: err.stack
+        });
+      }
+      
+      // Production error response
+      res.status(500).json({ error: 'An unexpected error occurred' });
+    });
+    ```
+    
+    Verbose error messages can reveal sensitive information about the application's internal workings, database structure, or system configuration.
+    
+    To implement proper error message configuration:
+    - Configure different error handling for development and production
+    - Log detailed errors server-side
+    - Return generic error messages to users in production
+    - Implement proper error handling middleware
+    - Consider using error tracking services
+    - Regularly review error logs for sensitive information
+  </Accordion>
+  
+  <Accordion title="Insecure Cross-Origin Resource Sharing (CORS)" icon="globe">
+    ```javascript
+    // Anti-pattern: Insecure CORS configuration
+    app.use(cors({
+      origin: '*', // Allow all origins
+      credentials: true
+    }));
+    
+    // Better approach: Secure CORS configuration
+    const allowedOrigins = [
+      'https://example.com',
+      'https://www.example.com',
+      'https://app.example.com'
+    ];
+    
+    // For development environment only
+    if (process.env.NODE_ENV === 'development') {
+      allowedOrigins.push('http://localhost:3000');
+    }
+    
+    app.use(cors({
+      origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) === -1) {
+          const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+          return callback(new Error(msg), false);
+        }
+        
+        return callback(null, true);
+      },
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+      maxAge: 86400 // 24 hours
+    }));
+    ```
+    
+    Insecure CORS configuration can allow unauthorized websites to make requests to your API, potentially leading to data theft or unauthorized actions.
+    
+    To implement secure CORS:
+    - Specify allowed origins explicitly
+    - Avoid using wildcard origins in production
+    - Limit allowed HTTP methods and headers
+    - Consider the implications of allowing credentials
+    - Implement proper preflight request handling
+    - Use environment-specific CORS configurations
+  </Accordion>
+  
+  <Accordion title="Insufficient Transport Layer Security" icon="lock">
+    ```javascript
+    // Anti-pattern: Insufficient TLS configuration
+    const https = require('https');
+    const fs = require('fs');
+    
+    const options = {
+      key: fs.readFileSync('server.key'),
+      cert: fs.readFileSync('server.crt')
+      // Missing secure TLS configuration
+    };
+    
+    https.createServer(options, app).listen(443);
+    
+    // Better approach: Secure TLS configuration
+    const https = require('https');
+    const fs = require('fs');
+    
+    const options = {
+      key: fs.readFileSync('server.key'),
+      cert: fs.readFileSync('server.crt'),
+      // Secure TLS configuration
+      minVersion: 'TLSv1.2',
+      ciphers: [
+        'ECDHE-ECDSA-AES128-GCM-SHA256',
+        'ECDHE-RSA-AES128-GCM-SHA256',
+        'ECDHE-ECDSA-AES256-GCM-SHA384',
+        'ECDHE-RSA-AES256-GCM-SHA384',
+        'DHE-RSA-AES128-GCM-SHA256',
+        'ECDHE-ECDSA-CHACHA20-POLY1305',
+        'ECDHE-RSA-CHACHA20-POLY1305',
+        'DHE-RSA-AES256-GCM-SHA384'
+      ].join(':'),
+      honorCipherOrder: true
+    };
+    
+    https.createServer(options, app).listen(443);
+    ```
+    
+    Insufficient transport layer security can expose communications to interception, tampering, or eavesdropping.
+    
+    To implement secure TLS:
+    - Enforce minimum TLS version (1.2 or higher)
+    - Configure secure cipher suites
+    - Implement proper certificate management
+    - Enable HTTP Strict Transport Security (HSTS)
+    - Disable insecure protocols and ciphers
+    - Regularly update TLS configurations
+    - Use automated tools to verify TLS security
+  </Accordion>
+  
+  <Accordion title="Insecure HTTP Headers" icon="code">
+    ```javascript
+    // Anti-pattern: Missing security headers
+    const express = require('express');
+    const app = express();
+    
+    // No security headers configured
+    
+    // Better approach: Implementing security headers
+    const express = require('express');
+    const helmet = require('helmet');
+    const app = express();
+    
+    // Add security headers with Helmet
+    app.use(helmet());
+    
+    // Customize specific headers
+    app.use(helmet.contentSecurityPolicy({
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'trusted-cdn.com'],
+        styleSrc: ["'self'", 'trusted-cdn.com'],
+        imgSrc: ["'self'", 'data:', 'trusted-cdn.com'],
+        connectSrc: ["'self'", 'api.example.com'],
+        fontSrc: ["'self'", 'trusted-cdn.com'],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+        // Report violations to this URL
+        reportUri: '/csp-violation-report'
+      }
+    }));
+    
+    // Set HSTS header
+    app.use(helmet.hsts({
+      maxAge: 15552000, // 180 days in seconds
+      includeSubDomains: true,
+      preload: true
+    }));
+    ```
+    
+    Insecure HTTP headers can make applications vulnerable to various attacks, including cross-site scripting, clickjacking, and information disclosure.
+    
+    To implement secure HTTP headers:
+    - Use security-focused middleware (like Helmet)
+    - Implement Content Security Policy (CSP)
+    - Enable HTTP Strict Transport Security (HSTS)
+    - Configure X-Content-Type-Options
+    - Set X-Frame-Options to prevent clickjacking
+    - Implement Referrer-Policy
+    - Configure Feature-Policy/Permissions-Policy
+    - Regularly test and update security headers
+  </Accordion>
+  
+  <Accordion title="Excessive Permissions" icon="user-shield">
+    ```javascript
+    // Anti-pattern: Excessive permissions in database configuration
+    // Database user with excessive privileges
+    const dbConfig = {
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER, // User with all privileges
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME
+    };
+    
+    // Better approach: Least privilege principle
+    // Read-only database configuration
+    const readOnlyDbConfig = {
+      host: process.env.DB_HOST,
+      user: process.env.DB_READ_USER, // User with read-only privileges
+      password: process.env.DB_READ_PASSWORD,
+      database: process.env.DB_NAME
+    };
+    
+    // Write database configuration
+    const writeDbConfig = {
+      host: process.env.DB_HOST,
+      user: process.env.DB_WRITE_USER, // User with specific write privileges
+      password: process.env.DB_WRITE_PASSWORD,
+      database: process.env.DB_NAME
+    };
+    
+    // Use appropriate connection based on operation
+    function getUser(userId) {
+      const connection = mysql.createConnection(readOnlyDbConfig);
+      // Query user data...
+    }
+    
+    function updateUser(userId, userData) {
+      const connection = mysql.createConnection(writeDbConfig);
+      // Update user data...
+    }
+    ```
+    
+    Excessive permissions can amplify the impact of security breaches, allowing attackers to gain more access than necessary if a vulnerability is exploited.
+    
+    To implement least privilege principle:
+    - Create separate accounts for different functions
+    - Grant only necessary permissions
+    - Use read-only access when possible
+    - Implement proper role-based access control
+    - Regularly audit and review permissions
+    - Revoke unnecessary permissions
+    - Use different credentials for different environments
+  </Accordion>
+  
+  <Accordion title="Insecure Cookie Configuration" icon="cookie">
+    ```javascript
+    // Anti-pattern: Insecure cookie configuration
+    app.use(session({
+      secret: 'session-secret',
+      resave: false,
+      saveUninitialized: true,
+      cookie: {
+        // Insecure cookie settings
+      }
+    }));
+    
+    // Better approach: Secure cookie configuration
+    app.use(session({
+      secret: process.env.SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: process.env.NODE_ENV === 'production', // Requires HTTPS
+        httpOnly: true, // Prevents JavaScript access
+        sameSite: 'strict', // Prevents CSRF
+        maxAge: 3600000, // 1 hour
+        domain: process.env.COOKIE_DOMAIN, // Restrict to specific domain
+        path: '/' // Restrict to specific path
+      }
+    }));
+    ```
+    
+    Insecure cookie configuration can lead to session hijacking, cross-site scripting, or cross-site request forgery attacks.
+    
+    To implement secure cookies:
+    - Set the HttpOnly flag to prevent JavaScript access
+    - Use the Secure flag to ensure cookies are only sent over HTTPS
+    - Implement the SameSite attribute to prevent CSRF
+    - Set appropriate domain and path restrictions
+    - Use appropriate expiration times
+    - Consider implementing cookie prefixes for additional security
+    - Use strong, randomly generated session identifiers
+  </Accordion>
+  
+  <Accordion title="Unnecessary Services and Features" icon="server">
+    ```javascript
+    // Anti-pattern: Enabling unnecessary features
+    const express = require('express');
+    const app = express();
+    
+    // Enabling directory listing
+    app.use('/public', express.static('public', { index: false }));
+    
+    // Enabling TRACE method
+    app.trace('*', (req, res) => {
+      res.send('TRACE method enabled');
+    });
+    
+    // Better approach: Disabling unnecessary features
+    const express = require('express');
+    const app = express();
+    
+    // Disable directory listing
+    app.use('/public', express.static('public', { index: true }));
+    
+    // Disable X-Powered-By header
+    app.disable('x-powered-by');
+    
+    // Allow only necessary HTTP methods
+    const allowedMethods = ['GET', 'POST', 'PUT', 'DELETE'];
+    
+    app.use((req, res, next) => {
+      if (!allowedMethods.includes(req.method)) {
+        return res.status(405).send('Method Not Allowed');
+      }
+      next();
+    });
+    ```
+    
+    Unnecessary services and features can increase the attack surface of an application, providing additional vectors for attackers to exploit.
+    
+    To minimize attack surface:
+    - Disable unnecessary features and modules
+    - Remove unused dependencies
+    - Implement proper HTTP method restrictions
+    - Disable directory listing
+    - Remove unnecessary headers that reveal system information
+    - Close unused ports and services
+    - Regularly audit enabled features and services
+  </Accordion>
+  
+  <Accordion title="Insecure File Upload Configuration" icon="file-arrow-up">
+    ```javascript
+    // Anti-pattern: Insecure file upload configuration
+    const multer = require('multer');
+    
+    const storage = multer.diskStorage({
+      destination: function(req, file, cb) {
+        cb(null, 'public/uploads/'); // Uploads stored in public directory
+      },
+      filename: function(req, file, cb) {
+        cb(null, file.originalname); // Using original filename
+      }
+    });
+    
+    const upload = multer({ storage: storage });
+    
+    app.post('/upload', upload.single('file'), (req, res) => {
+      res.json({ file: req.file });
+    });
+    
+    // Better approach: Secure file upload configuration
+    const multer = require('multer');
+    const crypto = require('crypto');
+    const path = require('path');
+    
+    // Store uploads outside web root
+    const uploadDir = path.join(__dirname, '../uploads');
+    
+    const storage = multer.diskStorage({
+      destination: function(req, file, cb) {
+        cb(null, uploadDir);
+      },
+      filename: function(req, file, cb) {
+        // Generate secure random filename
+        crypto.randomBytes(16, (err, raw) => {
+          if (err) return cb(err);
+          
+          // Keep original extension but use random filename
+          const extension = path.extname(file.originalname).toLowerCase();
+          cb(null, raw.toString('hex') + extension);
+        });
+      }
+    });
+    
+    // Validate file type and size
+    const fileFilter = (req, file, cb) => {
+      // Define allowed extensions
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+      
+      if (!allowedTypes.includes(file.mimetype)) {
+        return cb(new Error('Invalid file type'), false);
+      }
+      
+      cb(null, true);
+    };
+    
+    const upload = multer({
+      storage: storage,
+      fileFilter: fileFilter,
+      limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+      }
+    });
+    
+    app.post('/upload', upload.single('file'), (req, res) => {
+      // Return only necessary information
+      res.json({
+        filename: req.file.filename,
+        size: req.file.size
+      });
+    });
+    ```
+    
+    Insecure file upload configuration can lead to various vulnerabilities, including code execution, path traversal, or denial-of-service attacks.
+    
+    To implement secure file uploads:
+    - Store uploaded files outside the web root
+    - Generate secure random filenames
+    - Validate file types and content
+    - Implement file size limits
+    - Use proper file permissions
+    - Scan uploaded files for malware
+    - Serve files through a controlled endpoint
+    - Consider using a CDN or dedicated file storage service
+  </Accordion>
+  
+  <Accordion title="Improper Cache Control" icon="database">
+    ```javascript
+    // Anti-pattern: Missing cache control headers
+    app.get('/api/user-profile', authenticateUser, (req, res) => {
+      getUserProfile(req.user.id)
+        .then(profile => res.json(profile))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Proper cache control configuration
+    app.get('/api/user-profile', authenticateUser, (req, res) => {
+      // Set cache control headers for sensitive data
+      res.set({
+        'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
+      getUserProfile(req.user.id)
+        .then(profile => res.json(profile))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // For public, cacheable content
+    app.get('/api/public-data', (req, res) => {
+      // Allow caching for public data
+      res.set({
+        'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+        'Expires': new Date(Date.now() + 3600000).toUTCString()
+      });
+      
+      getPublicData()
+        .then(data => res.json(data))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Improper cache control can lead to sensitive information being stored in browser caches or proxies, potentially exposing it to unauthorized users.
+    
+    To implement proper cache control:
+    - Set appropriate cache control headers based on content sensitivity
+    - Prevent caching of sensitive information
+    - Use appropriate caching directives for public content
+    - Consider implementing cache partitioning
+    - Be aware of proxy caching behavior
+    - Implement proper cache invalidation strategies
+    - Regularly test caching behavior
+  </Accordion>
+  
+  <Accordion title="Insecure Dependency Configuration" icon="box-open">
+    ```javascript
+    // Anti-pattern: Insecure dependency configuration
+    // package.json with no version pinning
+    {
+      "dependencies": {
+        "express": "^4.17.1",
+        "mongoose": "^5.9.7",
+        "jsonwebtoken": "^8.5.1"
+      }
+    }
+    
+    // Better approach: Secure dependency configuration
+    // package.json with exact version pinning
+    {
+      "dependencies": {
+        "express": "4.17.1",
+        "mongoose": "5.9.7",
+        "jsonwebtoken": "8.5.1"
+      },
+      "scripts": {
+        "audit": "npm audit",
+        "outdated": "npm outdated",
+        "update": "npm update"
+      }
+    }
+    
+    // Even better: Using lock files
+    // package-lock.json or yarn.lock should be committed to version control
+    ```
+    
+    Insecure dependency configuration can lead to unexpected behavior, compatibility issues, or security vulnerabilities if dependencies are automatically updated to versions with security issues.
+    
+    To implement secure dependency management:
+    - Pin dependency versions to specific releases
+    - Use lock files to ensure consistent installations
+    - Regularly audit dependencies for vulnerabilities
+    - Update dependencies in a controlled manner
+    - Consider using dependency scanning tools
+    - Implement continuous monitoring for vulnerable dependencies
+    - Have a process for emergency updates when critical vulnerabilities are discovered
+  </Accordion>
+  
+  <Accordion title="Insufficient Rate Limiting" icon="gauge-high">
+    ```javascript
+    // Anti-pattern: No rate limiting
+    app.post('/api/login', (req, res) => {
+      // No rate limiting for authentication
+      authenticateUser(req.body.username, req.body.password)
+        .then(user => {
+          if (user) {
+            return res.json({ token: generateToken(user) });
+          }
+          res.status(401).json({ error: 'Invalid credentials' });
+        })
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Implementing rate limiting
+    const rateLimit = require('express-rate-limit');
+    
+    // Create different rate limiters for different endpoints
+    const loginLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 5, // 5 requests per windowMs per IP
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: 'Too many login attempts, please try again after 15 minutes'
+    });
+    
+    const apiLimiter = rateLimit({
+      windowMs: 60 * 1000, // 1 minute
+      max: 60, // 60 requests per minute per IP
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: 'Too many requests, please try again later'
+    });
+    
+    // Apply rate limiters to specific routes
+    app.post('/api/login', loginLimiter, (req, res) => {
+      authenticateUser(req.body.username, req.body.password)
+        .then(user => {
+          if (user) {
+            return res.json({ token: generateToken(user) });
+          }
+          res.status(401).json({ error: 'Invalid credentials' });
+        })
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Apply general rate limiting to all API routes
+    app.use('/api/', apiLimiter);
+    ```
+    
+    Insufficient rate limiting can make applications vulnerable to brute force attacks, credential stuffing, denial-of-service attacks, or resource exhaustion.
+    
+    To implement proper rate limiting:
+    - Apply stricter limits for authentication endpoints
+    - Implement different limits for different types of resources
+    - Consider using IP-based and user-based rate limiting
+    - Implement proper response headers for rate limiting
+    - Use appropriate time windows for different endpoints
+    - Consider implementing progressive delays
+    - Monitor for rate limit violations and potential attacks
+  </Accordion>
+  
+  <Accordion title="Debug Mode in Production" icon="bug">
+    ```javascript
+    // Anti-pattern: Debug mode enabled in production
+    // config.js
+    module.exports = {
+      // Debug mode always enabled
+      debug: true,
+      // Other configuration...
+    };
+    
+    // app.js
+    if (config.debug) {
+      // Enable detailed error messages
+      app.use((err, req, res, next) => {
+        res.status(500).json({
+          error: err.message,
+          stack: err.stack,
+          details: err
+        });
+      });
+      
+      // Enable debug routes
+      app.get('/debug/config', (req, res) => {
+        res.json(config);
+      });
+      
+      app.get('/debug/env', (req, res) => {
+        res.json(process.env);
+      });
+    }
+    
+    // Better approach: Environment-specific configuration
+    // config.js
+    module.exports = {
+      // Debug mode based on environment
+      debug: process.env.NODE_ENV !== 'production',
+      // Other configuration...
+    };
+    
+    // app.js
+    if (config.debug && process.env.NODE_ENV !== 'production') {
+      // Enable detailed error messages in non-production environments
+      app.use((err, req, res, next) => {
+        res.status(500).json({
+          error: err.message,
+          stack: err.stack,
+          details: err
+        });
+      });
+      
+      // Enable debug routes in non-production environments
+      app.get('/debug/config', (req, res) => {
+        // Filter out sensitive information
+        const safeConfig = { ...config };
+        delete safeConfig.secret;
+        delete safeConfig.apiKeys;
+        
+        res.json(safeConfig);
+      });
+    }
+    ```
+    
+    Debug mode in production can expose sensitive information, internal system details, or debugging endpoints that should not be accessible in a production environment.
+    
+    To implement proper debug configuration:
+    - Disable debug mode in production environments
+    - Use environment variables to control debug settings
+    - Implement environment-specific configuration files
+    - Remove or secure debugging endpoints in production
+    - Implement proper error handling for different environments
+    - Regularly audit production environments for debug settings
+    - Use configuration validation to prevent misconfiguration
+  </Accordion>
+</AccordionGroup>

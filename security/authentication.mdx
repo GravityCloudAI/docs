@@ -1,0 +1,762 @@
+---
+title: 'Authentication Vulnerabilities'
+description: 'Authentication vulnerabilities compromise the system that verifies user identity, potentially allowing unauthorized access to sensitive information and functionality.'
+---
+
+<AccordionGroup>
+  <Accordion title="Authentication Vulnerabilities Overview" icon="shield-xmark">
+    Authentication is the process of verifying that users are who they claim to be. Authentication vulnerabilities can allow attackers to bypass this verification process, impersonate legitimate users, and gain unauthorized access to systems and data.
+    
+    These vulnerabilities often arise from poor implementation of authentication mechanisms, weak credential management, or flawed authentication workflows. When exploited, they can lead to account takeover, data breaches, privilege escalation, and other serious security incidents.
+  </Accordion>
+  
+  <Accordion title="Weak Password Policies" icon="key">
+    ```javascript
+    // Anti-pattern: Weak password requirements
+    function validatePassword(password) {
+      return password.length >= 6;
+    }
+    
+    // Better approach: Comprehensive password policy
+    function validatePassword(password) {
+      // At least 12 characters
+      if (password.length < 12) return false;
+      
+      // Check for uppercase, lowercase, numbers, and special characters
+      const hasUppercase = /[A-Z]/.test(password);
+      const hasLowercase = /[a-z]/.test(password);
+      const hasNumbers = /[0-9]/.test(password);
+      const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+      
+      return hasUppercase && hasLowercase && hasNumbers && hasSpecial;
+    }
+    ```
+    
+    Weak password policies allow users to create passwords that are easily guessable or vulnerable to brute force attacks. This significantly reduces the security of the authentication system.
+    
+    To implement strong password policies:
+    - Require a minimum length (at least 12 characters)
+    - Require a mix of character types (uppercase, lowercase, numbers, special characters)
+    - Check passwords against lists of commonly used or compromised passwords
+    - Encourage the use of passphrases
+    - Consider implementing password strength meters
+  </Accordion>
+  
+  <Accordion title="Plaintext Password Storage" icon="database">
+    ```javascript
+    // Anti-pattern: Storing passwords in plaintext
+    function createUser(username, password) {
+      const query = `INSERT INTO users (username, password) VALUES ('${username}', '${password}')`;
+      return db.execute(query);
+    }
+    
+    // Better approach: Hashing passwords with a strong algorithm and salt
+    async function createUser(username, password) {
+      const salt = await bcrypt.genSalt(12);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      const query = `INSERT INTO users (username, password) VALUES ('${username}', '${hashedPassword}')`;
+      return db.execute(query);
+    }
+    ```
+    
+    Storing passwords in plaintext is one of the most dangerous security practices. If an attacker gains access to the database, they immediately have access to all user credentials.
+    
+    To properly store passwords:
+    - Never store passwords in plaintext
+    - Use strong, slow hashing algorithms designed for password storage (bcrypt, Argon2, PBKDF2)
+    - Use a unique salt for each password
+    - Implement key stretching with an appropriate work factor
+    - Regularly update hashing algorithms as stronger ones become available
+  </Accordion>
+  
+  <Accordion title="Insecure Authentication Protocols" icon="lock">
+    ```javascript
+    // Anti-pattern: Using basic authentication over HTTP
+    app.get('/api/data', (req, res) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        res.setHeader('WWW-Authenticate', 'Basic');
+        return res.status(401).send('Authentication required');
+      }
+      // Process basic auth header...
+    });
+    
+    // Better approach: Using secure protocols and tokens
+    app.get('/api/data', authenticateJWT, (req, res) => {
+      // User is authenticated via JWT
+      // Process request...
+    });
+    ```
+    
+    Insecure authentication protocols transmit credentials in an easily interceptable format or are vulnerable to various attacks.
+    
+    To implement secure authentication protocols:
+    - Always use HTTPS for transmitting credentials
+    - Prefer token-based authentication (JWT, OAuth) over basic authentication
+    - Implement proper token validation and expiration
+    - Use secure cookie attributes (HttpOnly, Secure, SameSite)
+    - Consider implementing multi-factor authentication
+  </Accordion>
+  
+  <Accordion title="Insufficient Brute Force Protection" icon="shield">
+    ```javascript
+    // Anti-pattern: No brute force protection
+    async function login(username, password) {
+      const user = await db.getUser(username);
+      if (!user) return null;
+      
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (passwordMatch) return user;
+      
+      return null;
+    }
+    
+    // Better approach: Implementing rate limiting and account lockout
+    async function login(username, password) {
+      // Check for too many failed attempts
+      const attempts = await getLoginAttempts(username);
+      if (attempts >= MAX_ATTEMPTS) {
+        throw new Error('Account temporarily locked due to too many failed attempts');
+      }
+      
+      const user = await db.getUser(username);
+      if (!user) {
+        await recordFailedAttempt(username);
+        return null;
+      }
+      
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (passwordMatch) {
+        await resetLoginAttempts(username);
+        return user;
+      }
+      
+      await recordFailedAttempt(username);
+      return null;
+    }
+    ```
+    
+    Without brute force protection, attackers can make unlimited login attempts to guess passwords through automated tools.
+    
+    To implement brute force protection:
+    - Implement rate limiting on authentication endpoints
+    - Use progressive delays between login attempts
+    - Implement temporary account lockouts after multiple failed attempts
+    - Consider using CAPTCHA for suspicious login attempts
+    - Log and alert on unusual authentication patterns
+  </Accordion>
+  
+  <Accordion title="Insecure Password Recovery" icon="key-skeleton">
+    ```javascript
+    // Anti-pattern: Insecure password recovery
+    app.post('/forgot-password', async (req, res) => {
+      const { email } = req.body;
+      const user = await db.getUserByEmail(email);
+      if (!user) return res.status(200).send('If your email exists, you will receive a reset link');
+      
+      // Generate a simple token
+      const token = Math.random().toString(36).substring(2, 15);
+      await db.storeResetToken(user.id, token);
+      
+      // Send email with reset link
+      sendEmail(email, `Reset your password by clicking: https://example.com/reset?token=${token}`);
+      
+      res.status(200).send('If your email exists, you will receive a reset link');
+    });
+    
+    // Better approach: Secure password recovery
+    app.post('/forgot-password', async (req, res) => {
+      const { email } = req.body;
+      const user = await db.getUserByEmail(email);
+      if (!user) return res.status(200).send('If your email exists, you will receive a reset link');
+      
+      // Generate a secure token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiry = new Date(Date.now() + 3600000); // 1 hour from now
+      await db.storeResetToken(user.id, token, expiry);
+      
+      // Send email with reset link
+      sendEmail(email, `Reset your password by clicking: https://example.com/reset?token=${token}&email=${encodeURIComponent(email)}`);
+      
+      res.status(200).send('If your email exists, you will receive a reset link');
+    });
+    ```
+    
+    Insecure password recovery mechanisms can be exploited to take over user accounts without knowing the original password.
+    
+    To implement secure password recovery:
+    - Use cryptographically secure tokens with sufficient entropy
+    - Set short expiration times for reset tokens
+    - Implement one-time use tokens
+    - Verify the user's identity through multiple factors when possible
+    - Don't reveal whether an email exists in the system
+    - Log and notify users about password reset attempts
+  </Accordion>
+  
+  <Accordion title="Session Fixation" icon="browser">
+    ```javascript
+    // Anti-pattern: Vulnerable to session fixation
+    app.post('/login', (req, res) => {
+      const { username, password } = req.body;
+      const user = authenticate(username, password);
+      if (user) {
+        // Using the same session ID after authentication
+        req.session.userId = user.id;
+        return res.redirect('/dashboard');
+      }
+      res.render('login', { error: 'Invalid credentials' });
+    });
+    
+    // Better approach: Regenerating session ID after authentication
+    app.post('/login', (req, res) => {
+      const { username, password } = req.body;
+      const user = authenticate(username, password);
+      if (user) {
+        // Regenerate session to prevent fixation
+        req.session.regenerate((err) => {
+          if (err) return res.status(500).send('Error during login');
+          req.session.userId = user.id;
+          return res.redirect('/dashboard');
+        });
+      } else {
+        res.render('login', { error: 'Invalid credentials' });
+      }
+    });
+    ```
+    
+    Session fixation occurs when an attacker sets a user's session ID to one known to the attacker, allowing them to hijack the session after the user authenticates.
+    
+    To prevent session fixation:
+    - Generate a new session identifier after authentication
+    - Invalidate the old session when a user logs in
+    - Use secure, HttpOnly, and SameSite cookies for session management
+    - Implement proper session timeout and expiration
+    - Validate the session against stored user information
+  </Accordion>
+  
+  <Accordion title="Insecure Credential Transmission" icon="network-wired">
+    ```javascript
+    // Anti-pattern: Transmitting credentials over HTTP
+    const loginForm = document.getElementById('login-form');
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      fetch('http://example.com/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+    });
+    
+    // Better approach: Using HTTPS and secure headers
+    const loginForm = document.getElementById('login-form');
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      fetch('https://example.com/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+    });
+    
+    // Server-side configuration
+    app.use(helmet()); // Adds security headers
+    app.use(helmet.hsts({ maxAge: 15552000 })); // Strict Transport Security
+    ```
+    
+    Insecure credential transmission exposes authentication data to interception by attackers through network sniffing or man-in-the-middle attacks.
+    
+    To secure credential transmission:
+    - Always use HTTPS for all authentication-related traffic
+    - Implement HTTP Strict Transport Security (HSTS)
+    - Use secure cookies with the Secure flag
+    - Avoid transmitting credentials in URLs
+    - Consider using client-side hashing before transmission (though not as a replacement for HTTPS)
+  </Accordion>
+  
+  <Accordion title="Missing Multi-Factor Authentication" icon="shield-check">
+    ```javascript
+    // Anti-pattern: Single-factor authentication only
+    async function login(email, password) {
+      const user = await db.getUserByEmail(email);
+      if (!user) return null;
+      
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (passwordMatch) return user;
+      
+      return null;
+    }
+    
+    // Better approach: Implementing multi-factor authentication
+    async function login(email, password, otpCode) {
+      const user = await db.getUserByEmail(email);
+      if (!user) return null;
+      
+      // First factor: password
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (!passwordMatch) return null;
+      
+      // Second factor: OTP
+      if (user.mfaEnabled) {
+        const otpValid = verifyOTP(user.otpSecret, otpCode);
+        if (!otpValid) return null;
+      }
+      
+      return user;
+    }
+    ```
+    
+    Relying solely on passwords for authentication leaves systems vulnerable to credential theft, phishing, and brute force attacks.
+    
+    To implement multi-factor authentication:
+    - Offer multiple types of second factors (TOTP, SMS, email, push notifications, hardware keys)
+    - Implement secure enrollment and recovery processes
+    - Allow users to manage their MFA settings
+    - Provide backup methods for account recovery
+    - Consider risk-based authentication for sensitive operations
+  </Accordion>
+  
+  <Accordion title="Insecure OAuth Implementation" icon="plug">
+    ```javascript
+    // Anti-pattern: Insecure OAuth implementation
+    app.get('/auth/callback', (req, res) => {
+      const { code } = req.query;
+      
+      // Missing state parameter validation
+      axios.post('https://oauth-provider.com/token', {
+        code,
+        client_id: 'my-client-id',
+        client_secret: 'my-client-secret',
+        redirect_uri: 'https://myapp.com/auth/callback',
+        grant_type: 'authorization_code'
+      }).then(response => {
+        const { access_token } = response.data;
+        // Use access token...
+      });
+    });
+    
+    // Better approach: Secure OAuth implementation
+    app.get('/auth/oauth', (req, res) => {
+      const state = crypto.randomBytes(16).toString('hex');
+      req.session.oauthState = state;
+      
+      const authUrl = new URL('https://oauth-provider.com/authorize');
+      authUrl.searchParams.append('client_id', 'my-client-id');
+      authUrl.searchParams.append('redirect_uri', 'https://myapp.com/auth/callback');
+      authUrl.searchParams.append('response_type', 'code');
+      authUrl.searchParams.append('state', state);
+      authUrl.searchParams.append('scope', 'profile email');
+      
+      res.redirect(authUrl.toString());
+    });
+    
+    app.get('/auth/callback', (req, res) => {
+      const { code, state } = req.query;
+      
+      // Validate state parameter to prevent CSRF
+      if (!state || state !== req.session.oauthState) {
+        return res.status(403).send('Invalid state parameter');
+      }
+      
+      // Exchange code for token
+      axios.post('https://oauth-provider.com/token', {
+        code,
+        client_id: 'my-client-id',
+        client_secret: 'my-client-secret',
+        redirect_uri: 'https://myapp.com/auth/callback',
+        grant_type: 'authorization_code'
+      }).then(response => {
+        const { access_token, id_token } = response.data;
+        
+        // Validate tokens and extract user information
+        // ...
+      });
+    });
+    ```
+    
+    Insecure OAuth implementations can lead to various vulnerabilities, including CSRF attacks, token leakage, and account takeover.
+    
+    To implement OAuth securely:
+    - Always use the state parameter to prevent CSRF attacks
+    - Validate redirect URIs
+    - Use PKCE (Proof Key for Code Exchange) for public clients
+    - Securely store client secrets
+    - Validate tokens properly
+    - Implement proper scope handling
+  </Accordion>
+  
+  <Accordion title="Hardcoded Credentials" icon="key">
+    ```java
+    // Anti-pattern: Hardcoded credentials
+    public class DatabaseConnector {
+        private static final String DB_USERNAME = "admin";
+        private static final String DB_PASSWORD = "super_secret_password";
+        
+        public Connection getConnection() {
+            return DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/mydb",
+                DB_USERNAME,
+                DB_PASSWORD
+            );
+        }
+    }
+    
+    // Better approach: Using environment variables or secure configuration
+    public class DatabaseConnector {
+        public Connection getConnection() {
+            String username = System.getenv("DB_USERNAME");
+            String password = System.getenv("DB_PASSWORD");
+            
+            if (username == null || password == null) {
+                throw new IllegalStateException("Database credentials not configured");
+            }
+            
+            return DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/mydb",
+                username,
+                password
+            );
+        }
+    }
+    ```
+    
+    Hardcoded credentials in source code are easily discoverable, especially in open-source projects or when source code is leaked.
+    
+    To avoid hardcoded credentials:
+    - Use environment variables for sensitive configuration
+    - Implement a secure configuration management system
+    - Use secrets management services
+    - Implement proper access controls for configuration files
+    - Regularly rotate credentials
+  </Accordion>
+  
+  <Accordion title="Insufficient Logging and Monitoring" icon="chart-line">
+    ```javascript
+    // Anti-pattern: Insufficient authentication logging
+    app.post('/login', async (req, res) => {
+      const { username, password } = req.body;
+      const user = await authenticate(username, password);
+      
+      if (user) {
+        req.session.userId = user.id;
+        return res.redirect('/dashboard');
+      }
+      
+      return res.render('login', { error: 'Invalid credentials' });
+    });
+    
+    // Better approach: Comprehensive authentication logging
+    app.post('/login', async (req, res) => {
+      const { username, password } = req.body;
+      const ip = req.ip;
+      const userAgent = req.headers['user-agent'];
+      
+      try {
+        const user = await authenticate(username, password);
+        
+        if (user) {
+          req.session.userId = user.id;
+          logger.info('Successful login', {
+            userId: user.id,
+            username,
+            ip,
+            userAgent,
+            timestamp: new Date().toISOString()
+          });
+          return res.redirect('/dashboard');
+        }
+        
+        logger.warn('Failed login attempt', {
+          username,
+          ip,
+          userAgent,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.render('login', { error: 'Invalid credentials' });
+      } catch (error) {
+        logger.error('Login error', {
+          username,
+          ip,
+          userAgent,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+        return res.status(500).render('error');
+      }
+    });
+    ```
+    
+    Insufficient logging and monitoring of authentication events makes it difficult to detect and respond to security incidents.
+    
+    To implement proper authentication logging:
+    - Log all authentication events (successful and failed)
+    - Include relevant context (IP, user agent, timestamp)
+    - Implement centralized log collection and analysis
+    - Set up alerts for suspicious authentication patterns
+    - Ensure logs are tamper-resistant
+    - Retain logs for an appropriate period
+  </Accordion>
+  
+  <Accordion title="Default or Weak Credentials" icon="user-lock">
+    ```javascript
+    // Anti-pattern: Using default credentials
+    const defaultAdminUser = {
+      username: 'admin',
+      password: 'admin123',
+      role: 'admin'
+    };
+    
+    async function initializeDatabase() {
+      const adminExists = await db.getUserByUsername('admin');
+      if (!adminExists) {
+        await db.createUser(defaultAdminUser);
+      }
+    }
+    
+    // Better approach: Requiring secure credentials on setup
+    async function initializeDatabase() {
+      const adminExists = await db.getUserByUsername('admin');
+      if (!adminExists) {
+        // Require admin to set credentials during first-time setup
+        app.use('/setup', setupRouter);
+      }
+    }
+    
+    const setupRouter = express.Router();
+    setupRouter.get('/', (req, res) => {
+      res.render('setup');
+    });
+    
+    setupRouter.post('/', async (req, res) => {
+      const { username, password } = req.body;
+      
+      // Validate password strength
+      if (!isStrongPassword(password)) {
+        return res.render('setup', { error: 'Password does not meet security requirements' });
+      }
+      
+      // Create admin user with secure credentials
+      await db.createUser({ username, password, role: 'admin' });
+      
+      // Disable setup route
+      app.use('/setup', (req, res) => res.redirect('/'));
+      
+      res.redirect('/login');
+    });
+    ```
+    
+    Default or weak credentials are a common entry point for attackers, especially in systems that are publicly accessible.
+    
+    To avoid default or weak credentials:
+    - Never ship software with default credentials
+    - Require users to set strong passwords during initial setup
+    - Implement password strength validation
+    - Regularly audit for weak credentials
+    - Consider implementing credential rotation policies
+  </Accordion>
+  
+  <Accordion title="Insecure Remember Me Functionality" icon="cookie">
+    ```javascript
+    // Anti-pattern: Insecure "Remember Me" implementation
+    app.post('/login', (req, res) => {
+      const { username, password, rememberMe } = req.body;
+      const user = authenticate(username, password);
+      
+      if (user) {
+        req.session.userId = user.id;
+        
+        if (rememberMe) {
+          // Insecure: Using only user ID in the cookie
+          res.cookie('rememberMe', user.id, { maxAge: 30 * 24 * 60 * 60 * 1000 });
+        }
+        
+        return res.redirect('/dashboard');
+      }
+      
+      return res.render('login', { error: 'Invalid credentials' });
+    });
+    
+    // Better approach: Secure "Remember Me" implementation
+    app.post('/login', async (req, res) => {
+      const { username, password, rememberMe } = req.body;
+      const user = authenticate(username, password);
+      
+      if (user) {
+        req.session.userId = user.id;
+        
+        if (rememberMe) {
+          // Generate a secure token
+          const token = crypto.randomBytes(32).toString('hex');
+          const selector = crypto.randomBytes(16).toString('hex');
+          
+          // Store token hash in the database
+          const hashedToken = await bcrypt.hash(token, 10);
+          await db.storeRememberMeToken({
+            userId: user.id,
+            selector,
+            token: hashedToken,
+            expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          });
+          
+          // Set cookie with selector and token
+          res.cookie('rememberMe', `${selector}:${token}`, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 30 * 24 * 60 * 60 * 1000
+          });
+        }
+        
+        return res.redirect('/dashboard');
+      }
+      
+      return res.render('login', { error: 'Invalid credentials' });
+    });
+    ```
+    
+    Insecure "Remember Me" functionality can lead to persistent authentication vulnerabilities and account takeover.
+    
+    To implement secure "Remember Me" functionality:
+    - Use cryptographically secure tokens
+    - Store only token hashes in the database
+    - Implement proper token expiration
+    - Use secure, HttpOnly, and SameSite cookies
+    - Provide users with the ability to view and revoke persistent sessions
+    - Automatically invalidate tokens when users change passwords
+  </Accordion>
+  
+  <Accordion title="Insecure Account Recovery Questions" icon="question">
+    ```javascript
+    // Anti-pattern: Using common security questions
+    app.post('/setup-recovery', (req, res) => {
+      const { userId, question, answer } = req.body;
+      
+      // Using common questions with easily discoverable answers
+      db.storeSecurityQuestion(userId, question, answer);
+      
+      res.redirect('/account-settings');
+    });
+    
+    // Better approach: More secure account recovery
+    app.post('/setup-recovery', async (req, res) => {
+      const { userId, question, answer } = req.body;
+      
+      // Validate question is not from a list of weak questions
+      if (isWeakQuestion(question)) {
+        return res.render('setup-recovery', { error: 'Please choose a stronger security question' });
+      }
+      
+      // Hash the answer
+      const hashedAnswer = await bcrypt.hash(answer.toLowerCase().trim(), 10);
+      
+      // Store the question and hashed answer
+      db.storeSecurityQuestion(userId, question, hashedAnswer);
+      
+      res.redirect('/account-settings');
+    });
+    
+    // Verification
+    app.post('/verify-recovery', async (req, res) => {
+      const { userId, answer } = req.body;
+      
+      const securityQuestion = await db.getSecurityQuestion(userId);
+      
+      // Compare with hashed answer
+      const isCorrect = await bcrypt.compare(answer.toLowerCase().trim(), securityQuestion.hashedAnswer);
+      
+      if (isCorrect) {
+        // Generate password reset token
+        // ...
+      } else {
+        res.render('verify-recovery', { error: 'Incorrect answer' });
+      }
+    });
+    ```
+    
+    Security questions often rely on information that can be easily researched or guessed, making them a weak form of authentication.
+    
+    To implement more secure account recovery:
+    - Avoid common security questions with easily discoverable answers
+    - Allow users to create their own questions
+    - Store answers as hashed values, not plaintext
+    - Consider alternative recovery methods (email, phone, backup codes)
+    - Implement multi-step recovery processes
+    - Rate-limit recovery attempts
+  </Accordion>
+  
+  <Accordion title="Missing Account Lockout" icon="user-lock">
+    ```javascript
+    // Anti-pattern: No account lockout mechanism
+    app.post('/login', async (req, res) => {
+      const { username, password } = req.body;
+      const user = await db.getUserByUsername(username);
+      
+      if (!user) {
+        return res.render('login', { error: 'Invalid credentials' });
+      }
+      
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (passwordMatch) {
+        req.session.userId = user.id;
+        return res.redirect('/dashboard');
+      }
+      
+      return res.render('login', { error: 'Invalid credentials' });
+    });
+    
+    // Better approach: Implementing account lockout
+    app.post('/login', async (req, res) => {
+      const { username, password } = req.body;
+      const user = await db.getUserByUsername(username);
+      
+      if (!user) {
+        // Use constant-time response for non-existent users
+        await bcrypt.compare(password, '$2a$10$invalidhashvalue');
+        return res.render('login', { error: 'Invalid credentials' });
+      }
+      
+      // Check if account is locked
+      if (user.lockedUntil && user.lockedUntil > new Date()) {
+        return res.render('login', {
+          error: 'Account is temporarily locked. Please try again later or reset your password.'
+        });
+      }
+      
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (passwordMatch) {
+        // Reset failed attempts on successful login
+        await db.resetFailedAttempts(user.id);
+        req.session.userId = user.id;
+        return res.redirect('/dashboard');
+      }
+      
+      // Increment failed attempts
+      const updatedUser = await db.incrementFailedAttempts(user.id);
+      
+      // Lock account after too many failed attempts
+      if (updatedUser.failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        const lockUntil = new Date(Date.now() + LOCK_DURATION);
+        await db.lockAccount(user.id, lockUntil);
+      }
+      
+      return res.render('login', { error: 'Invalid credentials' });
+    });
+    ```
+    
+    Without account lockout mechanisms, attackers can make unlimited attempts to guess passwords through automated tools.
+    
+    To implement account lockout:
+    - Lock accounts after a specified number of failed login attempts
+    - Implement temporary lockouts with increasing durations
+    - Provide alternative recovery methods for legitimate users
+    - Log and alert on account lockouts
+    - Consider implementing progressive security measures instead of hard lockouts
+    - Use CAPTCHA or other verification methods after a few failed attempts
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,699 @@
+---
+title: 'Sensitive Data Exposure Vulnerabilities'
+description: 'Sensitive data exposure vulnerabilities occur when applications fail to adequately protect sensitive information, potentially leading to data breaches, identity theft, or fraud.'
+---
+
+<AccordionGroup>
+  <Accordion title="Sensitive Data Exposure Overview" icon="eye">
+    Sensitive data exposure occurs when an application fails to adequately protect sensitive information. This can include personally identifiable information (PII), financial data, healthcare information, credentials, or any data that should be kept confidential.
+    
+    These vulnerabilities can lead to data breaches, identity theft, credit card fraud, or other serious consequences. Sensitive data exposure can occur through various means, including insecure data storage, transmission of data in clear text, weak encryption, or improper access controls.
+    
+    Preventing sensitive data exposure requires implementing proper data protection measures throughout the application's lifecycle, including secure storage, transmission, and access controls.
+  </Accordion>
+  
+  <Accordion title="Cleartext Storage of Sensitive Data" icon="database">
+    ```javascript
+    // Anti-pattern: Storing sensitive data in cleartext
+    const mongoose = require('mongoose');
+    
+    const UserSchema = new mongoose.Schema({
+      username: String,
+      email: String,
+      password: String, // Stored in cleartext
+      creditCardNumber: String, // Stored in cleartext
+      ssn: String // Stored in cleartext
+    });
+    
+    // Better approach: Proper protection of sensitive data
+    const mongoose = require('mongoose');
+    const bcrypt = require('bcrypt');
+    const crypto = require('crypto');
+    
+    // Function to encrypt sensitive data
+    function encrypt(text) {
+      // Use environment variables for encryption keys
+      const algorithm = 'aes-256-gcm';
+      const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+      const iv = crypto.randomBytes(16);
+      
+      const cipher = crypto.createCipheriv(algorithm, key, iv);
+      let encrypted = cipher.update(text, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      
+      const authTag = cipher.getAuthTag().toString('hex');
+      
+      // Return IV, encrypted data, and auth tag
+      return iv.toString('hex') + ':' + encrypted + ':' + authTag;
+    }
+    
+    const UserSchema = new mongoose.Schema({
+      username: String,
+      email: String,
+      password: { type: String, required: true }, // Will be hashed before storage
+      creditCardNumber: { type: String, required: false }, // Will be encrypted
+      ssn: { type: String, required: false } // Will be encrypted
+    });
+    
+    // Hash password before saving
+    UserSchema.pre('save', async function(next) {
+      if (this.isModified('password')) {
+        this.password = await bcrypt.hash(this.password, 12);
+      }
+      
+      // Encrypt sensitive data
+      if (this.isModified('creditCardNumber') && this.creditCardNumber) {
+        this.creditCardNumber = encrypt(this.creditCardNumber);
+      }
+      
+      if (this.isModified('ssn') && this.ssn) {
+        this.ssn = encrypt(this.ssn);
+      }
+      
+      next();
+    });
+    ```
+    
+    Storing sensitive data in cleartext is a serious security vulnerability that can lead to data breaches if the database is compromised.
+    
+    To prevent cleartext storage of sensitive data:
+    - Hash passwords using strong, adaptive algorithms (bcrypt, Argon2, PBKDF2)
+    - Encrypt sensitive data using strong encryption algorithms
+    - Use proper key management practices
+    - Consider using a dedicated secrets management service
+    - Implement proper access controls for sensitive data
+    - Minimize storage of sensitive data when possible
+    - Implement proper logging that doesn't include sensitive data
+    - Regularly audit data storage practices
+  </Accordion>
+  
+  <Accordion title="Insecure Data Transmission" icon="wifi">
+    ```javascript
+    // Anti-pattern: Insecure data transmission
+    // Server-side code using HTTP instead of HTTPS
+    const http = require('http');
+    const app = express();
+    
+    http.createServer(app).listen(80, () => {
+      console.log('Server running on port 80');
+    });
+    
+    // Client-side code sending sensitive data over HTTP
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      fetch('http://example.com/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      .then(response => response.json())
+      .then(data => console.log(data));
+    }
+    
+    // Better approach: Secure data transmission
+    // Server-side code using HTTPS
+    const https = require('https');
+    const fs = require('fs');
+    const app = express();
+    
+    // HTTPS options
+    const options = {
+      key: fs.readFileSync('server.key'),
+      cert: fs.readFileSync('server.cert')
+    };
+    
+    // Redirect HTTP to HTTPS
+    app.use((req, res, next) => {
+      if (!req.secure) {
+        return res.redirect('https://' + req.headers.host + req.url);
+      }
+      next();
+    });
+    
+    https.createServer(options, app).listen(443, () => {
+      console.log('Server running on port 443');
+    });
+    
+    // Client-side code using HTTPS
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      fetch('https://example.com/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      .then(response => response.json())
+      .then(data => console.log(data));
+    }
+    ```
+    
+    Insecure data transmission can allow attackers to intercept sensitive information through man-in-the-middle attacks or network sniffing.
+    
+    To implement secure data transmission:
+    - Use HTTPS for all communications
+    - Implement HTTP Strict Transport Security (HSTS)
+    - Configure secure TLS settings
+    - Redirect HTTP to HTTPS
+    - Use secure cookies with the Secure flag
+    - Consider using certificate pinning for mobile applications
+    - Implement proper error handling for TLS errors
+    - Regularly update TLS configurations
+  </Accordion>
+  
+  <Accordion title="Weak Cryptography" icon="lock-open">
+    ```javascript
+    // Anti-pattern: Weak cryptography
+    const crypto = require('crypto');
+    
+    // Using weak algorithms
+    function encryptWeakly(text, key) {
+      // MD5 for hashing (weak)
+      const hash = crypto.createHash('md5').update(key).digest('hex');
+      
+      // DES for encryption (weak)
+      const cipher = crypto.createCipheriv('des', hash.substr(0, 8), '12345678');
+      let encrypted = cipher.update(text, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      
+      return encrypted;
+    }
+    
+    // Better approach: Strong cryptography
+    function encryptStrongly(text) {
+      // Use environment variables for encryption keys
+      const algorithm = 'aes-256-gcm';
+      const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+      const iv = crypto.randomBytes(16);
+      
+      const cipher = crypto.createCipheriv(algorithm, key, iv);
+      let encrypted = cipher.update(text, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      
+      const authTag = cipher.getAuthTag().toString('hex');
+      
+      // Return IV, encrypted data, and auth tag
+      return iv.toString('hex') + ':' + encrypted + ':' + authTag;
+    }
+    
+    function decryptStrongly(encryptedText) {
+      const algorithm = 'aes-256-gcm';
+      const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+      
+      // Split the stored data
+      const parts = encryptedText.split(':');
+      if (parts.length !== 3) {
+        throw new Error('Invalid encrypted text format');
+      }
+      
+      const iv = Buffer.from(parts[0], 'hex');
+      const encrypted = parts[1];
+      const authTag = Buffer.from(parts[2], 'hex');
+      
+      const decipher = crypto.createDecipheriv(algorithm, key, iv);
+      decipher.setAuthTag(authTag);
+      
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      return decrypted;
+    }
+    ```
+    
+    Weak cryptography can lead to the compromise of encrypted data, potentially exposing sensitive information to attackers.
+    
+    To implement strong cryptography:
+    - Use modern, strong encryption algorithms (AES-256, RSA-2048+)
+    - Use secure modes of operation (GCM, CBC with HMAC)
+    - Generate strong, random initialization vectors (IVs)
+    - Implement proper key management
+    - Use appropriate key lengths
+    - Keep cryptographic libraries updated
+    - Follow cryptographic best practices
+    - Consider using established cryptographic libraries instead of implementing your own
+  </Accordion>
+  
+  <Accordion title="Improper Certificate Validation" icon="certificate">
+    ```javascript
+    // Anti-pattern: Improper certificate validation
+    const https = require('https');
+    
+    // Disabling certificate validation
+    const agent = new https.Agent({
+      rejectUnauthorized: false // Dangerous: Disables certificate validation
+    });
+    
+    function fetchData(url) {
+      return fetch(url, { agent });
+    }
+    
+    // Better approach: Proper certificate validation
+    const https = require('https');
+    const fs = require('fs');
+    
+    // Using proper certificate validation
+    function fetchData(url) {
+      // Use default agent which validates certificates
+      return fetch(url);
+    }
+    
+    // For specific trusted CAs
+    const agent = new https.Agent({
+      ca: fs.readFileSync('trusted-ca.pem')
+    });
+    
+    function fetchDataWithCustomCA(url) {
+      return fetch(url, { agent });
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Improper certificate validation in Android
+    public class InsecureHostnameVerifier implements HostnameVerifier {
+        @Override
+        public boolean verify(String hostname, SSLSession session) {
+            // Dangerous: Always returns true, accepting any certificate
+            return true;
+        }
+    }
+    
+    // Better approach: Proper certificate validation
+    // Use the default hostname verifier which properly validates certificates
+    URL url = new URL("https://example.com");
+    HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+    // The default implementation validates the certificate properly
+    ```
+    
+    Improper certificate validation can allow attackers to perform man-in-the-middle attacks, potentially intercepting sensitive data.
+    
+    To implement proper certificate validation:
+    - Always validate SSL/TLS certificates
+    - Never disable certificate validation in production
+    - Use proper hostname verification
+    - Consider implementing certificate pinning for high-security applications
+    - Keep trusted certificate authorities updated
+    - Implement proper error handling for certificate validation failures
+    - Regularly update SSL/TLS libraries
+    - Consider using OWASP certificate validation tools
+  </Accordion>
+  
+  <Accordion title="Sensitive Data in Logs" icon="file-lines">
+    ```javascript
+    // Anti-pattern: Logging sensitive data
+    function processPayment(req, res) {
+      const { creditCardNumber, cvv, expiryDate, amount } = req.body;
+      
+      // Logging sensitive information
+      console.log(`Processing payment: ${amount} with card ${creditCardNumber}, CVV: ${cvv}, Expiry: ${expiryDate}`);
+      
+      // Process payment...
+      
+      res.json({ success: true });
+    }
+    
+    // Better approach: Secure logging
+    function processPayment(req, res) {
+      const { creditCardNumber, cvv, expiryDate, amount } = req.body;
+      
+      // Log only necessary, non-sensitive information
+      const lastFour = creditCardNumber.slice(-4);
+      console.log(`Processing payment: ${amount} with card ending in ${lastFour}`);
+      
+      // Process payment...
+      
+      res.json({ success: true });
+    }
+    ```
+    
+    Logging sensitive data can expose confidential information in log files, which may be accessible to unauthorized individuals or stored insecurely.
+    
+    To implement secure logging:
+    - Never log sensitive data (passwords, credit card numbers, SSNs, etc.)
+    - Implement data masking for partially displayed sensitive data
+    - Use appropriate log levels
+    - Implement proper access controls for log files
+    - Consider using a centralized logging solution with encryption
+    - Implement log rotation and retention policies
+    - Regularly audit logs for sensitive information
+    - Implement proper error handling that doesn't log sensitive data
+  </Accordion>
+  
+  <Accordion title="Sensitive Data in Error Messages" icon="triangle-exclamation">
+    ```javascript
+    // Anti-pattern: Sensitive data in error messages
+    app.post('/api/login', (req, res) => {
+      const { username, password } = req.body;
+      
+      try {
+        // Authenticate user
+        const user = authenticateUser(username, password);
+        res.json({ token: generateToken(user) });
+      } catch (error) {
+        // Revealing sensitive information in error messages
+        res.status(401).json({
+          error: `Authentication failed for user ${username} with password ${password}`,
+          details: error.message,
+          stack: error.stack
+        });
+      }
+    });
+    
+    // Better approach: Secure error handling
+    app.post('/api/login', (req, res) => {
+      const { username } = req.body;
+      
+      try {
+        // Authenticate user
+        const user = authenticateUser(username, req.body.password);
+        res.json({ token: generateToken(user) });
+      } catch (error) {
+        // Log detailed error server-side (without sensitive data)
+        console.error(`Authentication failed for user ${username}:`, error.message);
+        
+        // Return generic error message to client
+        res.status(401).json({
+          error: 'Invalid username or password'
+        });
+      }
+    });
+    ```
+    
+    Exposing sensitive data in error messages can provide attackers with valuable information about the system, potentially aiding in further attacks.
+    
+    To implement secure error handling:
+    - Return generic error messages to clients
+    - Log detailed errors server-side without sensitive data
+    - Implement different error handling for development and production
+    - Avoid exposing stack traces, database errors, or system information
+    - Implement proper exception handling
+    - Use consistent error responses
+    - Consider implementing a central error handling mechanism
+    - Regularly review error messages for sensitive information
+  </Accordion>
+  
+  <Accordion title="Sensitive Data in URLs" icon="link">
+    ```javascript
+    // Anti-pattern: Sensitive data in URLs
+    app.get('/api/users', (req, res) => {
+      const { username, password, apiKey } = req.query;
+      
+      // Using sensitive data in query parameters
+      if (authenticateAPI(apiKey)) {
+        const user = authenticateUser(username, password);
+        res.json(user);
+      } else {
+        res.status(401).json({ error: 'Authentication failed' });
+      }
+    });
+    
+    // Client-side code with sensitive data in URL
+    fetch(`https://example.com/api/users?username=john&password=secret123&apiKey=abcd1234`)
+      .then(response => response.json())
+      .then(data => console.log(data));
+    
+    // Better approach: Secure data transmission
+    app.post('/api/auth', (req, res) => {
+      const { username, password } = req.body;
+      
+      // Using POST body for sensitive data
+      const user = authenticateUser(username, password);
+      if (user) {
+        res.json({ token: generateToken(user) });
+      } else {
+        res.status(401).json({ error: 'Authentication failed' });
+      }
+    });
+    
+    // Client-side code with sensitive data in request body
+    fetch('https://example.com/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'john',
+        password: 'secret123'
+      })
+    })
+    .then(response => response.json())
+    .then(data => console.log(data));
+    ```
+    
+    Placing sensitive data in URLs can expose this information in browser history, server logs, referrer headers, and other places where URLs are stored or transmitted.
+    
+    To prevent sensitive data exposure in URLs:
+    - Use POST requests with request bodies for sensitive data
+    - Never include passwords, tokens, or API keys in URLs
+    - Implement proper authentication mechanisms
+    - Use secure cookies or authorization headers for authentication
+    - Implement proper session management
+    - Be cautious with URL parameters for sensitive operations
+    - Consider implementing URL encryption for sensitive parameters
+    - Regularly audit URL patterns for sensitive data
+  </Accordion>
+  
+  <Accordion title="Insecure Storage of Credentials" icon="key">
+    ```javascript
+    // Anti-pattern: Insecure storage of credentials
+    // Hardcoded credentials
+    const dbConfig = {
+      host: 'localhost',
+      user: 'admin',
+      password: 'admin123', // Hardcoded password
+      database: 'myapp'
+    };
+    
+    // Credentials in source code
+    const apiKey = '1234567890abcdef';
+    const secretKey = 'secretkey123';
+    
+    // Better approach: Secure credential management
+    // Using environment variables
+    const dbConfig = {
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME
+    };
+    
+    // Using a secrets manager (AWS Secrets Manager example)
+    const AWS = require('aws-sdk');
+    const secretsManager = new AWS.SecretsManager();
+    
+    async function getDbConfig() {
+      const data = await secretsManager.getSecretValue({
+        SecretId: 'myapp/db/credentials'
+      }).promise();
+      
+      const secret = JSON.parse(data.SecretString);
+      
+      return {
+        host: secret.host,
+        user: secret.username,
+        password: secret.password,
+        database: secret.dbname
+      };
+    }
+    ```
+    
+    Insecure storage of credentials, such as hardcoding them in source code or configuration files, can lead to unauthorized access if the code is compromised.
+    
+    To implement secure credential management:
+    - Use environment variables for configuration
+    - Consider using a secrets management service
+    - Never hardcode credentials in source code
+    - Implement proper access controls for configuration files
+    - Use different credentials for different environments
+    - Regularly rotate credentials
+    - Implement proper logging that doesn't include credentials
+    - Consider using vault systems for storing sensitive credentials
+  </Accordion>
+  
+  <Accordion title="Client-Side Data Exposure" icon="display">
+    ```javascript
+    // Anti-pattern: Client-side data exposure
+    // Storing sensitive data in localStorage
+    function login(username, password) {
+      // Authenticate user
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Storing sensitive data in localStorage
+        localStorage.setItem('user', JSON.stringify({
+          id: data.id,
+          username: data.username,
+          email: data.email,
+          creditCard: data.creditCard, // Sensitive!
+          ssn: data.ssn, // Sensitive!
+          token: data.token
+        }));
+      });
+    }
+    
+    // Better approach: Minimal client-side data storage
+    function login(username, password) {
+      // Authenticate user
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Store only necessary, non-sensitive data
+        localStorage.setItem('user', JSON.stringify({
+          id: data.id,
+          username: data.username,
+          token: data.token
+        }));
+        
+        // Optionally store token in HttpOnly cookie instead
+        // (set by server, not accessible via JavaScript)
+      });
+    }
+    ```
+    
+    Client-side data exposure occurs when sensitive data is stored in client-side storage mechanisms like localStorage, sessionStorage, or cookies without proper protection.
+    
+    To prevent client-side data exposure:
+    - Minimize sensitive data stored on the client
+    - Use HttpOnly cookies for authentication tokens
+    - Never store highly sensitive data (credit cards, SSNs, etc.) on the client
+    - Implement proper session management
+    - Consider using server-side sessions for sensitive data
+    - Implement proper access controls for API endpoints
+    - Use secure cookies with appropriate flags
+    - Regularly audit client-side storage for sensitive data
+  </Accordion>
+  
+  <Accordion title="Sensitive Data in Cache" icon="box-archive">
+    ```javascript
+    // Anti-pattern: Sensitive data in cache
+    // Server-side response without cache control
+    app.get('/api/user-profile', authenticateUser, (req, res) => {
+      const user = getUserProfile(req.user.id);
+      
+      // No cache control headers
+      res.json(user);
+    });
+    
+    // Better approach: Proper cache control
+    app.get('/api/user-profile', authenticateUser, (req, res) => {
+      const user = getUserProfile(req.user.id);
+      
+      // Set cache control headers
+      res.set({
+        'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
+      res.json(user);
+    });
+    ```
+    
+    ```html
+    <!-- Anti-pattern: No cache control for sensitive forms -->
+    <form action="/login" method="post">
+      <input type="text" name="username" placeholder="Username">
+      <input type="password" name="password" placeholder="Password">
+      <button type="submit">Login</button>
+    </form>
+    
+    <!-- Better approach: Cache control for sensitive pages -->
+    <head>
+      <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+      <meta http-equiv="Pragma" content="no-cache">
+      <meta http-equiv="Expires" content="0">
+    </head>
+    <form action="/login" method="post">
+      <input type="text" name="username" placeholder="Username">
+      <input type="password" name="password" placeholder="Password">
+      <button type="submit">Login</button>
+    </form>
+    ```
+    
+    Sensitive data can be exposed through browser or proxy caches if proper cache control headers are not implemented.
+    
+    To implement proper cache control:
+    - Set appropriate cache control headers for sensitive data
+    - Use 'Cache-Control: no-store' for highly sensitive pages
+    - Implement both HTTP headers and HTML meta tags for cache control
+    - Consider using HTTPS, which provides some protection against proxy caching
+    - Be cautious with CDN caching for sensitive data
+    - Implement proper session management
+    - Regularly test caching behavior for sensitive pages
+    - Consider implementing cache-busting techniques for sensitive resources
+  </Accordion>
+  
+  <Accordion title="Sensitive Data Exposure Prevention Checklist" icon="clipboard-check">
+    ```text
+    Sensitive Data Exposure Prevention Checklist:
+    
+    1. Data Classification and Inventory
+       - Identify and classify sensitive data
+       - Maintain an inventory of sensitive data locations
+       - Implement data minimization practices
+       - Consider data anonymization or pseudonymization
+    
+    2. Secure Data Storage
+       - Hash passwords using strong algorithms (bcrypt, Argon2, PBKDF2)
+       - Encrypt sensitive data using strong encryption
+       - Implement proper key management
+       - Consider using a secrets management service
+       - Implement proper access controls for sensitive data
+    
+    3. Secure Data Transmission
+       - Use HTTPS for all communications
+       - Implement HTTP Strict Transport Security (HSTS)
+       - Configure secure TLS settings
+       - Validate certificates properly
+       - Consider using certificate pinning for high-security applications
+    
+    4. Secure Data Handling
+       - Implement proper error handling without sensitive data
+       - Avoid storing sensitive data in logs
+       - Implement proper cache control
+       - Minimize client-side storage of sensitive data
+       - Never include sensitive data in URLs
+    
+    5. Access Controls and Authentication
+       - Implement proper authentication for sensitive data access
+       - Use multi-factor authentication for highly sensitive operations
+       - Implement proper session management
+       - Apply the principle of least privilege
+       - Regularly audit access to sensitive data
+    
+    6. Secure Development Practices
+       - Implement secure coding practices
+       - Use security-focused code reviews
+       - Implement automated security testing
+       - Keep all dependencies and libraries updated
+       - Follow security best practices for your technology stack
+    
+    7. Compliance and Monitoring
+       - Comply with relevant regulations (GDPR, HIPAA, PCI DSS, etc.)
+       - Implement proper logging and monitoring
+       - Regularly audit sensitive data handling
+       - Implement data breach detection and response
+       - Consider using data loss prevention (DLP) tools
+    ```
+    
+    Preventing sensitive data exposure requires a comprehensive approach that addresses data protection throughout its lifecycle, from collection to storage, processing, transmission, and disposal.
+    
+    Key prevention strategies:
+    - Identify and classify sensitive data
+    - Implement proper encryption and hashing
+    - Use secure transmission protocols
+    - Implement proper access controls
+    - Apply the principle of data minimization
+    - Regularly audit and test security controls
+    - Keep all systems and dependencies updated
+    - Follow relevant compliance requirements
+  </Accordion>
+</AccordionGroup>

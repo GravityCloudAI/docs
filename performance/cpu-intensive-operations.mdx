@@ -1,0 +1,840 @@
+---
+title: 'CPU-Intensive Operations'
+description: 'Anti-patterns related to CPU-intensive operations that can cause performance bottlenecks and affect application responsiveness.'
+---
+
+<AccordionGroup>
+  <Accordion title="CPU-Intensive Operations Overview" icon="microchip">
+    CPU-intensive operations are computations that require significant processor resources and can cause performance bottlenecks in applications. These operations can lead to reduced responsiveness, higher latency, increased power consumption, and poor user experience.
+    
+    Common causes of CPU-intensive operations include inefficient algorithms, blocking the main thread with heavy computations, unnecessary calculations, and improper use of concurrency. Identifying and optimizing these operations is crucial for maintaining application performance.
+    
+    This guide covers common anti-patterns related to CPU-intensive operations and provides best practices for optimizing CPU usage across different programming languages and environments.
+  </Accordion>
+  
+  <Accordion title="Blocking the Main Thread" icon="stop">
+    ```javascript
+    // Anti-pattern: Blocking the main thread with heavy computation
+    function calculatePrimes(max) {
+      const primes = [];
+      for (let i = 2; i <= max; i++) {
+        let isPrime = true;
+        for (let j = 2; j < i; j++) {
+          if (i % j === 0) {
+            isPrime = false;
+            break;
+          }
+        }
+        if (isPrime) primes.push(i);
+      }
+      return primes;
+    }
+    
+    // In a web application
+    document.getElementById('calculate-btn').addEventListener('click', () => {
+      // This will freeze the UI while calculating
+      const primes = calculatePrimes(100000);
+      displayResults(primes);
+    });
+    
+    // Better approach: Using Web Workers for CPU-intensive tasks
+    document.getElementById('calculate-btn').addEventListener('click', () => {
+      const worker = new Worker('primes-worker.js');
+      
+      worker.onmessage = (event) => {
+        displayResults(event.data);
+      };
+      
+      worker.postMessage(100000);
+    });
+    
+    // In primes-worker.js
+    self.onmessage = (event) => {
+      const max = event.data;
+      const primes = calculatePrimes(max);
+      self.postMessage(primes);
+    };
+    ```
+    
+    ```java
+    // Anti-pattern: Blocking the UI thread in Android
+    public void onCalculateButtonClick(View view) {
+        // This will freeze the UI while calculating
+        List<Integer> primes = calculatePrimes(100000);
+        displayResults(primes);
+    }
+    
+    // Better approach: Using background threads
+    public void onCalculateButtonClick(View view) {
+        new Thread(() -> {
+            List<Integer> primes = calculatePrimes(100000);
+            
+            // Update UI on the main thread
+            runOnUiThread(() -> {
+                displayResults(primes);
+            });
+        }).start();
+        
+        // Even better: Using structured concurrency
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Handler handler = new Handler(Looper.getMainLooper());
+        
+        executor.execute(() -> {
+            List<Integer> primes = calculatePrimes(100000);
+            
+            handler.post(() -> {
+                displayResults(primes);
+            });
+        });
+    }
+    ```
+    
+    Blocking the main thread with CPU-intensive operations can cause the UI to freeze, leading to poor user experience and potentially triggering "Application Not Responding" (ANR) errors in mobile applications.
+    
+    To avoid blocking the main thread:
+    - Move CPU-intensive operations to background threads or workers
+    - Use asynchronous programming patterns
+    - Consider using dedicated threading models like Web Workers in JavaScript
+    - Implement proper progress indicators to keep users informed
+    - Break long-running operations into smaller chunks
+    - Use structured concurrency patterns for better thread management
+    - Consider using reactive programming for complex asynchronous workflows
+  </Accordion>
+  
+  <Accordion title="Inefficient String Concatenation" icon="font">
+    ```java
+    // Anti-pattern: Inefficient string concatenation in a loop
+    public String buildReport(List<String> items) {
+        String report = "";
+        for (String item : items) {
+            // Creates a new String object in each iteration
+            report = report + item + ", ";
+        }
+        return report;
+    }
+    
+    // Better approach: Using StringBuilder
+    public String buildReportEfficiently(List<String> items) {
+        StringBuilder reportBuilder = new StringBuilder();
+        for (String item : items) {
+            reportBuilder.append(item).append(", ");
+        }
+        return reportBuilder.toString();
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient string concatenation in JavaScript
+    function buildReport(items) {
+      let report = '';
+      for (let i = 0; i < items.length; i++) {
+        report = report + items[i] + ', ';
+      }
+      return report;
+    }
+    
+    // Better approach: Using array join
+    function buildReportEfficiently(items) {
+      return items.join(', ');
+    }
+    
+    // For more complex concatenation
+    function buildComplexReport(items) {
+      const parts = [];
+      for (let i = 0; i < items.length; i++) {
+        parts.push(items[i]);
+      }
+      return parts.join(', ');
+    }
+    ```
+    
+    Inefficient string concatenation can lead to significant CPU and memory overhead, especially in loops, as each concatenation operation creates a new string object.
+    
+    To optimize string concatenation:
+    - Use dedicated string builders (StringBuilder in Java, StringBuffer in older Java code)
+    - In JavaScript, use array.join() for simple concatenation
+    - In Python, use ''.join(list) instead of += in loops
+    - Consider using string interpolation for simple cases
+    - Pre-allocate capacity when the final size is known or can be estimated
+    - Minimize the number of concatenation operations
+    - Consider using specialized libraries for very large string manipulations
+  </Accordion>
+  
+  <Accordion title="Excessive Regular Expression Usage" icon="magnifying-glass">
+    ```javascript
+    // Anti-pattern: Recompiling regular expressions in loops
+    function validateEmails(emails) {
+      const validEmails = [];
+      
+      for (const email of emails) {
+        // Regex is recompiled in each iteration
+        if (/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+          validEmails.push(email);
+        }
+      }
+      
+      return validEmails;
+    }
+    
+    // Better approach: Compile regex once
+    function validateEmailsEfficiently(emails) {
+      const validEmails = [];
+      // Compile regex once
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      
+      for (const email of emails) {
+        if (emailRegex.test(email)) {
+          validEmails.push(email);
+        }
+      }
+      
+      return validEmails;
+    }
+    ```
+    
+    ```python
+    # Anti-pattern: Recompiling regular expressions in Python
+    def validate_emails(emails):
+        valid_emails = []
+        
+        for email in emails:
+            # Regex is recompiled in each iteration
+            if re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+                valid_emails.append(email)
+                
+        return valid_emails
+    
+    # Better approach: Compile regex once
+    import re
+    
+    def validate_emails_efficiently(emails):
+        valid_emails = []
+        # Compile regex once
+        email_regex = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        
+        for email in emails:
+            if email_regex.match(email):
+                valid_emails.append(email)
+                
+        return valid_emails
+    ```
+    
+    Regular expressions are powerful but can be CPU-intensive, especially when complex patterns are repeatedly compiled or executed on large inputs.
+    
+    To optimize regular expression usage:
+    - Compile regular expressions once, outside of loops
+    - Use simpler patterns when possible
+    - Consider using string methods for simple cases (indexOf, startsWith, etc.)
+    - Be cautious with greedy quantifiers and backreferences
+    - Test regular expressions with realistic data volumes
+    - Consider using specialized libraries for complex text processing
+    - Be aware of catastrophic backtracking in complex patterns
+    - Use atomic groups or possessive quantifiers when available
+  </Accordion>
+  
+  <Accordion title="Inefficient Sorting Algorithms" icon="arrow-up-wide-short">
+    ```javascript
+    // Anti-pattern: Bubble sort (O(n²) complexity)
+    function bubbleSort(arr) {
+      const n = arr.length;
+      
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n - i - 1; j++) {
+          if (arr[j] > arr[j + 1]) {
+            // Swap elements
+            [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+          }
+        }
+      }
+      
+      return arr;
+    }
+    
+    // Better approach: Using native sort or more efficient algorithms
+    function efficientSort(arr) {
+      // JavaScript's native sort uses an optimized algorithm
+      return [...arr].sort((a, b) => a - b);
+    }
+    
+    // For custom sorting needs, consider more efficient algorithms
+    function quickSort(arr) {
+      if (arr.length <= 1) {
+        return arr;
+      }
+      
+      const pivot = arr[Math.floor(arr.length / 2)];
+      const left = arr.filter(x => x < pivot);
+      const middle = arr.filter(x => x === pivot);
+      const right = arr.filter(x => x > pivot);
+      
+      return [...quickSort(left), ...middle, ...quickSort(right)];
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Selection sort (O(n²) complexity)
+    public void selectionSort(int[] arr) {
+        int n = arr.length;
+        
+        for (int i = 0; i < n - 1; i++) {
+            int minIdx = i;
+            for (int j = i + 1; j < n; j++) {
+                if (arr[j] < arr[minIdx]) {
+                    minIdx = j;
+                }
+            }
+            
+            // Swap elements
+            int temp = arr[minIdx];
+            arr[minIdx] = arr[i];
+            arr[i] = temp;
+        }
+    }
+    
+    // Better approach: Using built-in sorting
+    public void efficientSort(int[] arr) {
+        // Java's Arrays.sort uses a dual-pivot Quicksort
+        Arrays.sort(arr);
+    }
+    
+    // For objects or custom comparisons
+    public void sortObjects(List<Person> people) {
+        Collections.sort(people, Comparator.comparing(Person::getAge));
+    }
+    ```
+    
+    Using inefficient sorting algorithms can lead to significant performance issues, especially with large datasets.
+    
+    To optimize sorting operations:
+    - Use built-in sorting functions which typically implement efficient algorithms
+    - Choose algorithms based on data characteristics (nearly sorted, many duplicates, etc.)
+    - Consider time and space complexity requirements
+    - For small arrays, simple algorithms may actually be faster due to lower overhead
+    - Use specialized algorithms for specific use cases (e.g., counting sort for integers in a known range)
+    - Consider parallel sorting for very large datasets
+    - Avoid unnecessary sorting operations
+    - Sort only the necessary portion of data when possible
+  </Accordion>
+  
+  <Accordion title="Excessive Object Creation" icon="boxes-stacked">
+    ```java
+    // Anti-pattern: Creating unnecessary objects in a loop
+    public double calculateAverage(int[] values) {
+        double sum = 0;
+        for (int i = 0; i < values.length; i++) {
+            // Creates a new Double object in each iteration
+            Double value = Double.valueOf(values[i]);
+            sum += value;
+        }
+        return sum / values.length;
+    }
+    
+    // Better approach: Avoiding unnecessary object creation
+    public double calculateAverageEfficiently(int[] values) {
+        double sum = 0;
+        for (int i = 0; i < values.length; i++) {
+            // Uses primitive types
+            sum += values[i];
+        }
+        return sum / values.length;
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Creating objects inside a hot loop
+    function processData(data) {
+      let results = [];
+      
+      for (let i = 0; i < data.length; i++) {
+        // Creates a new object in each iteration
+        results.push({
+          id: data[i].id,
+          value: data[i].value,
+          processed: true,
+          timestamp: new Date()
+        });
+      }
+      
+      return results;
+    }
+    
+    // Better approach: Minimizing object creation
+    function processDataEfficiently(data) {
+      const now = new Date(); // Create date object once
+      let results = [];
+      
+      for (let i = 0; i < data.length; i++) {
+        // Reuse existing properties when possible
+        const item = data[i];
+        item.processed = true;
+        item.timestamp = now;
+        results.push(item);
+      }
+      
+      return results;
+    }
+    ```
+    
+    Excessive object creation can lead to increased CPU usage for object initialization and increased pressure on the garbage collector.
+    
+    To minimize unnecessary object creation:
+    - Reuse objects when possible instead of creating new ones
+    - Use primitive types instead of wrapper objects when appropriate
+    - Consider object pooling for expensive-to-create objects
+    - Use factory methods that can return cached instances
+    - Avoid creating temporary objects in loops
+    - Use builders for complex object construction
+    - Consider immutable objects for thread safety and caching
+    - Be aware of hidden object creation in language features (e.g., autoboxing)
+  </Accordion>
+  
+  <Accordion title="Inefficient Collection Operations" icon="list-check">
+    ```java
+    // Anti-pattern: Inefficient collection operations
+    public boolean containsValue(List<String> list, String value) {
+        // Linear search (O(n) complexity)
+        for (String item : list) {
+            if (item.equals(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // Better approach: Using appropriate data structures
+    public boolean containsValueEfficiently(Set<String> set, String value) {
+        // O(1) average case complexity with HashSet
+        return set.contains(value);
+    }
+    
+    // Anti-pattern: Repeatedly checking size in a loop
+    public void processLargeList(List<String> items) {
+        for (int i = 0; i < items.size(); i++) { // items.size() called in each iteration
+            processItem(items.get(i));
+        }
+    }
+    
+    // Better approach: Caching the size
+    public void processLargeListEfficiently(List<String> items) {
+        int size = items.size(); // Calculate size once
+        for (int i = 0; i < size; i++) {
+            processItem(items.get(i));
+        }
+    }
+    ```
+    
+    ```python
+    # Anti-pattern: Inefficient list operations
+    def find_duplicates(items):
+        duplicates = []
+        for item in items:
+            if items.count(item) > 1 and item not in duplicates:  # O(n) operation in each iteration
+                duplicates.append(item)
+        return duplicates
+    
+    # Better approach: Using appropriate data structures
+    def find_duplicates_efficiently(items):
+        seen = set()
+        duplicates = set()
+        
+        for item in items:
+            if item in seen:  # O(1) operation
+                duplicates.add(item)
+            else:
+                seen.add(item)
+                
+        return list(duplicates)
+    ```
+    
+    Inefficient collection operations can lead to significant performance bottlenecks, especially with large datasets.
+    
+    To optimize collection operations:
+    - Choose the appropriate data structure for the operation (e.g., HashSet for lookups)
+    - Be aware of the time complexity of collection operations
+    - Cache results of expensive operations when possible
+    - Use bulk operations instead of multiple individual operations
+    - Consider specialized collections for specific use cases
+    - Avoid unnecessary copying of collections
+    - Pre-allocate collection capacity when the size is known
+    - Use streams or functional operations judiciously
+  </Accordion>
+  
+  <Accordion title="Recursive Functions Without Memoization" icon="code-branch">
+    ```javascript
+    // Anti-pattern: Recursive Fibonacci without memoization
+    function fibonacci(n) {
+      if (n <= 1) return n;
+      return fibonacci(n - 1) + fibonacci(n - 2);
+    }
+    
+    // Better approach: Using memoization
+    function fibonacciWithMemoization(n, memo = {}) {
+      if (n <= 1) return n;
+      
+      if (memo[n]) return memo[n];
+      
+      memo[n] = fibonacciWithMemoization(n - 1, memo) + 
+                fibonacciWithMemoization(n - 2, memo);
+      
+      return memo[n];
+    }
+    
+    // Even better: Using iteration
+    function fibonacciIterative(n) {
+      if (n <= 1) return n;
+      
+      let a = 0, b = 1;
+      for (let i = 2; i <= n; i++) {
+        const temp = a + b;
+        a = b;
+        b = temp;
+      }
+      
+      return b;
+    }
+    ```
+    
+    ```python
+    # Anti-pattern: Recursive function without memoization
+    def factorial(n):
+        if n <= 1:
+            return 1
+        return n * factorial(n - 1)
+    
+    # Better approach: Using memoization
+    from functools import lru_cache
+    
+    @lru_cache(maxsize=None)
+    def factorial_memoized(n):
+        if n <= 1:
+            return 1
+        return n * factorial_memoized(n - 1)
+    
+    # Even better: Using iteration
+    def factorial_iterative(n):
+        result = 1
+        for i in range(2, n + 1):
+            result *= i
+        return result
+    ```
+    
+    Recursive functions without memoization can lead to exponential time complexity and excessive CPU usage due to redundant calculations.
+    
+    To optimize recursive functions:
+    - Use memoization to cache results of expensive function calls
+    - Consider using dynamic programming approaches
+    - Convert recursive algorithms to iterative ones when possible
+    - Use tail recursion when supported by the language
+    - Be aware of stack overflow risks with deep recursion
+    - Consider using specialized libraries for common recursive problems
+    - Use language features like decorators for memoization when available
+    - Consider using a bottom-up approach instead of top-down recursion
+  </Accordion>
+  
+  <Accordion title="Unnecessary Computations" icon="calculator">
+    ```javascript
+    // Anti-pattern: Unnecessary computations in a loop
+    function processItems(items) {
+      const results = [];
+      
+      for (let i = 0; i < items.length; i++) {
+        // Expensive calculation performed for every item
+        const taxRate = calculateTaxRate(items[i].country);
+        const price = items[i].price;
+        const tax = price * taxRate;
+        
+        results.push({
+          item: items[i],
+          finalPrice: price + tax
+        });
+      }
+      
+      return results;
+    }
+    
+    // Better approach: Caching expensive computations
+    function processItemsEfficiently(items) {
+      const results = [];
+      const taxRateCache = {}; // Cache for tax rates
+      
+      for (let i = 0; i < items.length; i++) {
+        const country = items[i].country;
+        const price = items[i].price;
+        
+        // Use cached value if available
+        if (!taxRateCache[country]) {
+          taxRateCache[country] = calculateTaxRate(country);
+        }
+        
+        const taxRate = taxRateCache[country];
+        const tax = price * taxRate;
+        
+        results.push({
+          item: items[i],
+          finalPrice: price + tax
+        });
+      }
+      
+      return results;
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Unnecessary computations in rendering
+    public class ProductView extends View {
+        private List<Product> products;
+        
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            
+            // Expensive calculations in the draw method
+            double total = 0;
+            for (Product product : products) {
+                total += product.getPrice() * calculateTaxRate(product.getCountry());
+                // Draw product...
+            }
+            
+            // Draw total...
+        }
+    }
+    
+    // Better approach: Performing calculations only when needed
+    public class ProductView extends View {
+        private List<Product> products;
+        private double cachedTotal;
+        private boolean totalNeedsRecalculation = true;
+        
+        public void setProducts(List<Product> products) {
+            this.products = products;
+            totalNeedsRecalculation = true;
+            invalidate();
+        }
+        
+        private double calculateTotal() {
+            if (totalNeedsRecalculation) {
+                double total = 0;
+                Map<String, Double> taxRateCache = new HashMap<>();
+                
+                for (Product product : products) {
+                    String country = product.getCountry();
+                    
+                    // Use cached tax rate if available
+                    if (!taxRateCache.containsKey(country)) {
+                        taxRateCache.put(country, calculateTaxRate(country));
+                    }
+                    
+                    total += product.getPrice() * taxRateCache.get(country);
+                }
+                
+                cachedTotal = total;
+                totalNeedsRecalculation = false;
+            }
+            
+            return cachedTotal;
+        }
+        
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            
+            // Draw products...
+            
+            // Use pre-calculated total
+            double total = calculateTotal();
+            // Draw total...
+        }
+    }
+    ```
+    
+    Unnecessary computations can waste CPU resources and lead to poor performance, especially when performed repeatedly or in performance-critical sections.
+    
+    To avoid unnecessary computations:
+    - Cache results of expensive calculations
+    - Compute values lazily (only when needed)
+    - Move invariant calculations out of loops
+    - Use memoization for pure functions
+    - Implement dirty flags to track when recalculation is needed
+    - Consider using computed properties with caching
+    - Batch operations to avoid redundant processing
+    - Use incremental updates instead of full recalculations when possible
+  </Accordion>
+  
+  <Accordion title="Inefficient JSON Parsing" icon="brackets-curly">
+    ```javascript
+    // Anti-pattern: Inefficient JSON handling
+    function processLargeJsonResponse(jsonString) {
+      // Parse entire JSON at once
+      const data = JSON.parse(jsonString);
+      
+      // Process only a small portion of the data
+      return data.users.filter(user => user.active).map(user => user.name);
+    }
+    
+    // Better approach: Using streaming JSON parser for large data
+    function processLargeJsonResponseEfficiently(jsonString) {
+      const names = [];
+      
+      // Using a streaming JSON parser like Oboe.js
+      oboe(jsonString)
+        .node('users[*]', user => {
+          if (user.active) {
+            names.push(user.name);
+          }
+          // Return oboe.drop to free memory
+          return oboe.drop;
+        });
+      
+      return names;
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Inefficient JSON parsing in Java
+    public List<String> getActiveUserNames(String jsonString) throws Exception {
+        // Parse entire JSON at once
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode rootNode = mapper.readTree(jsonString);
+        
+        List<String> names = new ArrayList<>();
+        JsonNode usersNode = rootNode.get("users");
+        
+        for (JsonNode userNode : usersNode) {
+            if (userNode.get("active").asBoolean()) {
+                names.add(userNode.get("name").asText());
+            }
+        }
+        
+        return names;
+    }
+    
+    // Better approach: Using streaming JSON parser
+    public List<String> getActiveUserNamesEfficiently(String jsonString) throws Exception {
+        List<String> names = new ArrayList<>();
+        
+        JsonFactory factory = new JsonFactory();
+        JsonParser parser = factory.createParser(jsonString);
+        
+        // Find the users array
+        while (parser.nextToken() != JsonToken.END_OBJECT) {
+            String fieldName = parser.getCurrentName();
+            if ("users".equals(fieldName)) {
+                // Enter the array
+                parser.nextToken();
+                // Iterate through array elements
+                while (parser.nextToken() != JsonToken.END_ARRAY) {
+                    boolean isActive = false;
+                    String name = null;
+                    
+                    // Parse user object
+                    while (parser.nextToken() != JsonToken.END_OBJECT) {
+                        String userField = parser.getCurrentName();
+                        parser.nextToken();
+                        
+                        if ("active".equals(userField)) {
+                            isActive = parser.getBooleanValue();
+                        } else if ("name".equals(userField)) {
+                            name = parser.getText();
+                        }
+                    }
+                    
+                    if (isActive && name != null) {
+                        names.add(name);
+                    }
+                }
+                break;
+            }
+        }
+        
+        parser.close();
+        return names;
+    }
+    ```
+    
+    Inefficient JSON parsing can lead to high CPU usage and memory consumption, especially when dealing with large JSON documents.
+    
+    To optimize JSON parsing:
+    - Use streaming parsers for large JSON documents
+    - Parse only the required portions of the JSON
+    - Consider using specialized JSON libraries optimized for performance
+    - Reuse parser instances when parsing multiple documents
+    - Consider using binary formats like Protocol Buffers or MessagePack for better performance
+    - Implement pagination for large datasets
+    - Use appropriate data structures to store parsed data
+    - Consider using schema validation to ensure JSON structure
+  </Accordion>
+  
+  <Accordion title="CPU-Intensive Operations Prevention Checklist" icon="clipboard-check">
+    ```text
+    CPU-Intensive Operations Prevention Checklist:
+    
+    1. Thread Management
+       - Move CPU-intensive operations off the main/UI thread
+       - Use background threads, workers, or async operations
+       - Implement proper thread pooling
+       - Consider using non-blocking I/O
+       - Avoid thread contention and excessive context switching
+    
+    2. Algorithm Optimization
+       - Choose algorithms with appropriate time complexity
+       - Use memoization for expensive recursive functions
+       - Implement caching for repetitive calculations
+       - Consider space-time tradeoffs
+       - Use specialized algorithms for specific use cases
+    
+    3. Data Structure Selection
+       - Choose appropriate data structures for operations
+       - Be aware of the performance characteristics of collections
+       - Use specialized data structures for specific use cases
+       - Consider memory usage vs. access time tradeoffs
+       - Pre-allocate collections when size is known
+    
+    4. String and Text Processing
+       - Use efficient string builders for concatenation
+       - Compile regular expressions once, outside of loops
+       - Consider using specialized text processing libraries
+       - Be cautious with complex regular expressions
+       - Use string interning for frequently used strings
+    
+    5. Object Creation and Memory Management
+       - Minimize object creation in hot code paths
+       - Reuse objects when appropriate
+       - Consider object pooling for expensive objects
+       - Use value types or primitives when possible
+       - Be aware of boxing/unboxing overhead
+    
+    6. Parsing and Serialization
+       - Use streaming parsers for large documents
+       - Consider binary formats for better performance
+       - Implement partial parsing when appropriate
+       - Reuse parser instances when possible
+       - Consider schema validation for structured data
+    
+    7. Loop Optimization
+       - Move invariant calculations outside loops
+       - Consider loop unrolling for small, critical loops
+       - Use appropriate loop constructs
+       - Consider parallelizing loops for large datasets
+       - Minimize function calls inside loops
+    
+    8. Measurement and Profiling
+       - Use profiling tools to identify bottlenecks
+       - Establish performance baselines and budgets
+       - Measure performance with realistic data volumes
+       - Focus optimization efforts on hot code paths
+       - Validate optimizations with benchmarks
+    ```
+    
+    Preventing CPU-intensive operations requires a systematic approach to identifying, measuring, and optimizing performance bottlenecks.
+    
+    Key prevention strategies:
+    - Move CPU-intensive work off the main thread
+    - Choose appropriate algorithms and data structures
+    - Implement caching and memoization
+    - Optimize string and collection operations
+    - Minimize object creation in hot code paths
+    - Use efficient parsing and serialization techniques
+    - Optimize loops and recursive functions
+    - Regularly profile and benchmark performance
+  </Accordion>
+</AccordionGroup>

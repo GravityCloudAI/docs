@@ -1,0 +1,783 @@
+---
+title: 'File Handling Vulnerabilities'
+description: 'File handling vulnerabilities occur when applications improperly manage file operations, potentially leading to unauthorized access, data disclosure, or system compromise.'
+---
+
+<AccordionGroup>
+  <Accordion title="File Handling Vulnerabilities Overview" icon="shield-xmark">
+    File handling vulnerabilities arise when applications fail to properly validate, sanitize, or control file operations. These vulnerabilities can lead to various security issues, including path traversal, arbitrary file read/write, code execution, or denial of service.
+    
+    Proper file handling is essential for maintaining the security and integrity of applications that interact with the file system. This includes validating file paths, controlling file access, and implementing proper permission checks.
+  </Accordion>
+  
+  <Accordion title="Path Traversal" icon="folder-tree">
+    ```javascript
+    // Anti-pattern: Vulnerable to path traversal
+    app.get('/download', (req, res) => {
+      const fileName = req.query.file;
+      const filePath = `/var/www/files/${fileName}`;
+      
+      // No path validation
+      res.download(filePath);
+    });
+    
+    // Better approach: Preventing path traversal
+    const path = require('path');
+    
+    app.get('/download', (req, res) => {
+      const fileName = req.query.file;
+      
+      // Validate filename format
+      if (!fileName || !fileName.match(/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/)) {
+        return res.status(400).send('Invalid filename');
+      }
+      
+      // Create absolute path and validate it's within the allowed directory
+      const basePath = '/var/www/files';
+      const filePath = path.join(basePath, fileName);
+      
+      // Ensure the resolved path is within the base directory
+      if (!filePath.startsWith(basePath)) {
+        return res.status(403).send('Access denied');
+      }
+      
+      res.download(filePath);
+    });
+    ```
+    
+    Path traversal vulnerabilities allow attackers to access files outside of the intended directory by manipulating file paths with sequences like "../".
+    
+    To prevent path traversal:
+    - Validate and sanitize file paths
+    - Use path normalization functions
+    - Verify that resolved paths are within allowed directories
+    - Implement proper access controls
+    - Consider using a whitelist of allowed files
+    - Avoid exposing full file paths to users
+  </Accordion>
+  
+  <Accordion title="Unrestricted File Upload" icon="file-arrow-up">
+    ```javascript
+    // Anti-pattern: Unrestricted file upload
+    const multer = require('multer');
+    const upload = multer({ dest: 'uploads/' });
+    
+    app.post('/upload', upload.single('file'), (req, res) => {
+      // No validation of file type or content
+      res.json({ file: req.file });
+    });
+    
+    // Better approach: Restricted file upload
+    const multer = require('multer');
+    const path = require('path');
+    const crypto = require('crypto');
+    
+    // Configure storage
+    const storage = multer.diskStorage({
+      destination: function(req, file, cb) {
+        cb(null, 'uploads/');
+      },
+      filename: function(req, file, cb) {
+        // Generate a secure random filename
+        crypto.randomBytes(16, (err, raw) => {
+          if (err) return cb(err);
+          
+          // Keep original extension but use random filename
+          const extension = path.extname(file.originalname).toLowerCase();
+          cb(null, raw.toString('hex') + extension);
+        });
+      }
+    });
+    
+    // Validate file type
+    const fileFilter = (req, file, cb) => {
+      // Define allowed extensions
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+      
+      if (!allowedTypes.includes(file.mimetype)) {
+        return cb(new Error('Invalid file type'), false);
+      }
+      
+      cb(null, true);
+    };
+    
+    const upload = multer({
+      storage: storage,
+      fileFilter: fileFilter,
+      limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+      }
+    });
+    
+    app.post('/upload', upload.single('file'), (req, res) => {
+      // Perform additional validation if needed
+      // For example, scan the file for malware
+      
+      res.json({
+        filename: req.file.filename,
+        size: req.file.size
+      });
+    });
+    ```
+    
+    Unrestricted file uploads can allow attackers to upload malicious files, potentially leading to code execution, cross-site scripting, or other attacks.
+    
+    To implement secure file uploads:
+    - Validate file types and content
+    - Generate secure random filenames
+    - Implement file size limits
+    - Store uploaded files outside the web root
+    - Scan uploaded files for malware
+    - Implement proper access controls
+    - Consider using a CDN or dedicated file storage service
+  </Accordion>
+  
+  <Accordion title="Insecure File Permissions" icon="lock-open">
+    ```javascript
+    // Anti-pattern: Insecure file permissions
+    const fs = require('fs');
+    
+    function saveUserData(userId, data) {
+      const filePath = `/var/data/users/${userId}.json`;
+      
+      // Writing file with default permissions
+      fs.writeFileSync(filePath, JSON.stringify(data));
+    }
+    
+    // Better approach: Secure file permissions
+    const fs = require('fs');
+    
+    function saveUserData(userId, data) {
+      const filePath = `/var/data/users/${userId}.json`;
+      
+      // Writing file with restricted permissions (0600 = read/write for owner only)
+      fs.writeFileSync(filePath, JSON.stringify(data), { mode: 0o600 });
+    }
+    ```
+    
+    Insecure file permissions can allow unauthorized users to read, modify, or execute sensitive files.
+    
+    To implement secure file permissions:
+    - Set appropriate file permissions based on the principle of least privilege
+    - Use restrictive permissions for sensitive files
+    - Implement proper ownership for files and directories
+    - Regularly audit file permissions
+    - Consider using access control lists for more granular control
+    - Implement proper error handling for permission issues
+  </Accordion>
+  
+  <Accordion title="Arbitrary File Read" icon="file-lines">
+    ```javascript
+    // Anti-pattern: Arbitrary file read
+    app.get('/view-file', (req, res) => {
+      const filePath = req.query.path;
+      
+      // No validation of file path
+      fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+          return res.status(500).send('Error reading file');
+        }
+        
+        res.send(data);
+      });
+    });
+    
+    // Better approach: Restricted file read
+    const path = require('path');
+    
+    app.get('/view-file', (req, res) => {
+      const fileName = req.query.file;
+      
+      // Validate filename
+      if (!fileName || !fileName.match(/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/)) {
+        return res.status(400).send('Invalid filename');
+      }
+      
+      // Create absolute path and validate it's within the allowed directory
+      const basePath = '/var/www/files';
+      const filePath = path.join(basePath, fileName);
+      
+      // Ensure the resolved path is within the base directory
+      if (!filePath.startsWith(basePath)) {
+        return res.status(403).send('Access denied');
+      }
+      
+      // Check if file exists
+      fs.access(filePath, fs.constants.F_OK, (err) => {
+        if (err) {
+          return res.status(404).send('File not found');
+        }
+        
+        // Read file
+        fs.readFile(filePath, 'utf8', (err, data) => {
+          if (err) {
+            return res.status(500).send('Error reading file');
+          }
+          
+          res.send(data);
+        });
+      });
+    });
+    ```
+    
+    Arbitrary file read vulnerabilities allow attackers to read any file on the system that the application has access to, potentially exposing sensitive information.
+    
+    To prevent arbitrary file read:
+    - Validate and sanitize file paths
+    - Restrict file access to specific directories
+    - Implement proper access controls
+    - Use a whitelist of allowed files
+    - Consider using a file access abstraction layer
+    - Implement proper error handling
+  </Accordion>
+  
+  <Accordion title="Arbitrary File Write" icon="file-pen">
+    ```javascript
+    // Anti-pattern: Arbitrary file write
+    app.post('/save-file', (req, res) => {
+      const { path, content } = req.body;
+      
+      // No validation of file path
+      fs.writeFile(path, content, (err) => {
+        if (err) {
+          return res.status(500).send('Error writing file');
+        }
+        
+        res.send('File saved successfully');
+      });
+    });
+    
+    // Better approach: Restricted file write
+    const path = require('path');
+    
+    app.post('/save-file', authenticateUser, (req, res) => {
+      const { fileName, content } = req.body;
+      
+      // Validate filename
+      if (!fileName || !fileName.match(/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/)) {
+        return res.status(400).send('Invalid filename');
+      }
+      
+      // Create absolute path and validate it's within the allowed directory
+      const basePath = `/var/www/user_files/${req.user.id}`;
+      const filePath = path.join(basePath, fileName);
+      
+      // Ensure the resolved path is within the user's directory
+      if (!filePath.startsWith(basePath)) {
+        return res.status(403).send('Access denied');
+      }
+      
+      // Ensure directory exists
+      fs.mkdir(basePath, { recursive: true }, (err) => {
+        if (err) {
+          return res.status(500).send('Error creating directory');
+        }
+        
+        // Write file with restricted permissions
+        fs.writeFile(filePath, content, { mode: 0o600 }, (err) => {
+          if (err) {
+            return res.status(500).send('Error writing file');
+          }
+          
+          res.send('File saved successfully');
+        });
+      });
+    });
+    ```
+    
+    Arbitrary file write vulnerabilities allow attackers to write to any file on the system that the application has access to, potentially leading to code execution or system compromise.
+    
+    To prevent arbitrary file write:
+    - Validate and sanitize file paths
+    - Restrict file writes to specific directories
+    - Implement proper access controls
+    - Set appropriate file permissions
+    - Validate file content
+    - Implement proper error handling
+  </Accordion>
+  
+  <Accordion title="File Inclusion Vulnerabilities" icon="file-import">
+    ```php
+    // Anti-pattern: Insecure file inclusion (PHP example)
+    <?php
+    // Local File Inclusion vulnerability
+    $page = $_GET['page'];
+    include($page . '.php');
+    ?>
+    
+    // Better approach: Secure file inclusion
+    <?php
+    // Define a whitelist of allowed pages
+    $allowed_pages = ['home', 'about', 'contact', 'products'];
+    
+    // Get the requested page
+    $page = $_GET['page'] ?? 'home';
+    
+    // Validate against whitelist
+    if (!in_array($page, $allowed_pages)) {
+        $page = 'home'; // Default to home page if not in whitelist
+    }
+    
+    // Include the file with proper path handling
+    include(__DIR__ . '/pages/' . $page . '.php');
+    ?>
+    ```
+    
+    File inclusion vulnerabilities allow attackers to include files from the local file system or remote servers, potentially leading to code execution or information disclosure.
+    
+    To prevent file inclusion vulnerabilities:
+    - Use a whitelist of allowed files
+    - Avoid using user input for file inclusion
+    - Implement proper input validation
+    - Use absolute paths with proper directory restrictions
+    - Disable remote file inclusion if not needed
+    - Consider using a template engine instead of direct file inclusion
+  </Accordion>
+  
+  <Accordion title="Insecure File Deletion" icon="trash">
+    ```javascript
+    // Anti-pattern: Insecure file deletion
+    app.delete('/delete-file', (req, res) => {
+      const filePath = req.query.path;
+      
+      // No validation of file path
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          return res.status(500).send('Error deleting file');
+        }
+        
+        res.send('File deleted successfully');
+      });
+    });
+    
+    // Better approach: Secure file deletion
+    const path = require('path');
+    
+    app.delete('/delete-file', authenticateUser, (req, res) => {
+      const fileName = req.query.file;
+      
+      // Validate filename
+      if (!fileName || !fileName.match(/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/)) {
+        return res.status(400).send('Invalid filename');
+      }
+      
+      // Create absolute path and validate it's within the user's directory
+      const basePath = `/var/www/user_files/${req.user.id}`;
+      const filePath = path.join(basePath, fileName);
+      
+      // Ensure the resolved path is within the user's directory
+      if (!filePath.startsWith(basePath)) {
+        return res.status(403).send('Access denied');
+      }
+      
+      // Check if file exists and is a regular file
+      fs.stat(filePath, (err, stats) => {
+        if (err) {
+          return res.status(404).send('File not found');
+        }
+        
+        if (!stats.isFile()) {
+          return res.status(400).send('Not a file');
+        }
+        
+        // Delete file
+        fs.unlink(filePath, (err) => {
+          if (err) {
+            return res.status(500).send('Error deleting file');
+          }
+          
+          res.send('File deleted successfully');
+        });
+      });
+    });
+    ```
+    
+    Insecure file deletion can allow attackers to delete critical system files or other users' files, potentially leading to denial of service or data loss.
+    
+    To implement secure file deletion:
+    - Validate and sanitize file paths
+    - Restrict file deletion to specific directories
+    - Implement proper access controls
+    - Verify file ownership before deletion
+    - Implement proper error handling
+    - Consider implementing a trash/recycle bin functionality
+  </Accordion>
+  
+  <Accordion title="Race Conditions in File Operations" icon="bolt">
+    ```javascript
+    // Anti-pattern: Vulnerable to race conditions
+    app.post('/create-file', (req, res) => {
+      const { fileName, content } = req.body;
+      const filePath = `/var/www/files/${fileName}`;
+      
+      // Check if file exists
+      fs.access(filePath, fs.constants.F_OK, (err) => {
+        if (!err) {
+          return res.status(400).send('File already exists');
+        }
+        
+        // Race condition: Time between check and write
+        fs.writeFile(filePath, content, (err) => {
+          if (err) {
+            return res.status(500).send('Error writing file');
+          }
+          
+          res.send('File created successfully');
+        });
+      });
+    });
+    
+    // Better approach: Preventing race conditions
+    const fs = require('fs').promises;
+    
+    app.post('/create-file', async (req, res) => {
+      const { fileName, content } = req.body;
+      const filePath = `/var/www/files/${fileName}`;
+      
+      try {
+        // Use flags to handle file creation atomically
+        // wx flag: open for writing, fails if file exists
+        await fs.writeFile(filePath, content, { flag: 'wx' });
+        res.send('File created successfully');
+      } catch (err) {
+        if (err.code === 'EEXIST') {
+          return res.status(400).send('File already exists');
+        }
+        
+        res.status(500).send('Error writing file');
+      }
+    });
+    ```
+    
+    Race conditions in file operations can lead to data corruption, information disclosure, or security bypasses if multiple operations access the same file simultaneously.
+    
+    To prevent race conditions in file operations:
+    - Use atomic file operations when possible
+    - Implement proper file locking mechanisms
+    - Use appropriate file open flags
+    - Consider using a database for concurrent access scenarios
+    - Implement proper error handling for race conditions
+    - Be aware of the limitations of file system operations
+  </Accordion>
+  
+  <Accordion title="Temporary File Vulnerabilities" icon="clock">
+    ```javascript
+    // Anti-pattern: Insecure temporary file handling
+    function processData(data) {
+      const tempFile = `/tmp/data_${Date.now()}.tmp`;
+      
+      // Write data to predictable temporary file
+      fs.writeFileSync(tempFile, data);
+      
+      // Process the data...
+      
+      // Delete temporary file
+      fs.unlinkSync(tempFile);
+      
+      return result;
+    }
+    
+    // Better approach: Secure temporary file handling
+    const crypto = require('crypto');
+    const os = require('os');
+    const path = require('path');
+    
+    function processData(data) {
+      // Generate a secure random filename in the system temp directory
+      const randomName = crypto.randomBytes(16).toString('hex');
+      const tempFile = path.join(os.tmpdir(), randomName);
+      
+      try {
+        // Write data with restricted permissions
+        fs.writeFileSync(tempFile, data, { mode: 0o600 });
+        
+        // Process the data...
+        
+        return result;
+      } finally {
+        // Always delete the temporary file, even if an error occurs
+        try {
+          fs.unlinkSync(tempFile);
+        } catch (err) {
+          console.error('Error deleting temporary file:', err);
+        }
+      }
+    }
+    ```
+    
+    Temporary file vulnerabilities can lead to information disclosure, race conditions, or denial of service if temporary files are not properly managed.
+    
+    To implement secure temporary file handling:
+    - Use secure random filenames
+    - Store temporary files in appropriate directories
+    - Set proper file permissions
+    - Ensure temporary files are deleted after use
+    - Implement proper error handling
+    - Consider using built-in temporary file creation functions
+    - Be aware of the limitations of temporary file operations
+  </Accordion>
+  
+  <Accordion title="Directory Traversal in Archives" icon="file-zipper">
+    ```javascript
+    // Anti-pattern: Vulnerable to zip slip
+    const decompress = require('decompress');
+    
+    app.post('/upload-zip', upload.single('zipfile'), (req, res) => {
+      const zipFile = req.file.path;
+      const extractPath = '/var/www/uploads/extracted';
+      
+      // Vulnerable to zip slip
+      decompress(zipFile, extractPath)
+        .then(() => {
+          res.send('Zip file extracted successfully');
+        })
+        .catch(err => {
+          res.status(500).send('Error extracting zip file');
+        });
+    });
+    
+    // Better approach: Preventing zip slip
+    const decompress = require('decompress');
+    const path = require('path');
+    
+    app.post('/upload-zip', upload.single('zipfile'), (req, res) => {
+      const zipFile = req.file.path;
+      const extractPath = '/var/www/uploads/extracted';
+      
+      // Extract and validate each file path
+      decompress(zipFile, extractPath, {
+        // Custom filter to prevent zip slip
+        filter: file => {
+          const filePath = path.join(extractPath, file.path);
+          
+          // Ensure the file path is within the extract directory
+          if (!filePath.startsWith(extractPath)) {
+            console.error('Zip slip attempt detected:', file.path);
+            return false;
+          }
+          
+          return true;
+        }
+      })
+        .then(() => {
+          res.send('Zip file extracted successfully');
+        })
+        .catch(err => {
+          console.error('Error extracting zip file:', err);
+          res.status(500).send('Error extracting zip file');
+        });
+    });
+    ```
+    
+    Directory traversal in archives (also known as "zip slip") can allow attackers to extract files to arbitrary locations on the file system, potentially leading to code execution or system compromise.
+    
+    To prevent directory traversal in archives:
+    - Validate file paths within archives
+    - Ensure extracted files remain within the intended directory
+    - Use libraries that handle zip slip vulnerabilities
+    - Implement proper error handling
+    - Consider using a sandbox environment for extraction
+    - Be aware of the limitations of archive extraction libraries
+  </Accordion>
+  
+  <Accordion title="Symlink Vulnerabilities" icon="link">
+    ```javascript
+    // Anti-pattern: Vulnerable to symlink attacks
+    app.get('/download/:file', (req, res) => {
+      const fileName = req.params.file;
+      const filePath = path.join('/var/www/files', fileName);
+      
+      // No symlink check
+      res.download(filePath);
+    });
+    
+    // Better approach: Preventing symlink attacks
+    const fs = require('fs');
+    const path = require('path');
+    
+    app.get('/download/:file', (req, res) => {
+      const fileName = req.params.file;
+      
+      // Validate filename
+      if (!fileName || !fileName.match(/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/)) {
+        return res.status(400).send('Invalid filename');
+      }
+      
+      const basePath = '/var/www/files';
+      const filePath = path.join(basePath, fileName);
+      
+      // Ensure the resolved path is within the base directory
+      if (!filePath.startsWith(basePath)) {
+        return res.status(403).send('Access denied');
+      }
+      
+      // Check if file exists and is a regular file (not a symlink)
+      fs.lstat(filePath, (err, stats) => {
+        if (err) {
+          return res.status(404).send('File not found');
+        }
+        
+        if (!stats.isFile() || stats.isSymbolicLink()) {
+          return res.status(403).send('Access denied');
+        }
+        
+        res.download(filePath);
+      });
+    });
+    ```
+    
+    Symlink vulnerabilities can allow attackers to access files outside of the intended directory by creating symbolic links to sensitive files.
+    
+    To prevent symlink vulnerabilities:
+    - Check if files are symbolic links before accessing them
+    - Use lstat instead of stat to detect symlinks
+    - Implement proper access controls
+    - Consider using a sandbox environment
+    - Be aware of the limitations of symlink detection
+    - Regularly audit file system for unauthorized symlinks
+  </Accordion>
+  
+  <Accordion title="File Upload MIME Type Spoofing" icon="file-circle-exclamation">
+    ```javascript
+    // Anti-pattern: Relying only on MIME type for validation
+    const multer = require('multer');
+    const upload = multer({ dest: 'uploads/' });
+    
+    app.post('/upload-image', upload.single('image'), (req, res) => {
+      // Only checking MIME type
+      if (!req.file.mimetype.startsWith('image/')) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).send('Only images are allowed');
+      }
+      
+      res.send('Image uploaded successfully');
+    });
+    
+    // Better approach: Comprehensive file validation
+    const multer = require('multer');
+    const upload = multer({ dest: 'uploads/' });
+    const fileType = require('file-type');
+    const fs = require('fs');
+    
+    app.post('/upload-image', upload.single('image'), async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).send('No file uploaded');
+        }
+        
+        // Read the file buffer
+        const buffer = fs.readFileSync(req.file.path);
+        
+        // Detect file type from file content
+        const fileInfo = await fileType.fromBuffer(buffer);
+        
+        // Validate file type
+        const validImageTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        
+        if (!fileInfo || !validImageTypes.includes(fileInfo.mime)) {
+          // Clean up invalid file
+          fs.unlinkSync(req.file.path);
+          return res.status(400).send('Invalid image format');
+        }
+        
+        // Additional validation (e.g., image dimensions, content)
+        
+        res.send('Image uploaded successfully');
+      } catch (err) {
+        console.error('Error processing upload:', err);
+        
+        // Clean up on error
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+        
+        res.status(500).send('Error processing upload');
+      }
+    });
+    ```
+    
+    MIME type spoofing can allow attackers to upload malicious files by disguising them as allowed file types.
+    
+    To prevent MIME type spoofing:
+    - Validate file content, not just the MIME type
+    - Use libraries that detect file types from file content
+    - Implement multiple validation checks
+    - Consider using image processing libraries for image validation
+    - Implement proper error handling
+    - Clean up invalid files
+  </Accordion>
+  
+  <Accordion title="Insecure File Metadata Handling" icon="file-circle-info">
+    ```javascript
+    // Anti-pattern: Exposing sensitive file metadata
+    app.get('/files', (req, res) => {
+      fs.readdir('/var/www/files', (err, files) => {
+        if (err) {
+          return res.status(500).send('Error reading directory');
+        }
+        
+        // Collecting detailed file information
+        const fileDetails = files.map(file => {
+          const filePath = path.join('/var/www/files', file);
+          const stats = fs.statSync(filePath);
+          
+          return {
+            name: file,
+            path: filePath,
+            size: stats.size,
+            created: stats.birthtime,
+            modified: stats.mtime,
+            owner: stats.uid,
+            permissions: stats.mode.toString(8)
+          };
+        });
+        
+        res.json(fileDetails);
+      });
+    });
+    
+    // Better approach: Controlled metadata exposure
+    app.get('/files', authenticateUser, (req, res) => {
+      fs.readdir('/var/www/files', (err, files) => {
+        if (err) {
+          return res.status(500).send('Error reading directory');
+        }
+        
+        // Collecting only necessary file information
+        const fileDetails = files.map(file => {
+          const filePath = path.join('/var/www/files', file);
+          
+          try {
+            const stats = fs.statSync(filePath);
+            
+            // Return only necessary information
+            return {
+              name: file,
+              size: stats.size,
+              modified: stats.mtime
+            };
+          } catch (err) {
+            // Handle errors for individual files
+            return {
+              name: file,
+              error: 'Unable to read file information'
+            };
+          }
+        });
+        
+        res.json(fileDetails);
+      });
+    });
+    ```
+    
+    Exposing sensitive file metadata can reveal information about the system, file structure, or permissions that could be useful to attackers.
+    
+    To implement secure file metadata handling:
+    - Limit the metadata exposed to users
+    - Implement proper access controls
+    - Filter sensitive information
+    - Implement proper error handling
+    - Consider using a metadata abstraction layer
+    - Regularly audit exposed metadata
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,645 @@
+---
+title: 'Broken Access Control Vulnerabilities'
+description: 'Broken access control vulnerabilities occur when restrictions on what authenticated users are allowed to do are not properly enforced, potentially leading to unauthorized information access, modification, or destruction.'
+---
+
+<AccordionGroup>
+  <Accordion title="Broken Access Control Overview" icon="lock-open">
+    Broken access control vulnerabilities occur when an application fails to properly restrict what authenticated users are allowed to do. These vulnerabilities can allow attackers to access unauthorized functionality or data, such as accessing other users' accounts, viewing sensitive files, modifying data, or changing access rights.
+    
+    Access control enforces policy such that users cannot act outside of their intended permissions. Failures typically lead to unauthorized information disclosure, modification, or destruction of data, or performing business functions outside the user's limits.
+    
+    Preventing broken access control requires implementing proper authentication, authorization, and access control mechanisms throughout the application.
+  </Accordion>
+  
+  <Accordion title="Insecure Direct Object References (IDOR)" icon="diagram-project">
+    ```javascript
+    // Anti-pattern: Insecure Direct Object Reference
+    app.get('/api/users/:userId/profile', (req, res) => {
+      const userId = req.params.userId;
+      
+      // No authorization check
+      // Any authenticated user can access any profile
+      db.getUserProfile(userId)
+        .then(profile => res.json(profile))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Better approach: Proper authorization check
+    app.get('/api/users/:userId/profile', authenticateUser, (req, res) => {
+      const userId = req.params.userId;
+      const currentUserId = req.user.id;
+      
+      // Check if user is accessing their own profile or has admin rights
+      if (userId !== currentUserId && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      db.getUserProfile(userId)
+        .then(profile => res.json(profile))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    ```
+    
+    Insecure Direct Object References (IDOR) occur when an application exposes a reference to an internal implementation object, such as a database key, without proper access control checks.
+    
+    To prevent IDOR vulnerabilities:
+    - Implement proper authorization checks for all object references
+    - Use indirect references that are mapped on the server side
+    - Validate that the authenticated user has permission to access the requested object
+    - Implement access control at both the data and function levels
+    - Consider using UUIDs instead of sequential IDs for sensitive resources
+    - Log and monitor access control failures
+    - Implement proper error handling for authorization failures
+  </Accordion>
+  
+  <Accordion title="Missing Function Level Access Control" icon="user-lock">
+    ```javascript
+    // Anti-pattern: Missing function level access control
+    app.get('/admin/users', (req, res) => {
+      // No role check for administrative function
+      db.getAllUsers()
+        .then(users => res.render('admin/users', { users }))
+        .catch(error => res.status(500).render('error', { error }));
+    });
+    
+    // Better approach: Proper function level access control
+    // Middleware for checking admin role
+    function requireAdmin(req, res, next) {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).render('error', { error: 'Access denied' });
+      }
+      next();
+    }
+    
+    // Apply middleware to protected routes
+    app.get('/admin/users', authenticateUser, requireAdmin, (req, res) => {
+      db.getAllUsers()
+        .then(users => res.render('admin/users', { users }))
+        .catch(error => res.status(500).render('error', { error }));
+    });
+    ```
+    
+    Missing function level access control occurs when applications do not properly restrict access to sensitive functionality based on the user's role or permissions.
+    
+    To implement proper function level access control:
+    - Enforce authorization checks for all sensitive functions
+    - Implement role-based access control
+    - Use centralized authorization mechanisms
+    - Apply the principle of least privilege
+    - Hide or disable UI elements for unauthorized functions
+    - Implement server-side authorization checks (never rely on client-side checks alone)
+    - Regularly audit and test access controls
+    - Log and monitor access control failures
+  </Accordion>
+  
+  <Accordion title="Horizontal Privilege Escalation" icon="right-left">
+    ```javascript
+    // Anti-pattern: Vulnerable to horizontal privilege escalation
+    app.get('/api/accounts/:accountId/transactions', authenticateUser, (req, res) => {
+      const accountId = req.params.accountId;
+      
+      // No verification that the user owns this account
+      db.getTransactions(accountId)
+        .then(transactions => res.json(transactions))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Better approach: Preventing horizontal privilege escalation
+    app.get('/api/accounts/:accountId/transactions', authenticateUser, async (req, res) => {
+      try {
+        const accountId = req.params.accountId;
+        const userId = req.user.id;
+        
+        // Verify that the account belongs to the authenticated user
+        const account = await db.getAccount(accountId);
+        
+        if (!account) {
+          return res.status(404).json({ error: 'Account not found' });
+        }
+        
+        if (account.userId !== userId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        
+        const transactions = await db.getTransactions(accountId);
+        res.json(transactions);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+    ```
+    
+    Horizontal privilege escalation occurs when a user can access resources belonging to another user with the same privilege level.
+    
+    To prevent horizontal privilege escalation:
+    - Verify that the authenticated user owns or has access to the requested resource
+    - Implement proper data access controls
+    - Use indirect references that are mapped to user-specific resources
+    - Implement proper error handling that doesn't reveal sensitive information
+    - Log and monitor access attempts
+    - Consider implementing resource-based access control
+    - Regularly test for horizontal privilege escalation vulnerabilities
+  </Accordion>
+  
+  <Accordion title="Vertical Privilege Escalation" icon="arrow-up-right-dots">
+    ```javascript
+    // Anti-pattern: Vulnerable to vertical privilege escalation
+    app.post('/api/users/update-role', authenticateUser, (req, res) => {
+      const { userId, newRole } = req.body;
+      
+      // No verification of the user's authority to change roles
+      db.updateUserRole(userId, newRole)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Better approach: Preventing vertical privilege escalation
+    app.post('/api/users/update-role', authenticateUser, (req, res) => {
+      const { userId, newRole } = req.body;
+      
+      // Verify that the user has admin privileges
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      // Verify that the new role is valid
+      const validRoles = ['user', 'moderator', 'admin'];
+      if (!validRoles.includes(newRole)) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
+      
+      // Additional check: Prevent privilege escalation to super-admin
+      if (newRole === 'super-admin') {
+        return res.status(403).json({ error: 'Cannot assign super-admin role' });
+      }
+      
+      db.updateUserRole(userId, newRole)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    ```
+    
+    Vertical privilege escalation occurs when a user can gain access to functionality or data intended for users with higher privilege levels.
+    
+    To prevent vertical privilege escalation:
+    - Implement proper role-based access control
+    - Verify the user's authority for all privilege-changing operations
+    - Implement proper input validation for role assignments
+    - Use the principle of least privilege
+    - Consider implementing approval workflows for sensitive operations
+    - Log and monitor privilege changes
+    - Regularly audit user privileges
+    - Implement proper error handling for authorization failures
+  </Accordion>
+  
+  <Accordion title="Bypassing Access Controls" icon="shield-xmark">
+    ```javascript
+    // Anti-pattern: Access controls that can be bypassed
+    // Client-side access control
+    if (isAdmin) {
+      // Show admin panel
+      document.getElementById('adminPanel').style.display = 'block';
+    }
+    
+    // API endpoint with no server-side checks
+    app.get('/api/admin/users', (req, res) => {
+      // Relying on the client to only make this request if the user is an admin
+      db.getAllUsers()
+        .then(users => res.json(users))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Better approach: Proper server-side access controls
+    // Client-side UI (for usability only, not security)
+    if (isAdmin) {
+      // Show admin panel
+      document.getElementById('adminPanel').style.display = 'block';
+    }
+    
+    // Server-side middleware for checking admin role
+    function requireAdmin(req, res, next) {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      next();
+    }
+    
+    // API endpoint with proper server-side checks
+    app.get('/api/admin/users', authenticateUser, requireAdmin, (req, res) => {
+      db.getAllUsers()
+        .then(users => res.json(users))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    ```
+    
+    Access controls can be bypassed when they are implemented incorrectly, such as relying on client-side checks, using security through obscurity, or having flaws in the authorization logic.
+    
+    To prevent access control bypassing:
+    - Implement server-side access controls for all sensitive operations
+    - Never rely on client-side access controls for security
+    - Implement proper authentication and session management
+    - Use a centralized authorization mechanism
+    - Deny access by default
+    - Regularly test access controls with different user roles
+    - Implement proper logging and monitoring
+    - Keep authorization logic simple and consistent
+  </Accordion>
+  
+  <Accordion title="Improper Access Control in APIs" icon="cloud">
+    ```javascript
+    // Anti-pattern: Improper access control in APIs
+    // RESTful API with insufficient access controls
+    app.get('/api/v1/users/:id', authenticateUser, (req, res) => {
+      const userId = req.params.id;
+      
+      // No authorization check
+      db.getUserById(userId)
+        .then(user => res.json(user))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Better approach: Proper API access controls
+    app.get('/api/v1/users/:id', authenticateUser, async (req, res) => {
+      try {
+        const userId = req.params.id;
+        const currentUserId = req.user.id;
+        const userRole = req.user.role;
+        
+        // Check if user is accessing their own data or has admin rights
+        if (userId !== currentUserId && userRole !== 'admin') {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        
+        const user = await db.getUserById(userId);
+        
+        if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+        
+        // Filter sensitive data based on role
+        if (userRole !== 'admin' && userId !== currentUserId) {
+          // Remove sensitive fields for non-admin users viewing other profiles
+          delete user.email;
+          delete user.phoneNumber;
+          delete user.address;
+        }
+        
+        res.json(user);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+    ```
+    
+    APIs require special attention for access control as they are often designed to be consumed by multiple clients and may expose sensitive functionality or data.
+    
+    To implement proper access control in APIs:
+    - Implement proper authentication for all API endpoints
+    - Use token-based authentication with appropriate scopes
+    - Implement proper authorization checks for all resources
+    - Filter sensitive data based on the user's role
+    - Use rate limiting to prevent abuse
+    - Implement proper error handling
+    - Document access control requirements
+    - Regularly test API access controls
+  </Accordion>
+  
+  <Accordion title="Forced Browsing" icon="compass">
+    ```javascript
+    // Anti-pattern: Vulnerable to forced browsing
+    // No access control for sensitive pages
+    app.get('/admin', (req, res) => {
+      // No authentication or authorization check
+      res.render('admin/dashboard');
+    });
+    
+    app.get('/user-reports', (req, res) => {
+      // No authentication or authorization check
+      res.render('reports/user-reports');
+    });
+    
+    // Better approach: Preventing forced browsing
+    // Middleware for authentication
+    function requireAuth(req, res, next) {
+      if (!req.session.userId) {
+        return res.redirect('/login?redirect=' + encodeURIComponent(req.originalUrl));
+      }
+      next();
+    }
+    
+    // Middleware for role-based access control
+    function requireRole(role) {
+      return (req, res, next) => {
+        if (!req.user || req.user.role !== role) {
+          return res.status(403).render('error', { message: 'Access denied' });
+        }
+        next();
+      };
+    }
+    
+    // Apply middleware to protected routes
+    app.get('/admin', requireAuth, requireRole('admin'), (req, res) => {
+      res.render('admin/dashboard');
+    });
+    
+    app.get('/user-reports', requireAuth, requireRole('analyst'), (req, res) => {
+      res.render('reports/user-reports');
+    });
+    ```
+    
+    Forced browsing occurs when attackers directly access URLs that are not linked from the application but still accessible without proper authorization.
+    
+    To prevent forced browsing:
+    - Implement proper authentication and authorization for all pages
+    - Use role-based access control
+    - Implement proper URL authorization checks
+    - Avoid predictable resource locations
+    - Implement proper error handling for unauthorized access
+    - Consider using a web application firewall
+    - Regularly scan for unprotected resources
+    - Implement proper logging and monitoring
+  </Accordion>
+  
+  <Accordion title="Path Traversal" icon="folder-tree">
+    ```javascript
+    // Anti-pattern: Vulnerable to path traversal
+    const express = require('express');
+    const fs = require('fs');
+    const path = require('path');
+    const app = express();
+    
+    app.get('/download', (req, res) => {
+      const fileName = req.query.file;
+      const filePath = path.join('/var/www/files', fileName);
+      
+      // No path validation
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          return res.status(404).send('File not found');
+        }
+        res.send(data);
+      });
+    });
+    
+    // Better approach: Preventing path traversal
+    app.get('/download', (req, res) => {
+      const fileName = req.query.file;
+      
+      // Validate filename format
+      if (!fileName || !fileName.match(/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/)) {
+        return res.status(400).send('Invalid filename');
+      }
+      
+      // Create absolute path and validate it's within the allowed directory
+      const basePath = path.resolve('/var/www/files');
+      const filePath = path.resolve(path.join(basePath, fileName));
+      
+      // Ensure the resolved path is within the base directory
+      if (!filePath.startsWith(basePath)) {
+        return res.status(403).send('Access denied');
+      }
+      
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          return res.status(404).send('File not found');
+        }
+        res.send(data);
+      });
+    });
+    ```
+    
+    Path traversal vulnerabilities allow attackers to access files and directories outside of the intended directory by manipulating file paths.
+    
+    To prevent path traversal:
+    - Validate and sanitize user input used in file paths
+    - Use path normalization functions
+    - Verify that the final path is within the intended directory
+    - Use a whitelist of allowed files or directories
+    - Implement proper access controls for file operations
+    - Consider using a file access abstraction layer
+    - Avoid exposing direct file paths to users
+    - Implement proper error handling for file operations
+  </Accordion>
+  
+  <Accordion title="Missing Authorization Checks" icon="user-xmark">
+    ```javascript
+    // Anti-pattern: Missing authorization checks
+    app.put('/api/articles/:id', authenticateUser, (req, res) => {
+      const articleId = req.params.id;
+      const updates = req.body;
+      
+      // No authorization check to verify the user can edit this article
+      db.updateArticle(articleId, updates)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Better approach: Proper authorization checks
+    app.put('/api/articles/:id', authenticateUser, async (req, res) => {
+      try {
+        const articleId = req.params.id;
+        const updates = req.body;
+        const userId = req.user.id;
+        
+        // Retrieve the article
+        const article = await db.getArticle(articleId);
+        
+        if (!article) {
+          return res.status(404).json({ error: 'Article not found' });
+        }
+        
+        // Check if user is the author or has editor/admin role
+        if (article.authorId !== userId && 
+            !['editor', 'admin'].includes(req.user.role)) {
+          return res.status(403).json({ error: 'Not authorized to update this article' });
+        }
+        
+        // Additional checks for specific fields
+        if (updates.status === 'published' && 
+            !['editor', 'admin'].includes(req.user.role)) {
+          return res.status(403).json({ error: 'Only editors can publish articles' });
+        }
+        
+        // Update the article
+        await db.updateArticle(articleId, updates);
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+    ```
+    
+    Missing authorization checks occur when an application fails to verify that the authenticated user has the necessary permissions to perform an action or access a resource.
+    
+    To implement proper authorization checks:
+    - Verify user permissions for all sensitive operations
+    - Implement role-based or attribute-based access control
+    - Check resource ownership before allowing modifications
+    - Implement proper data filtering based on user permissions
+    - Use a centralized authorization mechanism
+    - Implement proper error handling for authorization failures
+    - Log and monitor authorization failures
+    - Regularly test authorization controls
+  </Accordion>
+  
+  <Accordion title="Broken Access Control in Single Page Applications" icon="spa">
+    ```javascript
+    // Anti-pattern: Client-side only access control in SPAs
+    // React component with client-side access control
+    function Dashboard() {
+      const [user, setUser] = useState(null);
+      
+      useEffect(() => {
+        // Get user from local storage
+        const userData = JSON.parse(localStorage.getItem('user'));
+        setUser(userData);
+      }, []);
+      
+      return (
+        <div>
+          <h1>Dashboard</h1>
+          {user && user.role === 'admin' && (
+            <div>
+              <h2>Admin Panel</h2>
+              <button onClick={fetchAllUsers}>View All Users</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // API call with no server-side checks
+    function fetchAllUsers() {
+      fetch('/api/users')
+        .then(response => response.json())
+        .then(data => console.log(data));
+    }
+    
+    // Better approach: Server-side access control for SPAs
+    // React component (client-side UI only)
+    function Dashboard() {
+      const [user, setUser] = useState(null);
+      const [isAdmin, setIsAdmin] = useState(false);
+      
+      useEffect(() => {
+        // Get user info from secure API endpoint
+        fetch('/api/me', {
+          credentials: 'include' // Include cookies
+        })
+          .then(response => response.json())
+          .then(data => {
+            setUser(data);
+            setIsAdmin(data.role === 'admin');
+          })
+          .catch(error => console.error('Error fetching user:', error));
+      }, []);
+      
+      return (
+        <div>
+          <h1>Dashboard</h1>
+          {isAdmin && (
+            <div>
+              <h2>Admin Panel</h2>
+              <button onClick={fetchAllUsers}>View All Users</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Server-side implementation
+    // Middleware for checking admin role
+    function requireAdmin(req, res, next) {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      next();
+    }
+    
+    // API endpoint with proper server-side checks
+    app.get('/api/users', authenticateUser, requireAdmin, (req, res) => {
+      db.getAllUsers()
+        .then(users => res.json(users))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    ```
+    
+    Single Page Applications (SPAs) require special consideration for access control, as they often implement UI-based access controls that can be bypassed if not properly secured on the server.
+    
+    To implement proper access control in SPAs:
+    - Implement server-side access controls for all API endpoints
+    - Never rely on client-side access controls for security
+    - Use proper authentication mechanisms (e.g., JWT, session cookies)
+    - Implement proper authorization checks for all resources
+    - Consider using an API gateway with authorization capabilities
+    - Implement proper error handling for unauthorized requests
+    - Regularly test API endpoints with different user roles
+    - Keep client-side and server-side authorization logic in sync
+  </Accordion>
+  
+  <Accordion title="Broken Access Control Prevention Checklist" icon="clipboard-check">
+    ```text
+    Broken Access Control Prevention Checklist:
+    
+    1. Authentication and Session Management
+       - Implement proper authentication for all users
+       - Use secure session management
+       - Implement proper logout functionality
+       - Consider using multi-factor authentication for sensitive operations
+    
+    2. Authorization Framework
+       - Implement a centralized authorization mechanism
+       - Use role-based or attribute-based access control
+       - Deny access by default
+       - Implement proper data filtering based on user permissions
+    
+    3. Access Control Implementation
+       - Verify user permissions for all sensitive operations
+       - Check resource ownership before allowing modifications
+       - Implement proper function level access control
+       - Use indirect references to prevent IDOR vulnerabilities
+    
+    4. API Security
+       - Implement proper access controls for all API endpoints
+       - Use token-based authentication with appropriate scopes
+       - Validate all parameters and inputs
+       - Implement proper rate limiting
+    
+    5. File and Resource Access
+       - Validate and sanitize file paths
+       - Implement proper access controls for file operations
+       - Use a whitelist of allowed files or directories
+       - Prevent path traversal attacks
+    
+    6. Testing and Monitoring
+       - Regularly test access controls with different user roles
+       - Log and monitor access control failures
+       - Implement automated testing for access controls
+       - Consider using penetration testing
+    
+    7. Error Handling
+       - Implement proper error handling for authorization failures
+       - Avoid revealing sensitive information in error messages
+       - Use consistent error responses
+       - Log authorization failures for monitoring
+    ```
+    
+    Preventing broken access control requires a comprehensive approach that addresses authentication, authorization, and proper implementation of access controls throughout the application.
+    
+    Key prevention strategies:
+    - Implement proper authentication and session management
+    - Use a centralized authorization mechanism
+    - Enforce the principle of least privilege
+    - Deny access by default
+    - Implement proper function and data level access controls
+    - Regularly test and audit access controls
+    - Log and monitor access control failures
+    - Keep authorization logic simple and consistent
+  </Accordion>
+</AccordionGroup>

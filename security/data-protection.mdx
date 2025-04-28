@@ -1,0 +1,750 @@
+---
+title: 'Data Protection Vulnerabilities'
+description: 'Data protection vulnerabilities arise when sensitive information is inadequately secured during storage, transmission, or processing, potentially leading to unauthorized access or data breaches.'
+---
+
+<AccordionGroup>
+  <Accordion title="Data Protection Vulnerabilities Overview" icon="shield-xmark">
+    Data protection is crucial for safeguarding sensitive information from unauthorized access, disclosure, alteration, or destruction. Data protection vulnerabilities can occur at various stages of the data lifecycle, including collection, storage, transmission, processing, and disposal.
+    
+    These vulnerabilities can lead to data breaches, privacy violations, regulatory non-compliance, and loss of user trust. Implementing proper data protection measures is essential for maintaining the confidentiality, integrity, and availability of sensitive information.
+  </Accordion>
+  
+  <Accordion title="Storing Sensitive Data in Plaintext" icon="database">
+    ```javascript
+    // Anti-pattern: Storing sensitive data in plaintext
+    function saveUserData(user) {
+      const query = `
+        INSERT INTO users (username, password, credit_card, ssn)
+        VALUES ('${user.username}', '${user.password}', '${user.creditCard}', '${user.ssn}')
+      `;
+      
+      return db.execute(query);
+    }
+    
+    // Better approach: Encrypting sensitive data and hashing passwords
+    async function saveUserData(user) {
+      // Hash password
+      const hashedPassword = await bcrypt.hash(user.password, 12);
+      
+      // Encrypt sensitive data
+      const encryptedCreditCard = encryptData(user.creditCard);
+      const encryptedSSN = encryptData(user.ssn);
+      
+      const query = `
+        INSERT INTO users (username, password_hash, encrypted_credit_card, encrypted_ssn)
+        VALUES (?, ?, ?, ?)
+      `;
+      
+      return db.execute(query, [
+        user.username,
+        hashedPassword,
+        encryptedCreditCard,
+        encryptedSSN
+      ]);
+    }
+    ```
+    
+    Storing sensitive data in plaintext exposes it to unauthorized access if the database is compromised or if there are vulnerabilities in the application.
+    
+    To protect sensitive data:
+    - Hash passwords using specialized password hashing functions (bcrypt, Argon2)
+    - Encrypt sensitive data using strong encryption algorithms
+    - Use proper key management for encryption keys
+    - Consider using database-level encryption
+    - Implement proper access controls for sensitive data
+  </Accordion>
+  
+  <Accordion title="Insecure Data Transmission" icon="network-wired">
+    ```javascript
+    // Anti-pattern: Insecure data transmission
+    fetch('http://example.com/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    
+    // Better approach: Secure data transmission
+    fetch('https://example.com/api/users', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Content-Type-Options': 'nosniff',
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+      },
+      body: JSON.stringify({ username, password })
+    });
+    ```
+    
+    Insecure data transmission can expose sensitive information to interception by attackers through network sniffing or man-in-the-middle attacks.
+    
+    To implement secure data transmission:
+    - Always use HTTPS for transmitting sensitive data
+    - Implement HTTP Strict Transport Security (HSTS)
+    - Use secure headers to prevent content type sniffing and other attacks
+    - Consider using additional encryption for highly sensitive data
+    - Implement certificate pinning for high-security applications
+  </Accordion>
+  
+  <Accordion title="Insufficient Data Masking" icon="eye-slash">
+    ```javascript
+    // Anti-pattern: Insufficient data masking
+    function displayUserProfile(user) {
+      return `
+        <div class="profile">
+          <h2>${user.name}</h2>
+          <p>Email: ${user.email}</p>
+          <p>Credit Card: ${user.creditCard}</p>
+          <p>SSN: ${user.ssn}</p>
+        </div>
+      `;
+    }
+    
+    // Better approach: Proper data masking
+    function displayUserProfile(user) {
+      // Mask sensitive data
+      const maskedCreditCard = maskCreditCard(user.creditCard);
+      const maskedSSN = maskSSN(user.ssn);
+      
+      return `
+        <div class="profile">
+          <h2>${user.name}</h2>
+          <p>Email: ${user.email}</p>
+          <p>Credit Card: ${maskedCreditCard}</p>
+          <p>SSN: ${maskedSSN}</p>
+        </div>
+      `;
+    }
+    
+    function maskCreditCard(creditCard) {
+      // Show only last 4 digits
+      return `XXXX-XXXX-XXXX-${creditCard.slice(-4)}`;
+    }
+    
+    function maskSSN(ssn) {
+      // Show only last 4 digits
+      return `XXX-XX-${ssn.slice(-4)}`;
+    }
+    ```
+    
+    Insufficient data masking can expose sensitive information in user interfaces, logs, or error messages, potentially leading to unauthorized access or privacy violations.
+    
+    To implement proper data masking:
+    - Mask sensitive data in user interfaces (e.g., show only last 4 digits of credit cards)
+    - Implement consistent masking across all application components
+    - Mask sensitive data in logs and error messages
+    - Consider context-aware masking based on user roles
+    - Implement proper access controls for unmasked data
+  </Accordion>
+  
+  <Accordion title="Excessive Data Collection" icon="database">
+    ```javascript
+    // Anti-pattern: Excessive data collection
+    function registerUser(userData) {
+      // Collecting excessive personal information
+      const user = {
+        username: userData.username,
+        password: userData.password,
+        email: userData.email,
+        fullName: userData.fullName,
+        address: userData.address,
+        phoneNumber: userData.phoneNumber,
+        dateOfBirth: userData.dateOfBirth,
+        ssn: userData.ssn,
+        driverLicense: userData.driverLicense,
+        motherMaidenName: userData.motherMaidenName,
+        // Many more fields not necessary for the service
+      };
+      
+      return db.users.insert(user);
+    }
+    
+    // Better approach: Minimal data collection
+    function registerUser(userData) {
+      // Collecting only necessary information
+      const user = {
+        username: userData.username,
+        password: hashPassword(userData.password),
+        email: userData.email,
+        // Only collect additional data if absolutely necessary
+      };
+      
+      return db.users.insert(user);
+    }
+    ```
+    
+    Excessive data collection increases the risk and impact of data breaches, violates privacy principles, and may not comply with data protection regulations like GDPR.
+    
+    To implement minimal data collection:
+    - Collect only the data necessary for the specific purpose
+    - Implement data minimization principles
+    - Clearly communicate what data is collected and why
+    - Provide options for users to opt out of optional data collection
+    - Regularly review and purge unnecessary data
+  </Accordion>
+  
+  <Accordion title="Insecure Data Storage" icon="database">
+    ```java
+    // Anti-pattern: Insecure data storage
+    public class UserDataManager {
+        public void saveUserData(String username, String password) {
+            // Storing sensitive data in shared preferences without encryption
+            SharedPreferences prefs = context.getSharedPreferences("user_data", Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString("username", username);
+            editor.putString("password", password);
+            editor.apply();
+        }
+    }
+    
+    // Better approach: Secure data storage
+    public class UserDataManager {
+        public void saveUserData(String username, String password) {
+            try {
+                // Using Android Keystore for encryption
+                KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+                keyStore.load(null);
+                
+                // Generate or retrieve encryption key
+                KeyGenerator keyGenerator = KeyGenerator.getInstance(
+                    KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+                keyGenerator.init(new KeyGenParameterSpec.Builder(
+                    "user_data_key",
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .build());
+                SecretKey secretKey = keyGenerator.generateKey();
+                
+                // Encrypt sensitive data
+                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+                byte[] encryptedPassword = cipher.doFinal(password.getBytes("UTF-8"));
+                byte[] iv = cipher.getIV();
+                
+                // Store encrypted data and IV
+                SharedPreferences prefs = context.getSharedPreferences("user_data", Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = prefs.edit();
+                editor.putString("username", username);
+                editor.putString("encrypted_password", Base64.encodeToString(encryptedPassword, Base64.DEFAULT));
+                editor.putString("password_iv", Base64.encodeToString(iv, Base64.DEFAULT));
+                editor.apply();
+            } catch (Exception e) {
+                // Handle exceptions
+            }
+        }
+    }
+    ```
+    
+    Insecure data storage can expose sensitive information to unauthorized access, especially on mobile devices or shared systems.
+    
+    To implement secure data storage:
+    - Encrypt sensitive data before storing it
+    - Use platform-specific secure storage mechanisms
+    - Implement proper key management
+    - Avoid storing sensitive data in plaintext files or preferences
+    - Regularly audit and clean up stored data
+  </Accordion>
+  
+  <Accordion title="Improper Data Disposal" icon="trash">
+    ```javascript
+    // Anti-pattern: Improper data disposal
+    function deleteUser(userId) {
+      // Simply marking the user as deleted but keeping all data
+      return db.execute(
+        'UPDATE users SET is_deleted = true WHERE id = ?',
+        [userId]
+      );
+    }
+    
+    // Better approach: Proper data disposal
+    function deleteUser(userId) {
+      // Anonymize user data
+      return db.execute(
+        `UPDATE users 
+         SET username = CONCAT('deleted_', id),
+             email = NULL,
+             phone_number = NULL,
+             address = NULL,
+             personal_data = NULL,
+             is_deleted = true
+         WHERE id = ?`,
+        [userId]
+      );
+    }
+    
+    // Even better: Complete data removal (if regulatory requirements allow)
+    function deleteUser(userId) {
+      // Completely remove user data
+      return db.execute('DELETE FROM users WHERE id = ?', [userId]);
+    }
+    ```
+    
+    Improper data disposal can leave sensitive information accessible even after it's no longer needed, potentially leading to privacy violations or data breaches.
+    
+    To implement proper data disposal:
+    - Define and implement data retention policies
+    - Properly anonymize or delete data when it's no longer needed
+    - Implement secure deletion methods for sensitive data
+    - Consider regulatory requirements for data retention and deletion
+    - Regularly audit and clean up old data
+  </Accordion>
+  
+  <Accordion title="Insecure Direct Object References" icon="link">
+    ```javascript
+    // Anti-pattern: Insecure direct object references
+    app.get('/api/documents/:id', (req, res) => {
+      const documentId = req.params.id;
+      
+      // No access control check
+      db.getDocument(documentId)
+        .then(document => res.json(document))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Proper access control
+    app.get('/api/documents/:id', authenticateUser, (req, res) => {
+      const documentId = req.params.id;
+      const userId = req.user.id;
+      
+      // Check if user has access to the document
+      db.getDocument(documentId)
+        .then(document => {
+          if (!document) {
+            return res.status(404).json({ error: 'Document not found' });
+          }
+          
+          if (document.ownerId !== userId && !hasAccessPermission(userId, document)) {
+            return res.status(403).json({ error: 'Access denied' });
+          }
+          
+          return res.json(document);
+        })
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Insecure direct object references can allow attackers to access or modify data that they shouldn't have permission to access.
+    
+    To prevent insecure direct object references:
+    - Implement proper access control checks for all object references
+    - Use indirect references or authorization tokens
+    - Validate that the current user has permission to access the requested object
+    - Implement proper error handling that doesn't reveal sensitive information
+    - Log access attempts for sensitive resources
+  </Accordion>
+  
+  <Accordion title="Missing Data Backups" icon="database">
+    ```javascript
+    // Anti-pattern: No data backup strategy
+    // Application with no backup mechanism
+    
+    // Better approach: Implementing regular backups
+    const cron = require('node-cron');
+    const { exec } = require('child_process');
+    
+    // Schedule daily database backups
+    cron.schedule('0 0 * * *', () => {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupFile = `backup-${timestamp}.sql`;
+      
+      exec(`mysqldump -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} > ${BACKUP_DIR}/${backupFile}`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Backup error: ${error}`);
+          return;
+        }
+        
+        // Encrypt the backup
+        exec(`gpg --encrypt --recipient ${GPG_KEY} ${BACKUP_DIR}/${backupFile}`, (encError) => {
+          if (encError) {
+            console.error(`Encryption error: ${encError}`);
+            return;
+          }
+          
+          // Remove unencrypted backup
+          exec(`rm ${BACKUP_DIR}/${backupFile}`);
+          
+          // Upload to secure storage
+          uploadToSecureStorage(`${BACKUP_DIR}/${backupFile}.gpg`);
+        });
+      });
+    });
+    ```
+    
+    Missing data backups can lead to permanent data loss in case of system failures, data corruption, or ransomware attacks.
+    
+    To implement proper data backup strategies:
+    - Schedule regular automated backups
+    - Encrypt backup data
+    - Store backups in multiple locations, including off-site
+    - Regularly test backup restoration processes
+    - Implement proper access controls for backups
+    - Define retention policies for backups
+  </Accordion>
+  
+  <Accordion title="Logging Sensitive Data" icon="file-lines">
+    ```javascript
+    // Anti-pattern: Logging sensitive data
+    function processPayment(user, paymentDetails) {
+      // Logging sensitive payment information
+      console.log(`Processing payment for ${user.email} with card ${paymentDetails.cardNumber}, CVV: ${paymentDetails.cvv}`);
+      
+      // Process payment...
+    }
+    
+    // Better approach: Secure logging
+    function processPayment(user, paymentDetails) {
+      // Logging non-sensitive information
+      const maskedCardNumber = maskCreditCard(paymentDetails.cardNumber);
+      console.log(`Processing payment for user ID ${user.id} with card ${maskedCardNumber}`);
+      
+      // Process payment...
+    }
+    
+    function maskCreditCard(cardNumber) {
+      // Show only last 4 digits
+      return `XXXX-XXXX-XXXX-${cardNumber.slice(-4)}`;
+    }
+    ```
+    
+    Logging sensitive data can expose it to unauthorized access through log files, log management systems, or debugging tools.
+    
+    To implement secure logging:
+    - Never log sensitive data like passwords, credit card numbers, or personal identifiers
+    - Implement data masking for any potentially sensitive information in logs
+    - Use proper log levels to control verbosity
+    - Secure access to log files and log management systems
+    - Implement log rotation and retention policies
+    - Consider using structured logging formats
+  </Accordion>
+  
+  <Accordion title="Insecure Deserialization" icon="code">
+    ```java
+    // Anti-pattern: Insecure deserialization
+    public Object deserializeObject(byte[] serializedData) {
+        try {
+            ByteArrayInputStream bis = new ByteArrayInputStream(serializedData);
+            ObjectInputStream ois = new ObjectInputStream(bis);
+            return ois.readObject(); // Unsafe deserialization
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
+    // Better approach: Secure deserialization
+    public Object deserializeObject(byte[] serializedData) {
+        try {
+            ByteArrayInputStream bis = new ByteArrayInputStream(serializedData);
+            ObjectInputStream ois = new ObjectInputStreamWithWhitelist(bis);
+            return ois.readObject();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
+    // Custom ObjectInputStream with class whitelist
+    class ObjectInputStreamWithWhitelist extends ObjectInputStream {
+        private static final Set<String> WHITELIST = new HashSet<>(Arrays.asList(
+            "com.example.SafeClass1",
+            "com.example.SafeClass2"
+            // Add other safe classes
+        ));
+        
+        public ObjectInputStreamWithWhitelist(InputStream in) throws IOException {
+            super(in);
+        }
+        
+        @Override
+        protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
+            String className = desc.getName();
+            if (!WHITELIST.contains(className)) {
+                throw new SecurityException("Unauthorized deserialization attempt: " + className);
+            }
+            return super.resolveClass(desc);
+        }
+    }
+    ```
+    
+    Insecure deserialization can allow attackers to execute arbitrary code, manipulate application logic, or perform denial-of-service attacks.
+    
+    To implement secure deserialization:
+    - Use safer serialization formats (JSON, YAML, XML) with proper validation
+    - Implement class whitelisting for Java deserialization
+    - Consider using serialization libraries with built-in security features
+    - Validate and sanitize all serialized data before deserialization
+    - Implement integrity checks for serialized data
+  </Accordion>
+  
+  <Accordion title="Insufficient Access Controls" icon="user-lock">
+    ```javascript
+    // Anti-pattern: Insufficient access controls
+    app.get('/api/user/:id/data', (req, res) => {
+      const userId = req.params.id;
+      
+      // No access control check
+      db.getUserData(userId)
+        .then(data => res.json(data))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Proper access controls
+    app.get('/api/user/:id/data', authenticateUser, (req, res) => {
+      const requestedUserId = req.params.id;
+      const currentUserId = req.user.id;
+      
+      // Check if user is requesting their own data or has admin privileges
+      if (requestedUserId !== currentUserId && !isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      db.getUserData(requestedUserId)
+        .then(data => res.json(data))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Insufficient access controls can allow unauthorized users to access, modify, or delete sensitive data.
+    
+    To implement proper access controls:
+    - Authenticate users before allowing access to protected resources
+    - Implement role-based or attribute-based access control
+    - Verify authorization for every protected resource access
+    - Apply the principle of least privilege
+    - Implement proper error handling for unauthorized access attempts
+    - Log access attempts for sensitive resources
+  </Accordion>
+  
+  <Accordion title="Unprotected API Endpoints" icon="server">
+    ```javascript
+    // Anti-pattern: Unprotected API endpoints
+    app.post('/api/reset-password', (req, res) => {
+      const { email } = req.body;
+      
+      // No rate limiting, no CAPTCHA, no authentication
+      sendPasswordResetEmail(email)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Protected API endpoints
+    const rateLimit = require('express-rate-limit');
+    
+    // Create rate limiter
+    const resetLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 5, // 5 requests per windowMs
+      message: 'Too many password reset attempts, please try again later'
+    });
+    
+    app.post('/api/reset-password', resetLimiter, verifyCaptcha, (req, res) => {
+      const { email } = req.body;
+      
+      // Implement additional security measures
+      sendPasswordResetEmail(email)
+        .then(() => {
+          // Don't reveal whether email exists
+          res.json({ message: 'If your email is registered, you will receive a password reset link' });
+        })
+        .catch(err => {
+          console.error(err);
+          // Don't reveal whether email exists
+          res.json({ message: 'If your email is registered, you will receive a password reset link' });
+        });
+    });
+    ```
+    
+    Unprotected API endpoints can be exploited for data theft, account takeover, or denial-of-service attacks.
+    
+    To protect API endpoints:
+    - Implement proper authentication and authorization
+    - Apply rate limiting to prevent abuse
+    - Use CAPTCHA for sensitive operations
+    - Implement proper input validation
+    - Use HTTPS for all API communications
+    - Monitor and log API usage
+  </Accordion>
+  
+  <Accordion title="Missing Data Integrity Checks" icon="check-double">
+    ```javascript
+    // Anti-pattern: Missing data integrity checks
+    function processTransaction(transaction) {
+      // No integrity validation
+      db.saveTransaction(transaction)
+        .then(() => processPayment(transaction))
+        .catch(handleError);
+    }
+    
+    // Better approach: Implementing data integrity checks
+    function processTransaction(transaction) {
+      // Validate transaction data
+      if (!isValidTransaction(transaction)) {
+        throw new Error('Invalid transaction data');
+      }
+      
+      // Check for duplicate transaction
+      return db.findTransaction({ transactionId: transaction.id })
+        .then(existingTransaction => {
+          if (existingTransaction) {
+            throw new Error('Duplicate transaction');
+          }
+          
+          // Verify account balance
+          return db.getAccountBalance(transaction.accountId);
+        })
+        .then(balance => {
+          if (balance < transaction.amount) {
+            throw new Error('Insufficient funds');
+          }
+          
+          // Save transaction with checksum
+          const checksum = calculateChecksum(transaction);
+          return db.saveTransaction({ ...transaction, checksum });
+        })
+        .then(() => processPayment(transaction))
+        .catch(handleError);
+    }
+    
+    function calculateChecksum(data) {
+      // Create a cryptographic hash of the data
+      return crypto.createHash('sha256')
+        .update(JSON.stringify(data))
+        .digest('hex');
+    }
+    ```
+    
+    Missing data integrity checks can allow attackers to manipulate data, potentially leading to unauthorized actions or data corruption.
+    
+    To implement data integrity checks:
+    - Validate all input data before processing
+    - Implement checksums or digital signatures for sensitive data
+    - Verify data integrity before processing
+    - Use database constraints and transactions
+    - Implement proper error handling for integrity violations
+    - Log integrity check failures
+  </Accordion>
+  
+  <Accordion title="Insecure File Handling" icon="file">
+    ```javascript
+    // Anti-pattern: Insecure file handling
+    app.post('/api/upload', (req, res) => {
+      const fileName = req.body.fileName;
+      const fileData = req.body.fileData;
+      
+      // Writing file without proper validation
+      fs.writeFile(`./uploads/${fileName}`, fileData, (err) => {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+        
+        res.json({ success: true });
+      });
+    });
+    
+    // Better approach: Secure file handling
+    const path = require('path');
+    const crypto = require('crypto');
+    
+    app.post('/api/upload', authenticateUser, (req, res) => {
+      // Validate file type and size
+      if (!isValidFileType(req.body.fileType) || !isValidFileSize(req.body.fileData)) {
+        return res.status(400).json({ error: 'Invalid file type or size' });
+      }
+      
+      // Generate a secure random filename
+      const fileExtension = path.extname(req.body.fileName).toLowerCase();
+      const randomName = crypto.randomBytes(16).toString('hex');
+      const secureFileName = `${randomName}${fileExtension}`;
+      
+      // Ensure the path is within the uploads directory
+      const filePath = path.join(__dirname, 'uploads', secureFileName);
+      if (!filePath.startsWith(path.join(__dirname, 'uploads'))) {
+        return res.status(400).json({ error: 'Invalid file path' });
+      }
+      
+      // Write the file
+      fs.writeFile(filePath, req.body.fileData, (err) => {
+        if (err) {
+          return res.status(500).json({ error: 'File upload failed' });
+        }
+        
+        // Save file metadata to database
+        db.saveFileMetadata({
+          userId: req.user.id,
+          originalName: req.body.fileName,
+          storedName: secureFileName,
+          filePath,
+          fileType: req.body.fileType,
+          uploadDate: new Date()
+        });
+        
+        res.json({ success: true, fileName: secureFileName });
+      });
+    });
+    ```
+    
+    Insecure file handling can lead to various vulnerabilities, including path traversal, code execution, or denial-of-service attacks.
+    
+    To implement secure file handling:
+    - Validate file types, sizes, and contents
+    - Use secure random filenames
+    - Prevent path traversal attacks
+    - Store files outside the web root
+    - Implement proper access controls for uploaded files
+    - Scan uploaded files for malware
+    - Consider using a content delivery network (CDN) for file serving
+  </Accordion>
+  
+  <Accordion title="Unencrypted Data Storage" icon="database">
+    ```javascript
+    // Anti-pattern: Unencrypted data storage
+    function saveUserData(userData) {
+      return db.collection('users').insertOne({
+        name: userData.name,
+        email: userData.email,
+        ssn: userData.ssn,
+        creditCard: userData.creditCard
+      });
+    }
+    
+    // Better approach: Encrypted data storage
+    function saveUserData(userData) {
+      // Encrypt sensitive fields
+      const encryptedSSN = encryptData(userData.ssn);
+      const encryptedCreditCard = encryptData(userData.creditCard);
+      
+      return db.collection('users').insertOne({
+        name: userData.name,
+        email: userData.email,
+        encryptedSSN,
+        encryptedCreditCard
+      });
+    }
+    
+    function encryptData(data) {
+      // Use a proper encryption algorithm and key management
+      const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), crypto.randomBytes(16));
+      let encrypted = cipher.update(data, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      const authTag = cipher.getAuthTag().toString('hex');
+      
+      return {
+        data: encrypted,
+        iv: cipher.iv.toString('hex'),
+        authTag
+      };
+    }
+    ```
+    
+    Unencrypted data storage can expose sensitive information if the database is compromised or if there are vulnerabilities in the application.
+    
+    To implement encrypted data storage:
+    - Encrypt sensitive data before storing it
+    - Use strong encryption algorithms
+    - Implement proper key management
+    - Consider using database-level encryption
+    - Implement proper access controls for encrypted data
+    - Regularly rotate encryption keys
+  </Accordion>
+</AccordionGroup>

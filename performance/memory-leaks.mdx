@@ -1,0 +1,949 @@
+---
+title: 'Memory Leaks'
+description: 'Anti-patterns related to memory leaks that can degrade application performance over time.'
+---
+
+<AccordionGroup>
+  <Accordion title="Memory Leaks Overview" icon="memory">
+    Memory leaks occur when an application allocates memory but fails to release it when no longer needed. This leads to a gradual consumption of available memory, eventually causing performance degradation, application crashes, or system instability.
+    
+    Common causes of memory leaks include:
+    - Forgotten references to objects that are no longer needed
+    - Unclosed resources like file handles, database connections, or network sockets
+    - Circular references that prevent garbage collection
+    - Event listeners that aren't properly removed
+    - Improper cache management
+    
+    Memory leaks are particularly problematic in long-running applications as they accumulate over time, leading to a phenomenon known as "memory bloat."
+  </Accordion>
+  
+  <Accordion title="Unclosed Resources" icon="door-open">
+    ```java
+    // Anti-pattern: Not closing resources properly
+    public void readFile(String filePath) {
+        try {
+            FileInputStream fileStream = new FileInputStream(filePath);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream));
+            
+            String line;
+            while ((line = reader.readLine()) != null) {
+                processLine(line);
+            }
+            
+            // Missing reader.close() and fileStream.close()
+            // This will leak file handles
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    // Better approach: Using try-with-resources
+    public void readFileCorrectly(String filePath) {
+        try (FileInputStream fileStream = new FileInputStream(filePath);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream))) {
+            
+            String line;
+            while ((line = reader.readLine()) != null) {
+                processLine(line);
+            }
+            
+            // Resources automatically closed when the try block exits
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Not closing database connections
+    function queryDatabase(query) {
+      const connection = openDatabaseConnection();
+      
+      // Run query
+      const results = connection.execute(query);
+      
+      // Return results without closing the connection
+      return results;
+      
+      // Missing connection.close()
+    }
+    
+    // Better approach: Ensuring connections are closed
+    async function queryDatabaseCorrectly(query) {
+      const connection = await openDatabaseConnection();
+      
+      try {
+        // Run query
+        const results = await connection.execute(query);
+        return results;
+      } finally {
+        // Always close the connection, even if an error occurs
+        await connection.close();
+      }
+    }
+    ```
+    
+    Failing to close resources like file handles, database connections, network sockets, or streams leads to resource leaks that can exhaust system resources and cause memory leaks.
+    
+    To prevent resource leaks:
+    - Always close resources in a finally block or use language features like try-with-resources in Java
+    - Use the appropriate pattern for your language (e.g., using statement in C#, with statement in Python)
+    - Consider using resource management libraries or utilities
+    - Implement proper error handling to ensure resources are closed even when exceptions occur
+    - Use connection pooling for database connections
+    - Consider implementing AutoCloseable interface for custom resources
+  </Accordion>
+  
+  <Accordion title="Event Listener Leaks" icon="bell">
+    ```javascript
+    // Anti-pattern: Not removing event listeners
+    class ComponentWithLeak {
+      constructor(element) {
+        this.element = element;
+        this.handleClick = this.handleClick.bind(this);
+        
+        // Add event listener
+        this.element.addEventListener('click', this.handleClick);
+      }
+      
+      handleClick() {
+        console.log('Element clicked');
+      }
+      
+      // Missing cleanup method to remove the event listener
+    }
+    
+    // Better approach: Properly removing event listeners
+    class ComponentWithoutLeak {
+      constructor(element) {
+        this.element = element;
+        this.handleClick = this.handleClick.bind(this);
+        
+        // Add event listener
+        this.element.addEventListener('click', this.handleClick);
+      }
+      
+      handleClick() {
+        console.log('Element clicked');
+      }
+      
+      // Cleanup method to remove the event listener
+      destroy() {
+        this.element.removeEventListener('click', this.handleClick);
+        this.element = null; // Remove reference to DOM element
+      }
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Not removing listeners in Android
+    public class LeakyActivity extends Activity {
+        private SensorManager sensorManager;
+        private SensorEventListener sensorListener;
+        
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_main);
+            
+            sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            
+            sensorListener = new SensorEventListener() {
+                @Override
+                public void onSensorChanged(SensorEvent event) {
+                    // Handle sensor data
+                }
+                
+                @Override
+                public void onAccuracyChanged(Sensor sensor, int accuracy) {
+                    // Handle accuracy changes
+                }
+            };
+            
+            sensorManager.registerListener(sensorListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+            
+            // Missing unregisterListener in onPause or onDestroy
+        }
+    }
+    
+    // Better approach: Properly unregistering listeners
+    public class NonLeakyActivity extends Activity {
+        private SensorManager sensorManager;
+        private SensorEventListener sensorListener;
+        
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_main);
+            
+            sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            
+            sensorListener = new SensorEventListener() {
+                @Override
+                public void onSensorChanged(SensorEvent event) {
+                    // Handle sensor data
+                }
+                
+                @Override
+                public void onAccuracyChanged(Sensor sensor, int accuracy) {
+                    // Handle accuracy changes
+                }
+            };
+            
+            sensorManager.registerListener(sensorListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+        
+        @Override
+        protected void onPause() {
+            super.onPause();
+            // Unregister listener when activity is paused
+            sensorManager.unregisterListener(sensorListener);
+        }
+    }
+    ```
+    
+    Event listener leaks occur when listeners are registered but not properly unregistered, particularly in component-based architectures or UI frameworks.
+    
+    To prevent event listener leaks:
+    - Always unregister listeners when they're no longer needed
+    - Implement proper cleanup methods in components
+    - Use weak references for listeners when appropriate
+    - Follow the lifecycle methods of your framework (e.g., componentWillUnmount in React)
+    - Consider using event delegation patterns to reduce the number of listeners
+    - Use tools like Chrome DevTools Memory panel to detect listener leaks
+  </Accordion>
+  
+  <Accordion title="Circular References" icon="circle-nodes">
+    ```javascript
+    // Anti-pattern: Creating circular references
+    function createCircularReference() {
+      let parent = {};
+      let child = {};
+      
+      // Create circular reference
+      parent.child = child;
+      child.parent = parent;
+      
+      return parent;
+    }
+    
+    // Better approach: Using weak references
+    function createNonCircularReference() {
+      let parent = {};
+      let child = {};
+      
+      // Create reference from parent to child
+      parent.child = child;
+      
+      // Use WeakRef for the reverse reference (in modern JavaScript)
+      child.parent = new WeakRef(parent);
+      
+      return parent;
+    }
+    ```
+    
+    ```python
+    # Anti-pattern: Creating circular references in Python
+    def create_circular_reference():
+        parent = {}
+        child = {}
+        
+        # Create circular reference
+        parent['child'] = child
+        child['parent'] = parent
+        
+        return parent
+    
+    # Better approach: Using weak references
+    import weakref
+    
+    def create_non_circular_reference():
+        parent = {}
+        child = {}
+        
+        # Create reference from parent to child
+        parent['child'] = child
+        
+        # Use weak reference for the reverse reference
+        child['parent'] = weakref.ref(parent)
+        
+        return parent
+    ```
+    
+    Circular references occur when two or more objects reference each other, creating a cycle that can prevent garbage collection in environments without cycle-detecting garbage collectors.
+    
+    To prevent circular reference leaks:
+    - Use weak references for back-references
+    - Implement explicit cleanup methods to break cycles
+    - Design object relationships to avoid unnecessary bidirectional references
+    - Consider using observer patterns instead of direct references
+    - Use data structures that don't create cycles
+    - Manually set references to null when they're no longer needed
+  </Accordion>
+  
+  <Accordion title="Static Collections Growing Unbounded" icon="chart-line">
+    ```java
+    // Anti-pattern: Unbounded static collection
+    public class CacheWithLeak {
+        // Static cache that grows without bounds
+        private static final Map<String, Object> CACHE = new HashMap<>();
+        
+        public static void addToCache(String key, Object value) {
+            CACHE.put(key, value);
+        }
+        
+        public static Object getFromCache(String key) {
+            return CACHE.get(key);
+        }
+        
+        // No method to remove items or clear the cache
+    }
+    
+    // Better approach: Bounded cache with size limits
+    public class BoundedCache {
+        // Using LinkedHashMap with access order and maximum size
+        private static final int MAX_ENTRIES = 1000;
+        private static final Map<String, Object> CACHE = new LinkedHashMap<String, Object>(MAX_ENTRIES + 1, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, Object> eldest) {
+                return size() > MAX_ENTRIES;
+            }
+        };
+        
+        public static void addToCache(String key, Object value) {
+            CACHE.put(key, value);
+        }
+        
+        public static Object getFromCache(String key) {
+            return CACHE.get(key);
+        }
+        
+        public static void removeFromCache(String key) {
+            CACHE.remove(key);
+        }
+        
+        public static void clearCache() {
+            CACHE.clear();
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Unbounded cache in a singleton service
+    class LoggerService {
+      constructor() {
+        if (LoggerService.instance) {
+          return LoggerService.instance;
+        }
+        
+        this.logCache = {};
+        LoggerService.instance = this;
+      }
+      
+      logMessage(id, message) {
+        // Storing every log message without limits
+        if (!this.logCache[id]) {
+          this.logCache[id] = [];
+        }
+        
+        this.logCache[id].push({
+          message,
+          timestamp: Date.now()
+        });
+      }
+      
+      // No method to clear old logs
+    }
+    
+    // Better approach: Bounded cache with cleanup
+    class ImprovedLoggerService {
+      constructor() {
+        if (ImprovedLoggerService.instance) {
+          return ImprovedLoggerService.instance;
+        }
+        
+        this.logCache = {};
+        this.maxLogsPerKey = 100;
+        this.maxAgeMs = 24 * 60 * 60 * 1000; // 24 hours
+        
+        // Set up periodic cleanup
+        setInterval(() => this.cleanupOldLogs(), 60 * 60 * 1000); // Every hour
+        
+        ImprovedLoggerService.instance = this;
+      }
+      
+      logMessage(id, message) {
+        if (!this.logCache[id]) {
+          this.logCache[id] = [];
+        }
+        
+        this.logCache[id].push({
+          message,
+          timestamp: Date.now()
+        });
+        
+        // Trim if too many logs for this ID
+        if (this.logCache[id].length > this.maxLogsPerKey) {
+          this.logCache[id] = this.logCache[id].slice(-this.maxLogsPerKey);
+        }
+      }
+      
+      cleanupOldLogs() {
+        const now = Date.now();
+        
+        Object.keys(this.logCache).forEach(id => {
+          // Remove logs older than maxAgeMs
+          this.logCache[id] = this.logCache[id].filter(log => 
+            (now - log.timestamp) < this.maxAgeMs
+          );
+          
+          // Remove empty arrays
+          if (this.logCache[id].length === 0) {
+            delete this.logCache[id];
+          }
+        });
+      }
+    }
+    ```
+    
+    Static collections that grow unbounded are a common source of memory leaks, especially in long-running applications or singleton services.
+    
+    To prevent unbounded collection growth:
+    - Use bounded collections with a maximum size
+    - Implement eviction policies (LRU, LFU, FIFO)
+    - Set up periodic cleanup of old or unused entries
+    - Use weak references for values to allow garbage collection
+    - Consider using specialized caching libraries
+    - Implement time-based expiration for cached items
+    - Monitor collection sizes in production
+  </Accordion>
+  <Accordion title="Forgotten Timers and Intervals" icon="clock">
+    ```javascript
+    // Anti-pattern: Not clearing timers
+    class DataPoller {
+      constructor(url) {
+        this.url = url;
+        this.startPolling();
+      }
+      
+      startPolling() {
+        // Set up interval that's never cleared
+        this.intervalId = setInterval(() => {
+          this.fetchData();
+        }, 5000);
+      }
+      
+      fetchData() {
+        fetch(this.url)
+          .then(response => response.json())
+          .then(data => this.processData(data));
+      }
+      
+      processData(data) {
+        console.log('Processing data:', data);
+      }
+      
+      // Missing stopPolling method to clear the interval
+    }
+    
+    // Better approach: Providing cleanup method
+    class ImprovedDataPoller {
+      constructor(url) {
+        this.url = url;
+        this.intervalId = null;
+      }
+      
+      startPolling() {
+        // Clear any existing interval first
+        this.stopPolling();
+        
+        this.intervalId = setInterval(() => {
+          this.fetchData();
+        }, 5000);
+      }
+      
+      stopPolling() {
+        if (this.intervalId) {
+          clearInterval(this.intervalId);
+          this.intervalId = null;
+        }
+      }
+      
+      fetchData() {
+        fetch(this.url)
+          .then(response => response.json())
+          .then(data => this.processData(data));
+      }
+      
+      processData(data) {
+        console.log('Processing data:', data);
+      }
+    }
+    ```
+    
+    ```swift
+    // Anti-pattern: Not invalidating timers in iOS
+    class LeakyViewController: UIViewController {
+        var timer: Timer?
+        
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            
+            // Create timer that's never invalidated
+            timer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(updateUI), userInfo: nil, repeats: true)
+        }
+        
+        @objc func updateUI() {
+            // Update UI elements
+        }
+        
+        // Missing timer invalidation in deinit or viewWillDisappear
+    }
+    
+    // Better approach: Properly invalidating timers
+    class NonLeakyViewController: UIViewController {
+        var timer: Timer?
+        
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            
+            // Create timer
+            timer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(updateUI), userInfo: nil, repeats: true)
+        }
+        
+        @objc func updateUI() {
+            // Update UI elements
+        }
+        
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            
+            // Invalidate timer when view disappears
+            timer?.invalidate()
+            timer = nil
+        }
+        
+        deinit {
+            // Safety check to ensure timer is invalidated
+            timer?.invalidate()
+        }
+    }
+    ```
+    
+    Forgotten timers and intervals are a common source of memory leaks, especially in single-page applications or mobile apps where components are created and destroyed frequently.
+    
+    To prevent timer leaks:
+    - Always clear intervals and timeouts when they're no longer needed
+    - Implement proper cleanup methods in components
+    - Follow component lifecycle methods to clear timers
+    - Use weak references in timer callbacks when possible
+    - Consider using timer management utilities
+    - In iOS, invalidate timers in viewWillDisappear and deinit
+    - In Android, cancel handlers in onPause or onDestroy
+  </Accordion>
+  
+  <Accordion title="DOM Element References" icon="code-branch">
+    ```javascript
+    // Anti-pattern: Storing DOM references that outlive elements
+    class ElementManager {
+      constructor() {
+        this.elements = {};
+      }
+      
+      registerElement(id, element) {
+        // Storing reference to DOM element
+        this.elements[id] = element;
+      }
+      
+      // Missing method to unregister elements
+    }
+    
+    // Usage that causes a leak
+    const manager = new ElementManager();
+    
+    function createTemporaryUI() {
+      const tempDiv = document.createElement('div');
+      document.body.appendChild(tempDiv);
+      
+      // Register with manager
+      manager.registerElement('temp', tempDiv);
+      
+      // Later, we remove the element from DOM
+      document.body.removeChild(tempDiv);
+      
+      // But the reference still exists in the manager!
+    }
+    
+    // Better approach: Providing cleanup method
+    class ImprovedElementManager {
+      constructor() {
+        this.elements = {};
+      }
+      
+      registerElement(id, element) {
+        this.elements[id] = element;
+      }
+      
+      unregisterElement(id) {
+        delete this.elements[id];
+      }
+      
+      // Optional: Use weak references
+      registerElementWeak(id, element) {
+        this.elements[id] = new WeakRef(element);
+      }
+    }
+    
+    // Improved usage
+    const betterManager = new ImprovedElementManager();
+    
+    function createTemporaryUIImproved() {
+      const tempDiv = document.createElement('div');
+      document.body.appendChild(tempDiv);
+      
+      // Register with manager
+      betterManager.registerElement('temp', tempDiv);
+      
+      // Later, we remove the element from DOM and unregister
+      document.body.removeChild(tempDiv);
+      betterManager.unregisterElement('temp');
+    }
+    ```
+    
+    ```java
+    // Anti-pattern: Storing View references in Android
+    public class ViewCache {
+        private static Map<String, View> viewCache = new HashMap<>();
+        
+        public static void cacheView(String id, View view) {
+            viewCache.put(id, view);
+        }
+        
+        public static View getView(String id) {
+            return viewCache.get(id);
+        }
+        
+        // Missing method to remove views
+    }
+    
+    // Better approach: Using WeakReferences
+    public class ImprovedViewCache {
+        private static Map<String, WeakReference<View>> viewCache = new HashMap<>();
+        
+        public static void cacheView(String id, View view) {
+            viewCache.put(id, new WeakReference<>(view));
+        }
+        
+        public static View getView(String id) {
+            WeakReference<View> weakRef = viewCache.get(id);
+            return weakRef != null ? weakRef.get() : null;
+        }
+        
+        public static void removeView(String id) {
+            viewCache.remove(id);
+        }
+        
+        public static void clearCache() {
+            viewCache.clear();
+        }
+    }
+    ```
+    
+    Storing references to DOM elements or Views that outlive their visual representation is a common cause of memory leaks in web and mobile applications.
+    
+    To prevent DOM/View reference leaks:
+    - Use weak references when storing DOM/View references
+    - Implement proper cleanup methods to remove references
+    - Follow component lifecycle methods
+    - Avoid storing references in long-lived objects or singletons
+    - Consider using data attributes instead of direct references
+    - Use tools like Chrome DevTools Memory panel to detect leaks
+    - In Android, avoid storing Activity or View references in static fields
+  </Accordion>
+  
+  <Accordion title="Closure Memory Leaks" icon="code">
+    ```javascript
+    // Anti-pattern: Closure capturing large objects
+    function createLeakyProcessor(data) {
+      // data might be a very large object
+      
+      return function process() {
+        // This closure captures the entire data object
+        return data.items.map(item => item.value * 2);
+      };
+    }
+    
+    // Usage that causes a leak
+    const largeData = { items: Array(1000000).fill().map((_, i) => ({ value: i })) };
+    const processor = createLeakyProcessor(largeData);
+    
+    // Even if we don't need largeData anymore, it's still referenced by the closure
+    largeData = null; // This doesn't free the original object
+    
+    // Better approach: Extracting only what's needed
+    function createEfficientProcessor(data) {
+      // Extract only the necessary data
+      const items = data.items.map(item => item.value);
+      
+      return function process() {
+        // This closure only captures the values, not the entire objects
+        return items.map(value => value * 2);
+      };
+    }
+    ```
+    
+    ```python
+    # Anti-pattern: Closure capturing large objects in Python
+    def create_leaky_processor(data):
+        # data might be a very large dictionary
+        
+        def process():
+            # This closure captures the entire data object
+            return [item['value'] * 2 for item in data['items']]
+        
+        return process
+    
+    # Better approach: Extracting only what's needed
+    def create_efficient_processor(data):
+        # Extract only the necessary data
+        items = [item['value'] for item in data['items']]
+        
+        def process():
+            # This closure only captures the values, not the entire objects
+            return [value * 2 for value in items]
+        
+        return process
+    ```
+    
+    Closures can cause memory leaks when they capture and retain references to large objects or the entire parent scope, even when only a small portion of that data is needed.
+    
+    To prevent closure memory leaks:
+    - Extract only the specific data needed by the closure
+    - Avoid capturing large objects or collections
+    - Be careful with event handlers that capture the parent scope
+    - Consider using partial application or currying instead of closures
+    - Explicitly set captured variables to null when they're no longer needed
+    - Be aware of the scope chain and what variables are being captured
+    - Use memory profiling tools to detect closure-related leaks
+  </Accordion>
+  
+  <Accordion title="Memory-Intensive Caching" icon="database">
+    ```java
+    // Anti-pattern: Inefficient image caching
+    public class ImageCache {
+        // Unbounded cache that stores full-size images
+        private static final Map<String, Bitmap> CACHE = new HashMap<>();
+        
+        public static void cacheImage(String url, Bitmap image) {
+            CACHE.put(url, image);
+        }
+        
+        public static Bitmap getImage(String url) {
+            return CACHE.get(url);
+        }
+    }
+    
+    // Better approach: Size-limited cache with memory-sensitive handling
+    public class ImprovedImageCache {
+        private static final int MAX_MEMORY = (int) (Runtime.getRuntime().maxMemory() / 1024);
+        private static final int CACHE_SIZE = MAX_MEMORY / 8;
+        
+        private static LruCache<String, Bitmap> mMemoryCache;
+        
+        static {
+            mMemoryCache = new LruCache<String, Bitmap>(CACHE_SIZE) {
+                @Override
+                protected int sizeOf(String key, Bitmap bitmap) {
+                    // The cache size will be measured in kilobytes
+                    return bitmap.getByteCount() / 1024;
+                }
+                
+                @Override
+                protected void entryRemoved(boolean evicted, String key, Bitmap oldValue, Bitmap newValue) {
+                    // Optional: handle evicted bitmaps (e.g., add to disk cache)
+                }
+            };
+        }
+        
+        public static void cacheImage(String url, Bitmap bitmap) {
+            if (bitmap != null && url != null) {
+                mMemoryCache.put(url, bitmap);
+            }
+        }
+        
+        public static Bitmap getImage(String url) {
+            return mMemoryCache.get(url);
+        }
+        
+        public static void clearCache() {
+            mMemoryCache.evictAll();
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient caching of large objects
+    class DataCache {
+      constructor() {
+        this.cache = {};
+      }
+      
+      storeData(key, data) {
+        // Storing potentially large objects without limits
+        this.cache[key] = data;
+      }
+      
+      getData(key) {
+        return this.cache[key];
+      }
+    }
+    
+    // Better approach: Memory-sensitive caching
+    class ImprovedDataCache {
+      constructor(maxItems = 100, maxSizeMB = 50) {
+        this.cache = new Map();
+        this.maxItems = maxItems;
+        this.maxSizeBytes = maxSizeMB * 1024 * 1024;
+        this.currentSizeBytes = 0;
+      }
+      
+      estimateSize(data) {
+        // Rough estimation of object size in bytes
+        const jsonString = JSON.stringify(data);
+        return new Blob([jsonString]).size;
+      }
+      
+      storeData(key, data) {
+        // Check if key already exists
+        if (this.cache.has(key)) {
+          const oldSize = this.cache.get(key).size;
+          this.currentSizeBytes -= oldSize;
+        }
+        
+        const size = this.estimateSize(data);
+        
+        // Check if this item would exceed our max size
+        if (size > this.maxSizeBytes) {
+          console.warn(`Item ${key} is too large to cache (${size} bytes)`);  
+          return false;
+        }
+        
+        // Make room if necessary
+        while (this.cache.size >= this.maxItems || 
+               (this.currentSizeBytes + size) > this.maxSizeBytes) {
+          // Remove oldest entry (first item in Map)
+          const oldestKey = this.cache.keys().next().value;
+          const oldSize = this.cache.get(oldestKey).size;
+          this.cache.delete(oldestKey);
+          this.currentSizeBytes -= oldSize;
+        }
+        
+        // Store the data with its size
+        this.cache.set(key, {
+          data,
+          size,
+          timestamp: Date.now()
+        });
+        
+        this.currentSizeBytes += size;
+        return true;
+      }
+      
+      getData(key) {
+        const item = this.cache.get(key);
+        return item ? item.data : null;
+      }
+      
+      clear() {
+        this.cache.clear();
+        this.currentSizeBytes = 0;
+      }
+    }
+    ```
+    
+    Memory-intensive caching can lead to excessive memory consumption, especially when caching large objects like images, datasets, or complex structures.
+    
+    To implement memory-efficient caching:
+    - Set appropriate size limits based on available memory
+    - Use LRU (Least Recently Used) or similar eviction policies
+    - Consider the memory footprint of cached objects
+    - Implement multi-level caching (memory, disk, network)
+    - Use weak references for non-critical cache entries
+    - Monitor cache size and memory usage
+    - Consider using specialized caching libraries
+    - Implement proper cache invalidation strategies
+    - Use memory-efficient data structures for cached items
+  </Accordion>
+  
+  <Accordion title="Memory Leak Detection and Prevention" icon="magnifying-glass-chart">
+    ```javascript
+    // Example: Using Chrome DevTools for memory leak detection
+    
+    // 1. Take heap snapshot before suspected leak
+    // In Chrome DevTools: Memory tab > Heap Snapshot > Take Snapshot
+    
+    // 2. Perform actions that might cause a leak
+    function potentiallyLeakyOperation() {
+      // Create and destroy components, perform operations, etc.
+    }
+    
+    // 3. Take another heap snapshot
+    // In Chrome DevTools: Memory tab > Heap Snapshot > Take Snapshot
+    
+    // 4. Compare snapshots to identify retained objects
+    // In Chrome DevTools: Select second snapshot > Filter by "Objects allocated between Snapshot 1 and Snapshot 2"
+    ```
+    
+    ```java
+    // Example: Using LeakCanary for Android memory leak detection
+    
+    // In build.gradle
+    dependencies {
+      // Debug dependency
+      debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.7'
+    }
+    
+    // LeakCanary automatically watches for Activity and Fragment leaks
+    // For custom objects:
+    
+    class MyApplication extends Application {
+      @Override
+      public void onCreate() {
+        super.onCreate();
+        
+        // Watch for leaks in custom objects
+        AppWatcher.Config config = AppWatcher.getConfig()
+            .newBuilder()
+            .watchActivities(true)
+            .watchFragments(true)
+            .watchViewModels(true)
+            .build();
+        AppWatcher.setConfig(config);
+      }
+    }
+    ```
+    
+    Detecting and preventing memory leaks requires a combination of tools, practices, and awareness.
+    
+    Memory leak detection strategies:
+    - Use memory profiling tools (Chrome DevTools, Android Profiler, etc.)
+    - Implement automated memory leak detection in CI/CD pipelines
+    - Use specialized libraries like LeakCanary for Android
+    - Monitor memory usage over time to identify gradual increases
+    - Implement proper logging and metrics for memory usage
+    - Conduct regular code reviews focused on memory management
+    - Use static analysis tools to identify potential leaks
+    - Test applications under memory pressure
+    
+    Prevention best practices:
+    - Follow proper resource management patterns
+    - Implement appropriate cleanup methods
+    - Use weak references for back-references
+    - Be cautious with static collections and singletons
+    - Understand object lifecycle in your framework
+    - Implement proper caching strategies
+    - Educate team members about common memory leak patterns
+  </Accordion>
+</AccordionGroup>

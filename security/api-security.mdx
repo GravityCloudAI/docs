@@ -1,0 +1,636 @@
+---
+title: 'API Security Vulnerabilities'
+description: 'API security vulnerabilities occur when application programming interfaces are improperly secured, potentially leading to unauthorized access, data exposure, or system compromise.'
+---
+
+<AccordionGroup>
+  <Accordion title="API Security Vulnerabilities Overview" icon="cloud-bolt">
+    API security vulnerabilities arise when application programming interfaces lack proper authentication, authorization, input validation, or other security controls. These vulnerabilities can lead to unauthorized access, data exposure, or system compromise.
+    
+    Securing APIs is essential for protecting the data and functionality they expose, especially as APIs become increasingly central to modern application architectures.
+  </Accordion>
+  
+  <Accordion title="Broken Authentication" icon="key-skeleton">
+    ```javascript
+    // Anti-pattern: Weak API authentication
+    app.post('/api/login', (req, res) => {
+      const { username, password } = req.body;
+      
+      // Simple string comparison for authentication
+      if (username === 'admin' && password === 'password123') {
+        // Generate token without proper security measures
+        const token = createSimpleToken(username);
+        res.json({ token });
+      } else {
+        res.status(401).json({ error: 'Invalid credentials' });
+      }
+    });
+    
+    // Better approach: Secure API authentication
+    const jwt = require('jsonwebtoken');
+    const bcrypt = require('bcrypt');
+    
+    app.post('/api/login', async (req, res) => {
+      try {
+        const { username, password } = req.body;
+        
+        // Retrieve user from database
+        const user = await User.findOne({ username });
+        if (!user) {
+          // Use consistent response time to prevent timing attacks
+          await bcrypt.compare(password, '$2b$10$invalidhashforcomparison');
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        
+        // Verify password with secure comparison
+        const isValid = await bcrypt.compare(password, user.passwordHash);
+        if (!isValid) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        
+        // Generate secure JWT with proper claims and expiration
+        const token = jwt.sign(
+          { 
+            sub: user.id,
+            username: user.username,
+            roles: user.roles 
+          },
+          process.env.JWT_SECRET,
+          { 
+            expiresIn: '1h',
+            issuer: 'your-api-name',
+            audience: 'your-client-id'
+          }
+        );
+        
+        res.json({ 
+          token,
+          expiresIn: 3600 // seconds
+        });
+      } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ error: 'Authentication failed' });
+      }
+    });
+    ```
+    
+    Broken authentication in APIs can allow attackers to compromise user accounts, gain unauthorized access, or impersonate legitimate users.
+    
+    To implement secure API authentication:
+    - Use strong, industry-standard authentication protocols (OAuth 2.0, JWT)
+    - Implement proper password hashing and verification
+    - Set appropriate token expiration times
+    - Include necessary claims in tokens (issuer, audience, expiration)
+    - Protect against brute force attacks with rate limiting
+    - Use HTTPS for all authentication requests
+    - Implement multi-factor authentication for sensitive operations
+  </Accordion>
+  
+  <Accordion title="Broken Authorization" icon="user-lock">
+    ```javascript
+    // Anti-pattern: Broken API authorization
+    app.get('/api/users/:id/profile', (req, res) => {
+      const userId = req.params.id;
+      
+      // No authorization check, any authenticated user can access any profile
+      getUserProfile(userId)
+        .then(profile => res.json(profile))
+        .catch(error => res.status(500).json({ error: 'Failed to get profile' }));
+    });
+    
+    // Better approach: Proper API authorization
+    app.get('/api/users/:id/profile', authenticateJWT, (req, res) => {
+      const userId = req.params.id;
+      const requestingUserId = req.user.sub;
+      
+      // Check if user is accessing their own profile or has admin rights
+      if (userId !== requestingUserId && !req.user.roles.includes('admin')) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      getUserProfile(userId)
+        .then(profile => res.json(profile))
+        .catch(error => res.status(500).json({ error: 'Failed to get profile' }));
+    });
+    ```
+    
+    Broken authorization in APIs can allow attackers to access resources or perform actions they should not be permitted to, potentially leading to data breaches or unauthorized modifications.
+    
+    To implement secure API authorization:
+    - Implement proper access control checks for all API endpoints
+    - Use role-based or attribute-based access control
+    - Validate that the authenticated user has permission for the requested resource
+    - Implement the principle of least privilege
+    - Use authorization tokens with appropriate scopes
+    - Centralize authorization logic to prevent inconsistencies
+    - Regularly audit and test authorization controls
+  </Accordion>
+  
+  <Accordion title="Excessive Data Exposure" icon="database">
+    ```javascript
+    // Anti-pattern: Excessive data exposure
+    app.get('/api/users/:id', authenticateJWT, (req, res) => {
+      const userId = req.params.id;
+      
+      // Returning the entire user object including sensitive data
+      User.findById(userId)
+        .then(user => res.json(user))
+        .catch(error => res.status(500).json({ error: 'Failed to get user' }));
+    });
+    
+    // Better approach: Controlled data exposure
+    app.get('/api/users/:id', authenticateJWT, (req, res) => {
+      const userId = req.params.id;
+      
+      User.findById(userId)
+        .then(user => {
+          if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+          }
+          
+          // Return only necessary, non-sensitive information
+          const safeUserData = {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            email: user.email,
+            createdAt: user.createdAt,
+            // Exclude password, security questions, full address, etc.
+          };
+          
+          res.json(safeUserData);
+        })
+        .catch(error => res.status(500).json({ error: 'Failed to get user' }));
+    });
+    ```
+    
+    Excessive data exposure occurs when APIs return more data than necessary, potentially exposing sensitive information to unauthorized parties.
+    
+    To prevent excessive data exposure:
+    - Filter sensitive data on the server before sending responses
+    - Create specific data transfer objects (DTOs) for API responses
+    - Implement proper data access controls
+    - Use field-level permissions where appropriate
+    - Consider using GraphQL to allow clients to request only needed fields
+    - Regularly audit API responses for sensitive data
+    - Implement proper error handling to prevent data leakage
+  </Accordion>
+  
+  <Accordion title="Lack of Resources & Rate Limiting" icon="gauge-high">
+    ```javascript
+    // Anti-pattern: No rate limiting
+    app.post('/api/login', (req, res) => {
+      // No rate limiting, vulnerable to brute force attacks
+      authenticateUser(req.body)
+        .then(token => res.json({ token }))
+        .catch(error => res.status(401).json({ error: 'Authentication failed' }));
+    });
+    
+    // Better approach: Implementing rate limiting
+    const rateLimit = require('express-rate-limit');
+    
+    // Create rate limiter middleware
+    const loginLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 5, // 5 requests per window per IP
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (req, res) => {
+        res.status(429).json({
+          error: 'Too many login attempts, please try again after 15 minutes'
+        });
+      }
+    });
+    
+    // Apply rate limiting to sensitive endpoints
+    app.post('/api/login', loginLimiter, (req, res) => {
+      authenticateUser(req.body)
+        .then(token => res.json({ token }))
+        .catch(error => res.status(401).json({ error: 'Authentication failed' }));
+    });
+    
+    // Global rate limiter for all API endpoints
+    const apiLimiter = rateLimit({
+      windowMs: 60 * 1000, // 1 minute
+      max: 100, // 100 requests per minute per IP
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Too many requests, please try again later' }
+    });
+    
+    // Apply global rate limiting
+    app.use('/api/', apiLimiter);
+    ```
+    
+    Lack of resource and rate limiting can allow attackers to perform denial of service attacks or brute force attacks against the API.
+    
+    To implement proper rate limiting:
+    - Set appropriate limits for different API endpoints
+    - Implement stricter limits for authentication endpoints
+    - Use token bucket or sliding window algorithms for rate limiting
+    - Include proper rate limit headers in responses
+    - Implement exponential backoff for repeated failures
+    - Consider using IP-based and user-based rate limiting
+    - Monitor and adjust rate limits based on usage patterns
+  </Accordion>
+  
+  <Accordion title="Broken Function Level Authorization" icon="gears">
+    ```javascript
+    // Anti-pattern: Broken function level authorization
+    app.put('/api/articles/:id', authenticateJWT, (req, res) => {
+      const articleId = req.params.id;
+      const updates = req.body;
+      
+      // No function-level authorization check
+      // Any authenticated user can update any article
+      Article.findByIdAndUpdate(articleId, updates, { new: true })
+        .then(article => res.json(article))
+        .catch(error => res.status(500).json({ error: 'Failed to update article' }));
+    });
+    
+    // Better approach: Proper function level authorization
+    app.put('/api/articles/:id', authenticateJWT, async (req, res) => {
+      try {
+        const articleId = req.params.id;
+        const updates = req.body;
+        const userId = req.user.sub;
+        
+        // Retrieve the article
+        const article = await Article.findById(articleId);
+        if (!article) {
+          return res.status(404).json({ error: 'Article not found' });
+        }
+        
+        // Check if user is the author or has editor/admin role
+        if (article.authorId !== userId && 
+            !req.user.roles.includes('editor') && 
+            !req.user.roles.includes('admin')) {
+          return res.status(403).json({ error: 'Not authorized to update this article' });
+        }
+        
+        // Additional function-level checks
+        if (updates.status === 'published' && 
+            !req.user.roles.includes('editor') && 
+            !req.user.roles.includes('admin')) {
+          return res.status(403).json({ error: 'Only editors can publish articles' });
+        }
+        
+        // Update the article
+        const updatedArticle = await Article.findByIdAndUpdate(articleId, updates, { new: true });
+        res.json(updatedArticle);
+      } catch (error) {
+        console.error('Update error:', error);
+        res.status(500).json({ error: 'Failed to update article' });
+      }
+    });
+    ```
+    
+    Broken function level authorization occurs when APIs fail to restrict access to specific functions or operations based on the user's permissions, potentially allowing unauthorized actions.
+    
+    To implement proper function level authorization:
+    - Check permissions for each function or operation
+    - Implement role-based access control for different operations
+    - Validate ownership of resources before allowing modifications
+    - Use attribute-based access control for complex permission scenarios
+    - Centralize authorization logic in middleware or services
+    - Implement proper error handling for authorization failures
+    - Regularly audit and test function level authorization
+  </Accordion>
+  
+  <Accordion title="Mass Assignment" icon="list-check">
+    ```javascript
+    // Anti-pattern: Mass assignment vulnerability
+    app.post('/api/users', authenticateJWT, (req, res) => {
+      // Directly using request body without filtering
+      // Attacker could include admin: true or role: 'admin' in the request
+      const newUser = new User(req.body);
+      
+      newUser.save()
+        .then(user => res.status(201).json(user))
+        .catch(error => res.status(500).json({ error: 'Failed to create user' }));
+    });
+    
+    // Better approach: Preventing mass assignment
+    app.post('/api/users', authenticateJWT, (req, res) => {
+      // Explicitly specify which fields can be set
+      const { username, email, name, password } = req.body;
+      
+      // Create user with only allowed fields
+      const newUser = new User({
+        username,
+        email,
+        name,
+        password,
+        // Default values for protected fields
+        role: 'user',
+        isAdmin: false,
+        verified: false
+      });
+      
+      newUser.save()
+        .then(user => res.status(201).json(user))
+        .catch(error => res.status(500).json({ error: 'Failed to create user' }));
+    });
+    ```
+    
+    Mass assignment vulnerabilities occur when APIs automatically bind client-provided data to internal objects or database models without proper filtering, potentially allowing attackers to modify fields they should not have access to.
+    
+    To prevent mass assignment:
+    - Explicitly specify which fields can be set from user input
+    - Use whitelisting instead of blacklisting for allowed fields
+    - Create separate data transfer objects (DTOs) for input
+    - Implement property-level access controls
+    - Use framework features that prevent mass assignment
+    - Regularly audit model properties for sensitive fields
+    - Implement proper validation for all input fields
+  </Accordion>
+  
+  <Accordion title="Security Misconfiguration" icon="screwdriver-wrench">
+    ```javascript
+    // Anti-pattern: API security misconfiguration
+    const express = require('express');
+    const app = express();
+    
+    // Missing security headers
+    // No CORS configuration
+    // No HTTPS enforcement
+    
+    app.use(express.json());
+    
+    // Exposing detailed error information
+    app.use((err, req, res, next) => {
+      console.error(err.stack);
+      res.status(500).json({
+        error: err.message,
+        stack: err.stack
+      });
+    });
+    
+    // Better approach: Proper security configuration
+    const express = require('express');
+    const helmet = require('helmet');
+    const cors = require('cors');
+    const app = express();
+    
+    // Add security headers
+    app.use(helmet());
+    
+    // Configure CORS
+    const corsOptions = {
+      origin: ['https://example.com', 'https://www.example.com'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      maxAge: 86400 // 24 hours
+    };
+    app.use(cors(corsOptions));
+    
+    // Force HTTPS in production
+    if (process.env.NODE_ENV === 'production') {
+      app.use((req, res, next) => {
+        if (req.header('x-forwarded-proto') !== 'https') {
+          return res.redirect(`https://${req.header('host')}${req.url}`);
+        }
+        next();
+      });
+    }
+    
+    app.use(express.json({ limit: '100kb' })); // Limit request size
+    
+    // Sanitized error handler
+    app.use((err, req, res, next) => {
+      console.error(err.stack);
+      res.status(500).json({
+        error: 'An unexpected error occurred',
+        // No stack trace or detailed error in production
+        ...(process.env.NODE_ENV !== 'production' && { detail: err.message })
+      });
+    });
+    ```
+    
+    Security misconfiguration in APIs can expose sensitive information, enable attacks, or provide attackers with information useful for exploiting other vulnerabilities.
+    
+    To prevent security misconfiguration:
+    - Use security headers (Content-Security-Policy, X-Content-Type-Options, etc.)
+    - Configure CORS properly to restrict access to trusted domains
+    - Enforce HTTPS for all API traffic
+    - Limit request sizes to prevent denial of service
+    - Use secure cookie settings (HttpOnly, Secure, SameSite)
+    - Implement proper error handling that doesn't leak sensitive information
+    - Disable unnecessary features, methods, and debugging information
+    - Regularly update dependencies and frameworks
+  </Accordion>
+  
+  <Accordion title="Improper Assets Management" icon="sitemap">
+    ```javascript
+    // Anti-pattern: Improper API assets management
+    // Outdated API still accessible
+    app.get('/api/v1/users', (req, res) => {
+      // Old, insecure implementation
+      // No deprecation notice
+      // No migration path
+      db.query('SELECT * FROM users', (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+      });
+    });
+    
+    // Better approach: Proper API assets management
+    // Clear versioning and deprecation strategy
+    app.get('/api/v1/users', (req, res) => {
+      // Add deprecation header
+      res.set({
+        'Deprecation': 'true',
+        'Sunset': new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toUTCString(), // 6 months
+        'Link': '</api/v2/users>; rel="successor-version"'
+      });
+      
+      // Log deprecation access for monitoring
+      console.log('Deprecated API accessed:', req.path, 'by', req.ip);
+      
+      // Still handle the request securely
+      User.find({}, 'id username name email createdAt')
+        .then(users => res.json(users))
+        .catch(error => res.status(500).json({ error: 'Failed to retrieve users' }));
+    });
+    
+    // New version with improved security
+    app.get('/api/v2/users', authenticateJWT, (req, res) => {
+      // New, more secure implementation
+      User.find({}, 'id username name email createdAt')
+        .then(users => res.json(users))
+        .catch(error => res.status(500).json({ error: 'Failed to retrieve users' }));
+    });
+    ```
+    
+    Improper assets management can lead to the exposure of deprecated API versions, test endpoints, or debug information that may contain vulnerabilities or sensitive information.
+    
+    To implement proper API assets management:
+    - Maintain an inventory of all API endpoints and versions
+    - Implement a clear versioning strategy
+    - Use proper deprecation notices and sunset headers
+    - Provide migration paths for deprecated APIs
+    - Remove or secure test and debug endpoints in production
+    - Regularly audit and update API documentation
+    - Monitor usage of deprecated APIs
+    - Implement proper access controls for all API versions
+  </Accordion>
+  
+  <Accordion title="Insufficient Logging & Monitoring" icon="chart-line">
+    ```javascript
+    // Anti-pattern: Insufficient logging and monitoring
+    app.post('/api/login', (req, res) => {
+      const { username, password } = req.body;
+      
+      // No logging of authentication attempts
+      authenticateUser(username, password)
+        .then(token => res.json({ token }))
+        .catch(error => res.status(401).json({ error: 'Authentication failed' }));
+    });
+    
+    // Better approach: Proper logging and monitoring
+    const winston = require('winston');
+    
+    // Configure logger
+    const logger = winston.createLogger({
+      level: 'info',
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+      ),
+      defaultMeta: { service: 'api-service' },
+      transports: [
+        new winston.transports.File({ filename: 'error.log', level: 'error' }),
+        new winston.transports.File({ filename: 'combined.log' }),
+        // In production, consider adding transports for centralized logging
+      ],
+    });
+    
+    app.post('/api/login', (req, res) => {
+      const { username } = req.body;
+      const ip = req.ip;
+      const userAgent = req.headers['user-agent'];
+      
+      // Log authentication attempt (without password)
+      logger.info('Login attempt', {
+        username,
+        ip,
+        userAgent,
+        path: req.path,
+        method: req.method
+      });
+      
+      authenticateUser(req.body)
+        .then(token => {
+          // Log successful authentication
+          logger.info('Login successful', {
+            username,
+            ip,
+            userAgent
+          });
+          
+          res.json({ token });
+        })
+        .catch(error => {
+          // Log failed authentication
+          logger.warn('Login failed', {
+            username,
+            ip,
+            userAgent,
+            reason: error.message
+          });
+          
+          res.status(401).json({ error: 'Authentication failed' });
+        });
+    });
+    
+    // Log all API requests
+    app.use((req, res, next) => {
+      const startTime = Date.now();
+      
+      // Log when response is sent
+      res.on('finish', () => {
+        const duration = Date.now() - startTime;
+        const logLevel = res.statusCode >= 400 ? 'warn' : 'info';
+        
+        logger[logLevel]('API request', {
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          duration,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          userId: req.user ? req.user.sub : 'anonymous'
+        });
+      });
+      
+      next();
+    });
+    ```
+    
+    Insufficient logging and monitoring can prevent the detection of security incidents, hinder forensic analysis, and delay incident response.
+    
+    To implement proper logging and monitoring:
+    - Log all authentication events (successes and failures)
+    - Log access to sensitive data and functions
+    - Include relevant details in logs (timestamp, user, IP, action)
+    - Implement centralized log collection and analysis
+    - Set up alerts for suspicious activity
+    - Ensure logs are protected from tampering
+    - Implement proper log retention policies
+    - Regularly review and analyze logs for security incidents
+  </Accordion>
+  
+  <Accordion title="Insecure API Documentation" icon="file-lines">
+    ```javascript
+    // Anti-pattern: Insecure API documentation
+    // Exposing sensitive information in documentation
+    /**
+     * @api {post} /api/payments Process payment
+     * @apiName ProcessPayment
+     * @apiGroup Payments
+     * @apiParam {String} creditCardNumber User's credit card number
+     * @apiParam {String} cvv CVV code
+     * @apiParam {String} expiryDate Expiry date (MM/YY)
+     * @apiParam {Number} amount Payment amount
+     * 
+     * @apiExample {curl} Example usage:
+     *     curl -X POST -H "Content-Type: application/json" -d '{
+     *       "creditCardNumber": "4111111111111111",
+     *       "cvv": "123",
+     *       "expiryDate": "12/25",
+     *       "amount": 100
+     *     }' https://api.example.com/api/payments
+     */
+    
+    // Better approach: Secure API documentation
+    /**
+     * @api {post} /api/payments Process payment
+     * @apiName ProcessPayment
+     * @apiGroup Payments
+     * @apiParam {String} paymentToken Secure token from payment processor
+     * @apiParam {Number} amount Payment amount
+     * 
+     * @apiExample {curl} Example usage:
+     *     curl -X POST -H "Content-Type: application/json" -d '{
+     *       "paymentToken": "tok_visa",
+     *       "amount": 100
+     *     }' https://api.example.com/api/payments
+     * 
+     * @apiSecurity JWT
+     * @apiPermission user
+     */
+    ```
+    
+    Insecure API documentation can expose sensitive information, implementation details, or examples that could be used by attackers to exploit vulnerabilities.
+    
+    To implement secure API documentation:
+    - Avoid including sensitive data in examples
+    - Use placeholders or tokens instead of real credentials
+    - Clearly document authentication and authorization requirements
+    - Include information about rate limits and security controls
+    - Restrict access to detailed API documentation
+    - Regularly review and update documentation
+    - Remove internal implementation details from public documentation
+    - Provide security guidelines for API consumers
+  </Accordion>
+</AccordionGroup>

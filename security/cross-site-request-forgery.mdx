@@ -1,0 +1,617 @@
+---
+title: 'Cross-Site Request Forgery Vulnerabilities'
+description: 'Cross-Site Request Forgery (CSRF) vulnerabilities occur when attackers trick users into performing unwanted actions on websites where they are authenticated, potentially leading to unauthorized state changes.'
+---
+
+<AccordionGroup>
+  <Accordion title="Cross-Site Request Forgery (CSRF) Overview" icon="globe">
+    Cross-Site Request Forgery (CSRF) is an attack that forces authenticated users to execute unwanted actions on a web application in which they're currently authenticated. CSRF attacks specifically target state-changing requests, not theft of data, since the attacker has no way to see the response to the forged request.
+    
+    CSRF vulnerabilities exploit the trust that a web application has in a user's browser, leveraging the authenticated session to perform actions without the user's consent or knowledge.
+    
+    Preventing CSRF typically involves implementing anti-CSRF tokens, same-site cookies, and other security measures that verify the legitimacy of requests.
+  </Accordion>
+  
+  <Accordion title="Missing CSRF Protection" icon="shield-xmark">
+    ```javascript
+    // Anti-pattern: No CSRF protection
+    app.post('/api/transfer-funds', authenticateUser, (req, res) => {
+      const { toAccount, amount } = req.body;
+      
+      // Process the transfer without CSRF validation
+      transferFunds(req.user.accountId, toAccount, amount)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Better approach: Implementing CSRF protection
+    const csrf = require('csurf');
+    
+    // Configure CSRF protection
+    const csrfProtection = csrf({ cookie: true });
+    
+    // Apply CSRF protection to routes that change state
+    app.post('/api/transfer-funds', authenticateUser, csrfProtection, (req, res) => {
+      const { toAccount, amount } = req.body;
+      
+      // CSRF token is automatically validated by the middleware
+      transferFunds(req.user.accountId, toAccount, amount)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Provide CSRF token to the client
+    app.get('/transfer', authenticateUser, csrfProtection, (req, res) => {
+      res.render('transfer', { csrfToken: req.csrfToken() });
+    });
+    ```
+    
+    ```html
+    <!-- In the transfer.html template -->
+    <form action="/api/transfer-funds" method="POST">
+      <input type="hidden" name="_csrf" value="{{csrfToken}}">
+      <input type="text" name="toAccount" placeholder="Recipient Account">
+      <input type="number" name="amount" placeholder="Amount">
+      <button type="submit">Transfer</button>
+    </form>
+    ```
+    
+    Missing CSRF protection allows attackers to trick users into performing unwanted actions on websites where they are authenticated.
+    
+    To implement CSRF protection:
+    - Use anti-CSRF tokens in forms and AJAX requests
+    - Implement the Synchronizer Token Pattern
+    - Validate the token on the server for all state-changing requests
+    - Consider using a CSRF protection middleware
+    - Ensure tokens are unique per user session
+    - Regenerate tokens after authentication
+    - Use SameSite cookie attribute as an additional layer of protection
+  </Accordion>
+  
+  <Accordion title="Insecure Cookie Configuration" icon="cookie">
+    ```javascript
+    // Anti-pattern: Insecure cookie configuration
+    app.use(session({
+      secret: 'session-secret',
+      resave: false,
+      saveUninitialized: true,
+      cookie: {
+        // No SameSite attribute
+        // No Secure flag
+        // No HttpOnly flag
+      }
+    }));
+    
+    // Better approach: Secure cookie configuration
+    app.use(session({
+      secret: process.env.SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true, // Prevents JavaScript access to the cookie
+        secure: process.env.NODE_ENV === 'production', // Requires HTTPS in production
+        sameSite: 'lax', // Provides CSRF protection for most cases
+        maxAge: 3600000 // 1 hour
+      }
+    }));
+    ```
+    
+    Insecure cookie configuration can make it easier for attackers to perform CSRF attacks by allowing cookies to be sent in cross-site requests.
+    
+    To implement secure cookie configuration:
+    - Set the SameSite attribute to 'lax' or 'strict'
+    - Enable the Secure flag to ensure cookies are only sent over HTTPS
+    - Enable the HttpOnly flag to prevent JavaScript access to cookies
+    - Set appropriate cookie expiration times
+    - Use a strong, unique session secret
+    - Consider implementing cookie prefixes for additional security
+    - Regularly rotate session cookies
+  </Accordion>
+  
+  <Accordion title="Relying Only on Request Origin" icon="browser">
+    ```javascript
+    // Anti-pattern: Relying only on Origin/Referer headers
+    app.post('/api/update-profile', authenticateUser, (req, res) => {
+      const referer = req.headers.referer || req.headers.origin;
+      
+      // Weak protection: checking only the Referer/Origin header
+      if (referer && referer.startsWith('https://example.com')) {
+        updateUserProfile(req.user.id, req.body)
+          .then(() => res.json({ success: true }))
+          .catch(error => res.status(500).json({ error: error.message }));
+      } else {
+        res.status(403).json({ error: 'Invalid request origin' });
+      }
+    });
+    
+    // Better approach: Combining multiple protections
+    const csrf = require('csurf');
+    
+    // Configure CSRF protection
+    const csrfProtection = csrf({ cookie: { sameSite: 'lax' } });
+    
+    app.post('/api/update-profile', authenticateUser, csrfProtection, (req, res) => {
+      // CSRF token validation is handled by the middleware
+      
+      // Additional origin check as a defense in depth measure
+      const referer = req.headers.referer || req.headers.origin;
+      if (!referer || !referer.startsWith('https://example.com')) {
+        return res.status(403).json({ error: 'Invalid request origin' });
+      }
+      
+      updateUserProfile(req.user.id, req.body)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    ```
+    
+    Relying only on the Origin or Referer headers for CSRF protection is insufficient, as these headers can be spoofed or might be missing in some requests.
+    
+    To implement robust CSRF protection:
+    - Use anti-CSRF tokens as the primary protection mechanism
+    - Consider Origin/Referer checks as an additional layer of defense
+    - Implement SameSite cookie attributes
+    - Be aware that Referer headers might be stripped by privacy settings
+    - Use a defense-in-depth approach with multiple protection mechanisms
+    - Regularly test CSRF protections
+    - Keep security libraries and frameworks updated
+  </Accordion>
+  
+  <Accordion title="CSRF in REST APIs" icon="code">
+    ```javascript
+    // Anti-pattern: REST API without CSRF protection
+    app.put('/api/v1/users/:id', authenticateUser, (req, res) => {
+      // No CSRF protection for API endpoint
+      // Relying only on session cookie for authentication
+      updateUser(req.params.id, req.body)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Better approach: Protecting REST APIs from CSRF
+    // Option 1: Custom token-based authentication
+    app.put('/api/v1/users/:id', authenticateApiToken, (req, res) => {
+      // Using a custom Authorization header instead of cookies
+      // This prevents CSRF as the attacker cannot set custom headers in a forged request
+      updateUser(req.params.id, req.body)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Option 2: Double Submit Cookie pattern
+    app.put('/api/v1/users/:id', authenticateUser, (req, res) => {
+      const csrfToken = req.cookies.csrfToken;
+      const headerToken = req.headers['x-csrf-token'];
+      
+      // Validate that the token in the header matches the cookie
+      if (!csrfToken || !headerToken || csrfToken !== headerToken) {
+        return res.status(403).json({ error: 'CSRF token validation failed' });
+      }
+      
+      updateUser(req.params.id, req.body)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    ```
+    
+    REST APIs can be vulnerable to CSRF attacks if they rely solely on cookies for authentication and don't implement proper CSRF protections.
+    
+    To protect REST APIs from CSRF:
+    - Use token-based authentication with custom headers (e.g., JWT in Authorization header)
+    - Implement the Double Submit Cookie pattern
+    - Use SameSite cookie attributes
+    - Consider requiring a custom X-Requested-With header for AJAX requests
+    - Implement proper CORS configuration
+    - Use anti-CSRF tokens for endpoints that must use cookie-based authentication
+    - Regularly test API endpoints for CSRF vulnerabilities
+  </Accordion>
+  
+  <Accordion title="Double Submit Cookie Pattern" icon="cookie-bite">
+    ```javascript
+    // Anti-pattern: No CSRF protection
+    app.post('/api/change-password', authenticateUser, (req, res) => {
+      // No CSRF protection
+      changeUserPassword(req.user.id, req.body.newPassword)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    
+    // Better approach: Double Submit Cookie pattern
+    // Generate and set CSRF token cookie
+    app.get('/api/csrf-token', (req, res) => {
+      // Generate a random token
+      const csrfToken = crypto.randomBytes(32).toString('hex');
+      
+      // Set as a cookie with appropriate flags
+      res.cookie('csrfToken', csrfToken, {
+        httpOnly: false, // Client JavaScript needs to read this
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 3600000 // 1 hour
+      });
+      
+      res.json({ csrfToken });
+    });
+    
+    // Validate the token in requests
+    app.post('/api/change-password', authenticateUser, (req, res) => {
+      const cookieToken = req.cookies.csrfToken;
+      const headerToken = req.headers['x-csrf-token'];
+      
+      // Validate that both tokens exist and match
+      if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+        return res.status(403).json({ error: 'CSRF token validation failed' });
+      }
+      
+      changeUserPassword(req.user.id, req.body.newPassword)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    ```
+    
+    ```javascript
+    // Client-side implementation
+    // Fetch the CSRF token
+    fetch('/api/csrf-token')
+      .then(response => response.json())
+      .then(data => {
+        // Store the token for use in subsequent requests
+        const csrfToken = data.csrfToken;
+        
+        // Example: Change password request
+        document.getElementById('change-password-form').addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          const newPassword = document.getElementById('new-password').value;
+          
+          fetch('/api/change-password', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': csrfToken // Include token in header
+            },
+            body: JSON.stringify({ newPassword }),
+            credentials: 'include' // Include cookies
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              alert('Password changed successfully');
+            }
+          })
+          .catch(error => console.error('Error:', error));
+        });
+      });
+    ```
+    
+    The Double Submit Cookie pattern is a CSRF protection technique where a random token is stored as a cookie and also sent in a custom header or form field with each request.
+    
+    To implement the Double Submit Cookie pattern:
+    - Generate a secure random token
+    - Set the token as a cookie that is readable by JavaScript
+    - Include the same token in a custom header or form field with each request
+    - Validate on the server that both tokens exist and match
+    - Regenerate tokens periodically
+    - Use SameSite cookie attributes as an additional layer of protection
+    - Implement proper error handling for token validation failures
+  </Accordion>
+  
+  <Accordion title="SameSite Cookie Attribute" icon="cookie-bite">
+    ```javascript
+    // Anti-pattern: Cookies without SameSite attribute
+    res.cookie('sessionId', sessionId, {
+      httpOnly: true,
+      secure: true,
+      // No SameSite attribute specified
+    });
+    
+    // Better approach: Using SameSite cookie attribute
+    // Option 1: Lax mode (recommended default)
+    res.cookie('sessionId', sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax' // Allows top-level navigation with cookies, but blocks cross-site POST requests
+    });
+    
+    // Option 2: Strict mode (most secure)
+    res.cookie('sessionId', sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict' // Cookies are not sent for any cross-site requests
+    });
+    
+    // Option 3: None mode (least secure, requires Secure flag)
+    res.cookie('sessionId', sessionId, {
+      httpOnly: true,
+      secure: true, // Required with SameSite=None
+      sameSite: 'none' // Cookies are sent for all requests, including cross-site
+    });
+    ```
+    
+    The SameSite cookie attribute is a powerful defense against CSRF attacks, as it controls when cookies are sent in cross-site requests.
+    
+    To effectively use the SameSite cookie attribute:
+    - Use 'lax' mode as a good default for most applications
+    - Consider 'strict' mode for highly sensitive cookies
+    - Only use 'none' when cross-site cookie sharing is absolutely necessary
+    - Always combine 'none' with the Secure flag
+    - Be aware of browser compatibility issues with older browsers
+    - Implement additional CSRF protections for complete security
+    - Test the impact of SameSite settings on your application's functionality
+  </Accordion>
+  
+  <Accordion title="CSRF in Multi-Step Operations" icon="list-ol">
+    ```javascript
+    // Anti-pattern: Vulnerable multi-step operation
+    app.get('/transfer/step1', authenticateUser, (req, res) => {
+      // Step 1: Show transfer form
+      res.render('transfer-step1');
+    });
+    
+    app.post('/transfer/step2', authenticateUser, (req, res) => {
+      // Step 2: Confirm transfer details
+      const { toAccount, amount } = req.body;
+      
+      // Store in session for next step
+      req.session.transferDetails = { toAccount, amount };
+      
+      res.render('transfer-step2', { toAccount, amount });
+    });
+    
+    app.post('/transfer/execute', authenticateUser, (req, res) => {
+      // Step 3: Execute transfer
+      // No CSRF protection, vulnerable to attacks at the final step
+      const { toAccount, amount } = req.session.transferDetails;
+      
+      transferFunds(req.user.accountId, toAccount, amount)
+        .then(() => res.redirect('/transfer/success'))
+        .catch(error => res.render('error', { message: error.message }));
+    });
+    
+    // Better approach: Protected multi-step operation
+    const csrf = require('csurf');
+    const csrfProtection = csrf({ cookie: true });
+    
+    app.get('/transfer/step1', authenticateUser, csrfProtection, (req, res) => {
+      // Step 1: Show transfer form with CSRF token
+      res.render('transfer-step1', { csrfToken: req.csrfToken() });
+    });
+    
+    app.post('/transfer/step2', authenticateUser, csrfProtection, (req, res) => {
+      // Step 2: Confirm transfer details
+      const { toAccount, amount } = req.body;
+      
+      // Generate a unique operation token for this specific transfer
+      const operationToken = crypto.randomBytes(32).toString('hex');
+      
+      // Store in session with the operation token
+      req.session.transferDetails = { 
+        toAccount, 
+        amount,
+        operationToken,
+        createdAt: Date.now() // For expiration
+      };
+      
+      res.render('transfer-step2', { 
+        toAccount, 
+        amount, 
+        operationToken,
+        csrfToken: req.csrfToken() 
+      });
+    });
+    
+    app.post('/transfer/execute', authenticateUser, csrfProtection, (req, res) => {
+      // Step 3: Execute transfer with operation token validation
+      const { operationToken } = req.body;
+      const transferDetails = req.session.transferDetails;
+      
+      // Validate operation token and check for expiration
+      if (!transferDetails || 
+          !operationToken || 
+          transferDetails.operationToken !== operationToken ||
+          Date.now() - transferDetails.createdAt > 10 * 60 * 1000) { // 10 minutes expiration
+        return res.status(403).render('error', { message: 'Invalid or expired operation' });
+      }
+      
+      // Clear the transfer details from session
+      delete req.session.transferDetails;
+      
+      transferFunds(req.user.accountId, transferDetails.toAccount, transferDetails.amount)
+        .then(() => res.redirect('/transfer/success'))
+        .catch(error => res.render('error', { message: error.message }));
+    });
+    ```
+    
+    Multi-step operations can be vulnerable to CSRF attacks, especially at the final step if proper protections are not implemented throughout the process.
+    
+    To protect multi-step operations from CSRF:
+    - Implement CSRF protection at each step
+    - Use operation-specific tokens that are tied to the particular transaction
+    - Implement proper session management
+    - Set appropriate expiration times for operation tokens
+    - Validate the entire operation context, not just individual steps
+    - Clear sensitive data from the session after completion
+    - Implement proper error handling for token validation failures
+  </Accordion>
+  
+  <Accordion title="Login CSRF" icon="right-to-bracket">
+    ```javascript
+    // Anti-pattern: Vulnerable login form
+    app.get('/login', (req, res) => {
+      // No CSRF protection for login form
+      res.render('login');
+    });
+    
+    app.post('/login', (req, res) => {
+      const { username, password } = req.body;
+      
+      // Authenticate user without CSRF protection
+      authenticateUser(username, password)
+        .then(user => {
+          req.session.userId = user.id;
+          res.redirect('/dashboard');
+        })
+        .catch(error => res.render('login', { error: 'Invalid credentials' }));
+    });
+    
+    // Better approach: Protected login form
+    const csrf = require('csurf');
+    const csrfProtection = csrf({ cookie: true });
+    
+    app.get('/login', csrfProtection, (req, res) => {
+      // Include CSRF token in login form
+      res.render('login', { csrfToken: req.csrfToken() });
+    });
+    
+    app.post('/login', csrfProtection, (req, res) => {
+      const { username, password } = req.body;
+      
+      // CSRF token is validated by the middleware
+      authenticateUser(username, password)
+        .then(user => {
+          // Regenerate session to prevent session fixation
+          req.session.regenerate(err => {
+            if (err) {
+              return res.status(500).render('error', { message: 'Session error' });
+            }
+            
+            req.session.userId = user.id;
+            res.redirect('/dashboard');
+          });
+        })
+        .catch(error => res.render('login', { 
+          error: 'Invalid credentials',
+          csrfToken: req.csrfToken() // Provide fresh token for retry
+        }));
+    });
+    ```
+    
+    Login CSRF is a specific type of attack where an attacker forces a victim to log in to the attacker's account, potentially leading to sensitive information disclosure or other attacks.
+    
+    To prevent Login CSRF:
+    - Implement CSRF protection for login forms
+    - Regenerate the session after login
+    - Use SameSite cookie attributes
+    - Consider implementing login attempt rate limiting
+    - Use multi-factor authentication for sensitive accounts
+    - Implement proper logging of login attempts
+    - Consider using captchas for login forms
+  </Accordion>
+  
+  <Accordion title="CSRF Protection in Single Page Applications" icon="spa">
+    ```javascript
+    // Server-side implementation
+    // Generate CSRF token
+    app.get('/api/csrf-token', (req, res) => {
+      const csrfToken = crypto.randomBytes(32).toString('hex');
+      
+      // Store token in session
+      req.session.csrfToken = csrfToken;
+      
+      res.json({ csrfToken });
+    });
+    
+    // Middleware to validate CSRF token
+    function validateCsrfToken(req, res, next) {
+      const token = req.headers['x-csrf-token'];
+      
+      if (!token || token !== req.session.csrfToken) {
+        return res.status(403).json({ error: 'CSRF token validation failed' });
+      }
+      
+      next();
+    }
+    
+    // Apply middleware to protected routes
+    app.post('/api/update-profile', authenticateUser, validateCsrfToken, (req, res) => {
+      // Process the request
+      updateUserProfile(req.user.id, req.body)
+        .then(() => res.json({ success: true }))
+        .catch(error => res.status(500).json({ error: error.message }));
+    });
+    ```
+    
+    ```javascript
+    // Client-side implementation (React example)
+    import React, { useState, useEffect } from 'react';
+    import axios from 'axios';
+    
+    // Configure axios to include CSRF token in all requests
+    axios.interceptors.request.use(config => {
+      const token = localStorage.getItem('csrfToken');
+      if (token) {
+        config.headers['X-CSRF-Token'] = token;
+      }
+      return config;
+    });
+    
+    function App() {
+      useEffect(() => {
+        // Fetch CSRF token when app initializes
+        axios.get('/api/csrf-token')
+          .then(response => {
+            localStorage.setItem('csrfToken', response.data.csrfToken);
+          })
+          .catch(error => console.error('Error fetching CSRF token:', error));
+      }, []);
+      
+      // Rest of the component
+    }
+    ```
+    
+    Single Page Applications (SPAs) require special consideration for CSRF protection, as they often use APIs and may not use traditional form submissions.
+    
+    To implement CSRF protection in SPAs:
+    - Use token-based authentication (e.g., JWT) with proper storage
+    - Implement the Double Submit Cookie pattern
+    - Use custom headers for API requests
+    - Configure proper CORS settings
+    - Use SameSite cookie attributes
+    - Implement proper session management
+    - Consider using a stateless approach with JWTs in Authorization headers
+  </Accordion>
+  
+  <Accordion title="CSRF Prevention Checklist" icon="clipboard-check">
+    ```text
+    CSRF Prevention Checklist:
+    
+    1. Token-based Protection
+       - Implement anti-CSRF tokens for all state-changing operations
+       - Use the Synchronizer Token Pattern or Double Submit Cookie pattern
+       - Ensure tokens are unpredictable and unique per user session
+       - Validate tokens on the server for all state-changing requests
+    
+    2. Cookie Security
+       - Set the SameSite attribute to 'lax' or 'strict'
+       - Enable the Secure flag for cookies
+       - Enable the HttpOnly flag for session cookies
+       - Set appropriate cookie expiration times
+    
+    3. Custom Headers
+       - Use custom headers for AJAX requests (e.g., X-Requested-With)
+       - Implement token-based authentication with custom headers
+    
+    4. Additional Protections
+       - Implement proper CORS configuration
+       - Consider requiring re-authentication for sensitive operations
+       - Implement proper session management
+       - Use multi-factor authentication for sensitive accounts
+    
+    5. Testing and Monitoring
+       - Regularly test CSRF protections
+       - Monitor for suspicious activity
+       - Keep security libraries and frameworks updated
+    ```
+    
+    A comprehensive approach to CSRF prevention involves multiple layers of defense, including tokens, secure cookies, and proper request validation.
+    
+    Key CSRF prevention strategies:
+    - Implement proper anti-CSRF tokens
+    - Use SameSite cookie attributes
+    - Validate the origin of requests
+    - Implement proper session management
+    - Require re-authentication for sensitive operations
+    - Keep security libraries and frameworks updated
+    - Follow the principle of defense in depth
+  </Accordion>
+</AccordionGroup>

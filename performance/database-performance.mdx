@@ -1,0 +1,645 @@
+---
+title: 'Database Performance'
+description: 'Anti-patterns related to database operations that can lead to performance bottlenecks.'
+---
+
+<AccordionGroup>
+  <Accordion title="Database Performance Overview" icon="database">
+    Database operations are often the most significant performance bottleneck in applications. Inefficient database access patterns, poor query design, and improper indexing can lead to slow response times, high resource consumption, and poor scalability.
+    
+    Common database performance issues include:
+    - Inefficient queries and missing indexes
+    - N+1 query problems
+    - Improper connection management
+    - Excessive locking and contention
+    - Inappropriate data modeling
+    
+    This guide covers common anti-patterns related to database operations and provides best practices for optimizing database performance across different database systems and application frameworks.
+  </Accordion>
+  
+  <Accordion title="Missing Indexes" icon="table-columns">
+    ```sql
+    -- Anti-pattern: Query without proper indexes
+    SELECT * FROM users 
+    WHERE last_name = 'Smith' AND status = 'active';
+    
+    -- Better approach: Create appropriate indexes
+    CREATE INDEX idx_users_last_name_status ON users(last_name, status);
+    
+    -- Now the query will use the index
+    SELECT * FROM users 
+    WHERE last_name = 'Smith' AND status = 'active';
+    ```
+    
+    ```java
+    // Anti-pattern: Not considering indexes in ORM entities
+    @Entity
+    public class Product {
+        @Id
+        private Long id;
+        
+        private String name;
+        private String category;
+        private boolean active;
+        
+        // Getters and setters...
+    }
+    
+    // Repository usage without considering indexes
+    public List<Product> findActiveProductsByCategory(String category) {
+        return productRepository.findByCategoryAndActiveTrue(category);
+    }
+    
+    // Better approach: Adding indexes to frequently queried fields
+    @Entity
+    @Table(indexes = {
+        @Index(name = "idx_product_category_active", columnList = "category,active")
+    })
+    public class Product {
+        @Id
+        private Long id;
+        
+        private String name;
+        private String category;
+        private boolean active;
+        
+        // Getters and setters...
+    }
+    ```
+    
+    Missing indexes on frequently queried columns can lead to full table scans, resulting in poor query performance, especially as the table grows.
+    
+    To optimize indexing:
+    - Identify and index columns used in WHERE, JOIN, and ORDER BY clauses
+    - Create composite indexes for queries with multiple conditions
+    - Consider the order of columns in composite indexes (most selective first)
+    - Avoid over-indexing, as it impacts write performance
+    - Regularly analyze query performance using EXPLAIN or similar tools
+    - Consider partial indexes for large tables with specific query patterns
+    - Monitor index usage and remove unused indexes
+    - Rebuild indexes periodically to prevent fragmentation
+    - Consider covering indexes for frequently used queries
+  </Accordion>
+  
+  <Accordion title="SELECT * Anti-pattern" icon="asterisk">
+    ```sql
+    -- Anti-pattern: Using SELECT * unnecessarily
+    SELECT * FROM orders 
+    WHERE customer_id = 12345;
+    
+    -- Better approach: Select only needed columns
+    SELECT order_id, order_date, total_amount 
+    FROM orders 
+    WHERE customer_id = 12345;
+    ```
+    
+    ```javascript
+    // Anti-pattern: Retrieving all fields in MongoDB
+    async function getCustomerOrders(customerId) {
+      // Retrieves all fields for each order
+      return await db.collection('orders').find({ customerId }).toArray();
+    }
+    
+    // Better approach: Projecting only needed fields
+    async function getCustomerOrdersEfficiently(customerId) {
+      return await db.collection('orders').find(
+        { customerId },
+        { projection: { orderId: 1, orderDate: 1, totalAmount: 1, _id: 1 }}
+      ).toArray();
+    }
+    ```
+    
+    Using `SELECT *` or retrieving all fields from a database when only a subset is needed increases network traffic, memory usage, and processing time, especially for tables with many columns or large text/blob fields.
+    
+    To optimize field selection:
+    - Select only the columns needed for your application logic
+    - Avoid retrieving large text or binary fields unless necessary
+    - Use projections in NoSQL databases to limit returned fields
+    - Consider the impact on covering indexes (queries that can be satisfied from the index alone)
+    - Be mindful of ORM eager loading patterns
+    - Use column selection to reduce network traffic between database and application
+    - Consider creating views for frequently used column subsets
+    - Be aware that `SELECT *` can break code if table schema changes
+  </Accordion>
+  
+  <Accordion title="Inefficient Connection Management" icon="plug">
+    ```java
+    // Anti-pattern: Opening and closing connections for each operation
+    public void processOrders() {
+        for (Order order : getOrdersToProcess()) {
+            // Opening a new connection for each order
+            Connection conn = DriverManager.getConnection(DB_URL, USER, PASS);
+            try {
+                processOrder(conn, order);
+            } finally {
+                conn.close(); // Closing connection after each order
+            }
+        }
+    }
+    
+    // Better approach: Using connection pooling
+    public void processOrdersEfficiently() {
+        // Using a connection from the pool
+        try (Connection conn = dataSource.getConnection()) {
+            for (Order order : getOrdersToProcess()) {
+                processOrder(conn, order);
+            }
+        } catch (SQLException e) {
+            // Handle exception
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Creating new database connections for each request
+    app.get('/api/users', async (req, res) => {
+      // Creating a new connection for each request
+      const client = new MongoClient(uri);
+      try {
+        await client.connect();
+        const users = await client.db('myapp').collection('users').find({}).toArray();
+        res.json(users);
+      } finally {
+        await client.close();
+      }
+    });
+    
+    // Better approach: Using connection pooling
+    // Initialize connection pool once during application startup
+    const mongoClient = new MongoClient(uri, { maxPoolSize: 20 });
+    await mongoClient.connect();
+    
+    app.get('/api/users', async (req, res) => {
+      try {
+        // Reusing connection from the pool
+        const users = await mongoClient.db('myapp').collection('users').find({}).toArray();
+        res.json(users);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+    ```
+    
+    Inefficient connection management, such as creating and closing database connections for each operation, can significantly impact performance due to the high overhead of connection establishment.
+    
+    To optimize connection management:
+    - Use connection pooling to reuse database connections
+    - Configure appropriate pool sizes based on workload
+    - Properly close connections when they're no longer needed
+    - Monitor connection usage and pool statistics
+    - Consider using a single connection for multiple operations when appropriate
+    - Implement proper error handling to prevent connection leaks
+    - Use connection validation to detect stale connections
+    - Consider using persistent connections for long-lived applications
+    - Implement proper timeout settings to prevent hanging connections
+  </Accordion>
+  
+  <Accordion title="Inefficient Pagination" icon="pager">
+    ```sql
+    -- Anti-pattern: Inefficient pagination with OFFSET
+    SELECT * FROM products
+    ORDER BY created_at DESC
+    LIMIT 20 OFFSET 10000;
+    
+    -- Better approach: Using keyset pagination
+    SELECT * FROM products
+    WHERE created_at < :last_seen_created_at
+    ORDER BY created_at DESC
+    LIMIT 20;
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient pagination in MongoDB
+    async function getProductPage(pageNumber, pageSize) {
+      return await db.collection('products')
+        .find({})
+        .sort({ createdAt: -1 })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize)
+        .toArray();
+    }
+    
+    // Better approach: Using cursor-based pagination
+    async function getProductPageEfficiently(lastSeenId, lastSeenCreatedAt, pageSize) {
+      return await db.collection('products')
+        .find({
+          $or: [
+            { createdAt: { $lt: lastSeenCreatedAt } },
+            { 
+              createdAt: lastSeenCreatedAt,
+              _id: { $lt: lastSeenId }
+            }
+          ]
+        })
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(pageSize)
+        .toArray();
+    }
+    ```
+    
+    Inefficient pagination techniques, particularly using OFFSET/SKIP for deep pagination, can lead to poor performance as the database must still process all skipped rows.
+    
+    To optimize pagination:
+    - Use keyset pagination (cursor-based) instead of offset pagination
+    - Implement filtering by the last seen value rather than using OFFSET
+    - Include a unique identifier in pagination to handle ties
+    - Consider using covering indexes for pagination queries
+    - Implement proper caching for frequently accessed pages
+    - Use appropriate indexes for sorting columns
+    - Consider using materialized views for complex pagination scenarios
+    - Limit maximum page sizes to prevent resource exhaustion
+    - Use query hints when necessary to force index usage
+  </Accordion>
+  
+  <Accordion title="Cartesian Product Joins" icon="table-cells">
+    ```sql
+    -- Anti-pattern: Cartesian product (missing JOIN condition)
+    SELECT o.order_id, c.customer_name
+    FROM orders o, customers c
+    -- Missing JOIN condition creates a cartesian product
+    
+    -- Better approach: Proper JOIN with condition
+    SELECT o.order_id, c.customer_name
+    FROM orders o
+    JOIN customers c ON o.customer_id = c.customer_id
+    ```
+    
+    ```java
+    // Anti-pattern: Cartesian product in JPA/JPQL
+    @Query("SELECT o, c FROM Order o, Customer c")
+    List<Object[]> findAllOrdersAndCustomers();
+    
+    // Better approach: Proper JOIN with condition
+    @Query("SELECT o, c FROM Order o JOIN o.customer c")
+    List<Object[]> findAllOrdersWithCustomers();
+    ```
+    
+    Cartesian product joins (cross joins) occur when there's no join condition between tables, resulting in each row from one table being combined with every row from another table. This can lead to exponential result set growth and severe performance issues.
+    
+    To avoid cartesian product joins:
+    - Always include proper JOIN conditions between tables
+    - Use explicit JOIN syntax rather than comma-separated table lists
+    - Verify that all table relationships have appropriate conditions
+    - Use query analyzers to identify potential cartesian products
+    - Implement proper foreign key constraints
+    - Consider using EXISTS or IN clauses for existence checks instead of joins
+    - Review and test queries with realistic data volumes
+    - Be cautious with dynamically generated SQL
+    - Use ORMs that enforce proper join conditions
+  </Accordion>
+  <Accordion title="N+1 Query Problem" icon="database-lock">
+    ```java
+    // Anti-pattern: N+1 query problem in ORM
+    public void displayOrdersInefficiently() {
+        // First query: Get all orders
+        List<Order> orders = orderRepository.findAll();
+        
+        for (Order order : orders) {
+            // N additional queries: Get customer for each order
+            Customer customer = customerRepository.findById(order.getCustomerId());
+            System.out.println("Order #" + order.getId() + " by " + customer.getName());
+        }
+    }
+    
+    // Better approach: Using join fetch or eager loading
+    public void displayOrdersEfficiently() {
+        // Single query with join fetch
+        List<Order> ordersWithCustomers = orderRepository.findAllWithCustomers();
+        
+        for (Order order : ordersWithCustomers) {
+            // Customer is already loaded, no additional query needed
+            Customer customer = order.getCustomer();
+            System.out.println("Order #" + order.getId() + " by " + customer.getName());
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: N+1 query problem in Node.js/MongoDB
+    async function getUsersWithPostsInefficiently() {
+      // First query: Get all users
+      const users = await User.find({});
+      
+      // For each user, fetch their posts separately
+      for (const user of users) {
+        // N additional queries
+        user.posts = await Post.find({ userId: user._id });
+      }
+      
+      return users;
+    }
+    
+    // Better approach: Using aggregation or population
+    async function getUsersWithPostsEfficiently() {
+      // Option 1: Using MongoDB aggregation
+      const usersWithPosts = await User.aggregate([
+        {
+          $lookup: {
+            from: 'posts',
+            localField: '_id',
+            foreignField: 'userId',
+            as: 'posts'
+          }
+        }
+      ]);
+      
+      return usersWithPosts;
+      
+      // Option 2: Using Mongoose population
+      const users = await User.find({}).populate('posts');
+      return users;
+    }
+    ```
+    
+    The N+1 query problem occurs when an application makes one query to fetch a list of N items, then makes N additional queries to fetch related data for each item, resulting in N+1 total queries.
+    
+    To avoid the N+1 query problem:
+    - Use eager loading, join fetches, or includes in ORMs
+    - Implement batch loading of related entities
+    - Use GraphQL with DataLoader for efficient batching
+    - Consider denormalization for frequently accessed data
+    - Use database-specific features like MongoDB's $lookup or SQL JOINs
+    - Implement caching strategies for related entities
+    - Monitor and analyze database query patterns
+    - Use query optimization tools provided by your ORM or database
+    - Consider using specialized libraries like Facebook's DataLoader
+  </Accordion>
+  
+  <Accordion title="Inefficient Transaction Management" icon="money-bill-transfer">
+    ```java
+    // Anti-pattern: Transactions that are too long or too short
+    @Transactional
+    public void processOrderInefficiently(Long orderId) {
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        
+        // Potentially long-running operation inside transaction
+        generateInvoicePDF(order); // This could take several seconds
+        
+        order.setStatus("PROCESSED");
+        orderRepository.save(order);
+        
+        // External API call inside transaction
+        notifyShippingService(order); // Network call that could fail or timeout
+    }
+    
+    // Better approach: Appropriate transaction boundaries
+    public void processOrderEfficiently(Long orderId) {
+        // Step 1: Get the order (read-only operation)
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        
+        // Step 2: Long-running operation outside transaction
+        generateInvoicePDF(order);
+        
+        // Step 3: Database updates in a focused transaction
+        updateOrderStatus(order.getId(), "PROCESSED");
+        
+        // Step 4: External calls after transaction
+        notifyShippingService(order);
+    }
+    
+    @Transactional
+    public void updateOrderStatus(Long orderId, String status) {
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        order.setStatus(status);
+        orderRepository.save(order);
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Poor transaction management in Node.js/MongoDB
+    async function transferFundsInefficiently(fromAccountId, toAccountId, amount) {
+      // Two separate operations without transaction
+      await Account.updateOne(
+        { _id: fromAccountId },
+        { $inc: { balance: -amount } }
+      );
+      
+      // If an error occurs here, the money is lost
+      
+      await Account.updateOne(
+        { _id: toAccountId },
+        { $inc: { balance: amount } }
+      );
+    }
+    
+    // Better approach: Using transactions
+    async function transferFundsEfficiently(fromAccountId, toAccountId, amount) {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      
+      try {
+        await Account.updateOne(
+          { _id: fromAccountId },
+          { $inc: { balance: -amount } },
+          { session }
+        );
+        
+        await Account.updateOne(
+          { _id: toAccountId },
+          { $inc: { balance: amount } },
+          { session }
+        );
+        
+        await session.commitTransaction();
+      } catch (error) {
+        await session.abortTransaction();
+        throw error;
+      } finally {
+        session.endSession();
+      }
+    }
+    ```
+    
+    Inefficient transaction management, such as transactions that are too long, too short, or missing entirely, can lead to performance issues, data inconsistency, and resource contention.
+    
+    To optimize transaction management:
+    - Keep transactions as short as possible
+    - Avoid including long-running operations in transactions
+    - Don't include external API calls in transactions
+    - Use read-only transactions for queries when appropriate
+    - Consider transaction isolation levels based on requirements
+    - Implement proper error handling and rollback mechanisms
+    - Use optimistic locking for low-contention scenarios
+    - Consider using compensating transactions for distributed systems
+    - Monitor transaction duration and lock contention
+    - Implement retry mechanisms for transient failures
+  </Accordion>
+  
+  <Accordion title="Inefficient Batch Processing" icon="layer-group">
+    ```java
+    // Anti-pattern: Processing records one at a time
+    public void updatePricesInefficiently(List<Product> products, double increase) {
+        for (Product product : products) {
+            // One database call per product
+            product.setPrice(product.getPrice() * (1 + increase));
+            productRepository.save(product);
+        }
+    }
+    
+    // Better approach: Using batch operations
+    public void updatePricesEfficiently(List<Product> products, double increase) {
+        // Update all products in memory
+        for (Product product : products) {
+            product.setPrice(product.getPrice() * (1 + increase));
+        }
+        
+        // Save all products in a single batch operation
+        productRepository.saveAll(products);
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Individual MongoDB updates
+    async function updateUserStatusesInefficiently(userIds, newStatus) {
+      for (const userId of userIds) {
+        // One database call per user
+        await User.updateOne(
+          { _id: userId },
+          { $set: { status: newStatus } }
+        );
+      }
+    }
+    
+    // Better approach: Using bulk operations
+    async function updateUserStatusesEfficiently(userIds, newStatus) {
+      // Single bulk operation
+      await User.updateMany(
+        { _id: { $in: userIds } },
+        { $set: { status: newStatus } }
+      );
+    }
+    ```
+    
+    Processing database operations one at a time instead of in batches can lead to excessive network round trips, higher latency, and poor throughput, especially when dealing with large datasets.
+    
+    To optimize batch processing:
+    - Use bulk operations provided by your database or ORM
+    - Group similar operations into batches
+    - Consider appropriate batch sizes (too large can cause memory issues)
+    - Use multi-value inserts instead of individual inserts
+    - Implement proper error handling for batch operations
+    - Consider using JDBC batch operations in Java
+    - Use prepared statements for batch operations
+    - Monitor performance to find optimal batch sizes
+    - Consider using asynchronous batch processing for non-critical operations
+    - Implement proper transaction management for batches
+  </Accordion>
+  
+  <Accordion title="Inefficient Query Patterns" icon="magnifying-glass">
+    ```sql
+    -- Anti-pattern: Using functions on indexed columns
+    SELECT * FROM users
+    WHERE LOWER(email) = 'user@example.com';
+    
+    -- Better approach: Store normalized data and use direct comparison
+    SELECT * FROM users
+    WHERE email = 'user@example.com';
+    
+    -- Alternative: Create functional index if normalization is not possible
+    CREATE INDEX idx_users_email_lower ON users(LOWER(email));
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient MongoDB query patterns
+    async function findActiveUsersInefficiently() {
+      // Using $ne which can't use indexes efficiently
+      return await User.find({ status: { $ne: 'inactive' } });
+    }
+    
+    // Better approach: Using equality operator
+    async function findActiveUsersEfficiently() {
+      // Using equality which can use indexes efficiently
+      return await User.find({ status: 'active' });
+    }
+    
+    // Anti-pattern: Inefficient sorting without index
+    async function getRecentOrdersInefficiently(userId) {
+      // Sorting without proper index
+      return await Order.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(10);
+    }
+    
+    // Better approach: Ensure proper index exists
+    // db.orders.createIndex({ userId: 1, createdAt: -1 });
+    async function getRecentOrdersEfficiently(userId) {
+      // Now the same query will use the index for both filtering and sorting
+      return await Order.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(10);
+    }
+    ```
+    
+    Inefficient query patterns, such as using functions on indexed columns, inefficient filtering, or poor sorting strategies, can prevent the database from using indexes effectively.
+    
+    To optimize query patterns:
+    - Avoid using functions on indexed columns in WHERE clauses
+    - Use appropriate operators that can leverage indexes
+    - Ensure proper indexes exist for sorting operations
+    - Consider the selectivity of conditions in multi-column indexes
+    - Use covering indexes for frequently executed queries
+    - Avoid wildcard searches at the beginning of LIKE patterns
+    - Consider denormalizing data for complex query patterns
+    - Use query hints when necessary to force index usage
+    - Analyze query plans regularly to identify inefficient patterns
+    - Consider using materialized views for complex aggregations
+  </Accordion>
+  
+  <Accordion title="Database Performance Checklist" icon="clipboard-check">
+    ```text
+    Database Performance Optimization Checklist:
+    
+    1. Indexing Strategy
+       - Identify and index columns used in WHERE, JOIN, and ORDER BY clauses
+       - Create composite indexes for multi-column conditions
+       - Consider index column order (most selective first)
+       - Avoid over-indexing (impacts write performance)
+       - Implement covering indexes for frequent queries
+       - Regularly analyze index usage and remove unused indexes
+    
+    2. Query Optimization
+       - Select only needed columns instead of using SELECT *
+       - Avoid functions on indexed columns in WHERE clauses
+       - Use appropriate JOIN types (INNER, LEFT, etc.)
+       - Implement efficient pagination (keyset vs. offset)
+       - Use query parameterization and prepared statements
+       - Analyze query plans for inefficient operations
+       - Consider denormalization for complex query patterns
+    
+    3. Connection Management
+       - Implement connection pooling
+       - Configure appropriate pool sizes
+       - Close connections properly to prevent leaks
+       - Use connection validation to detect stale connections
+       - Monitor connection usage and pool statistics
+    
+    4. Transaction Management
+       - Keep transactions as short as possible
+       - Use appropriate isolation levels
+       - Avoid including non-database operations in transactions
+       - Implement proper error handling and rollback mechanisms
+       - Consider optimistic locking for low-contention scenarios
+    
+    5. Batch Processing
+       - Use bulk operations for multiple similar operations
+       - Determine appropriate batch sizes
+       - Group similar operations together
+       - Implement proper error handling for batches
+       - Consider asynchronous processing for non-critical operations
+    ```
+    
+    Optimizing database performance requires a systematic approach that addresses multiple aspects of database usage, from schema design to query patterns and operational practices.
+    
+    Key optimization strategies:
+    - Implement proper indexing based on query patterns
+    - Optimize queries to use indexes effectively
+    - Use efficient connection and transaction management
+    - Implement batch processing for multiple operations
+    - Consider caching strategies for frequently accessed data
+    - Monitor and analyze database performance regularly
+    - Scale appropriately (vertical vs. horizontal)
+    - Consider database-specific optimization techniques
+    - Implement proper data modeling for your access patterns
+    - Use appropriate tools for performance monitoring and tuning
+  </Accordion>
+</AccordionGroup>

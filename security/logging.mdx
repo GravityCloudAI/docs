@@ -1,0 +1,811 @@
+---
+title: 'Logging Vulnerabilities'
+description: 'Logging vulnerabilities occur when applications fail to properly implement logging mechanisms, potentially exposing sensitive information or failing to record important security events.'
+---
+
+<AccordionGroup>
+  <Accordion title="Logging Vulnerabilities Overview" icon="shield-xmark">
+    Proper logging is essential for security monitoring, incident response, and forensic analysis. Logging vulnerabilities arise when applications fail to implement secure logging practices, log too much or too little information, or fail to protect log data.
+    
+    These vulnerabilities can lead to information disclosure, compliance violations, or inability to detect and respond to security incidents. Implementing secure logging practices helps maintain the confidentiality of sensitive data while providing necessary visibility into application activities.
+  </Accordion>
+  
+  <Accordion title="Logging Sensitive Information" icon="eye">
+    ```javascript
+    // Anti-pattern: Logging sensitive information
+    function processPayment(user, paymentDetails) {
+      logger.info(`Processing payment for user ${user.email} with card ${paymentDetails.cardNumber}, CVV: ${paymentDetails.cvv}`);
+      
+      // Process payment...
+      
+      logger.info(`Payment successful for user ${user.email}`);
+    }
+    
+    // Better approach: Masking sensitive information
+    function processPayment(user, paymentDetails) {
+      const maskedCardNumber = maskCreditCard(paymentDetails.cardNumber);
+      logger.info(`Processing payment for user ID ${user.id} with card ${maskedCardNumber}`);
+      
+      // Process payment...
+      
+      logger.info(`Payment successful for user ID ${user.id}`);
+    }
+    
+    function maskCreditCard(cardNumber) {
+      // Show only last 4 digits
+      return `XXXX-XXXX-XXXX-${cardNumber.slice(-4)}`;
+    }
+    ```
+    
+    Logging sensitive information can expose personal data, credentials, or financial information in log files, which may be accessible to unauthorized personnel.
+    
+    To implement secure logging:
+    - Never log passwords, credit card numbers, or other sensitive data
+    - Implement data masking for personally identifiable information
+    - Use log field filtering to remove sensitive data
+    - Define clear policies on what should and shouldn't be logged
+    - Regularly audit logs for sensitive information
+    - Consider using specialized logging libraries with built-in data protection
+  </Accordion>
+  
+  <Accordion title="Insufficient Logging" icon="file-circle-exclamation">
+    ```javascript
+    // Anti-pattern: Insufficient logging
+    app.post('/api/login', (req, res) => {
+      const { username, password } = req.body;
+      
+      authenticateUser(username, password)
+        .then(user => {
+          if (user) {
+            // No logging for successful login
+            req.session.userId = user.id;
+            return res.json({ success: true });
+          }
+          
+          // No logging for failed login
+          res.status(401).json({ error: 'Invalid credentials' });
+        })
+        .catch(err => res.status(500).json({ error: 'Server error' }));
+    });
+    
+    // Better approach: Comprehensive security logging
+    app.post('/api/login', (req, res) => {
+      const { username, password } = req.body;
+      const clientIp = req.ip;
+      const userAgent = req.headers['user-agent'];
+      
+      authenticateUser(username, password)
+        .then(user => {
+          if (user) {
+            // Log successful login
+            logger.info('Successful login', {
+              userId: user.id,
+              username,
+              ip: clientIp,
+              userAgent,
+              timestamp: new Date().toISOString()
+            });
+            
+            req.session.userId = user.id;
+            return res.json({ success: true });
+          }
+          
+          // Log failed login
+          logger.warn('Failed login attempt', {
+            username,
+            ip: clientIp,
+            userAgent,
+            timestamp: new Date().toISOString()
+          });
+          
+          res.status(401).json({ error: 'Invalid credentials' });
+        })
+        .catch(err => {
+          // Log error
+          logger.error('Login error', {
+            username,
+            ip: clientIp,
+            userAgent,
+            error: err.message,
+            timestamp: new Date().toISOString()
+          });
+          
+          res.status(500).json({ error: 'Server error' });
+        });
+    });
+    ```
+    
+    Insufficient logging can make it difficult to detect security incidents, troubleshoot issues, or perform forensic analysis after a breach.
+    
+    To implement comprehensive logging:
+    - Log all security-relevant events (authentication, authorization, data access)
+    - Include contextual information (user ID, IP address, timestamp)
+    - Use appropriate log levels for different types of events
+    - Implement structured logging for better searchability
+    - Ensure logs are sufficient for regulatory compliance
+    - Balance logging verbosity with performance considerations
+  </Accordion>
+  
+  <Accordion title="Insecure Log Storage" icon="database">
+    ```javascript
+    // Anti-pattern: Insecure log storage
+    const fs = require('fs');
+    
+    function logEvent(message) {
+      // Writing logs to a world-readable file
+      fs.appendFileSync('/var/log/app.log', `${new Date().toISOString()} - ${message}\n`);
+    }
+    
+    // Better approach: Secure log storage
+    const winston = require('winston');
+    const { createLogger, format, transports } = winston;
+    
+    // Create secure logger
+    const logger = createLogger({
+      level: 'info',
+      format: format.combine(
+        format.timestamp(),
+        format.json()
+      ),
+      transports: [
+        // Console transport for development
+        new transports.Console(),
+        
+        // File transport with proper permissions
+        new transports.File({ 
+          filename: '/var/log/app.log',
+          options: { mode: 0o600 } // Read/write for owner only
+        })
+      ]
+    });
+    
+    // Even better: Using a centralized logging system
+    const logger = createLogger({
+      level: 'info',
+      format: format.combine(
+        format.timestamp(),
+        format.json()
+      ),
+      transports: [
+        // Send logs to centralized logging system
+        new transports.Http({
+          host: 'logging-service.example.com',
+          path: '/logs',
+          ssl: true,
+          auth: {
+            username: process.env.LOG_SERVICE_USER,
+            password: process.env.LOG_SERVICE_PASSWORD
+          }
+        })
+      ]
+    });
+    ```
+    
+    Insecure log storage can expose sensitive information to unauthorized users or make logs vulnerable to tampering.
+    
+    To implement secure log storage:
+    - Set appropriate file permissions for log files
+    - Consider using a centralized logging system
+    - Implement encryption for sensitive logs
+    - Ensure proper authentication for log access
+    - Implement log rotation and retention policies
+    - Consider using tamper-evident logging mechanisms
+  </Accordion>
+  
+  <Accordion title="Log Injection" icon="code">
+    ```javascript
+    // Anti-pattern: Vulnerable to log injection
+    function logUserActivity(username, action) {
+      // Directly inserting user input into log message
+      logger.info(`User ${username} performed action: ${action}`);
+    }
+    
+    // Example attack
+    logUserActivity('malicious\nSEVERE: Application crashed', 'view profile');
+    
+    // Better approach: Preventing log injection
+    function logUserActivity(username, action) {
+      // Sanitize inputs before logging
+      const sanitizedUsername = sanitizeLogField(username);
+      const sanitizedAction = sanitizeLogField(action);
+      
+      // Use structured logging
+      logger.info('User activity', {
+        username: sanitizedUsername,
+        action: sanitizedAction,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    function sanitizeLogField(field) {
+      if (typeof field !== 'string') {
+        return field;
+      }
+      
+      // Remove control characters and newlines
+      return field.replace(/[\r\n\t\\]/g, '');
+    }
+    ```
+    
+    Log injection occurs when an attacker can insert malicious characters into logs, potentially causing log forging or disrupting log analysis tools.
+    
+    To prevent log injection:
+    - Sanitize user inputs before logging
+    - Use structured logging formats (JSON, XML)
+    - Encode or escape special characters
+    - Validate log data before storage
+    - Consider using logging libraries with built-in protection
+    - Implement proper input validation throughout the application
+  </Accordion>
+  
+  <Accordion title="Missing Log Monitoring" icon="chart-line">
+    ```javascript
+    // Anti-pattern: No log monitoring
+    // Application generates logs but doesn't monitor them
+    
+    // Better approach: Implementing log monitoring
+    const winston = require('winston');
+    const { createLogger, format, transports } = winston;
+    
+    // Create logger with alerting
+    const logger = createLogger({
+      level: 'info',
+      format: format.combine(
+        format.timestamp(),
+        format.json()
+      ),
+      transports: [
+        new transports.File({ filename: '/var/log/app.log' }),
+        
+        // Add alert transport for security events
+        new transports.Http({
+          level: 'warn', // Only send warnings and errors
+          host: 'alert-service.example.com',
+          path: '/alerts',
+          ssl: true
+        })
+      ]
+    });
+    
+    // Custom transport for critical security events
+    class SecurityAlertTransport extends winston.Transport {
+      constructor(options) {
+        super(options);
+        this.name = 'securityAlert';
+        this.level = options.level || 'warn';
+      }
+      
+      log(info, callback) {
+        if (info.securityEvent) {
+          // Send immediate alert for security events
+          sendSecurityAlert(info);
+        }
+        
+        callback(null, true);
+      }
+    }
+    
+    // Add security alert transport
+    logger.add(new SecurityAlertTransport({ level: 'warn' }));
+    
+    // Usage
+    logger.warn('Failed login attempt', {
+      username: 'user123',
+      ip: '192.168.1.1',
+      attempts: 5,
+      securityEvent: true
+    });
+    ```
+    
+    Missing log monitoring can prevent timely detection of security incidents or system issues.
+    
+    To implement log monitoring:
+    - Set up real-time monitoring for security-relevant logs
+    - Implement alerting for suspicious activities
+    - Use log aggregation and analysis tools
+    - Define baselines and thresholds for normal behavior
+    - Implement automated response for critical security events
+    - Regularly review and tune monitoring rules
+  </Accordion>
+  
+  <Accordion title="Inconsistent Logging Levels" icon="layer-group">
+    ```javascript
+    // Anti-pattern: Inconsistent logging levels
+    function processOrder(order) {
+      // Using info level for security event
+      logger.info(`User ${order.userId} placed order ${order.id}`);
+      
+      // Using error level for non-critical issue
+      if (order.items.length === 0) {
+        logger.error('Order has no items');
+        return false;
+      }
+      
+      // Using debug level for important business event
+      if (order.total > 10000) {
+        logger.debug(`High-value order ${order.id} placed: $${order.total}`);
+      }
+      
+      // Process order...
+    }
+    
+    // Better approach: Consistent logging levels
+    function processOrder(order) {
+      // Using info level for normal business event
+      logger.info('Order placed', { orderId: order.id, userId: order.userId });
+      
+      // Using warn level for potential issues
+      if (order.items.length === 0) {
+        logger.warn('Order has no items', { orderId: order.id });
+        return false;
+      }
+      
+      // Using info level with appropriate context for important business event
+      if (order.total > 10000) {
+        logger.info('High-value order placed', { 
+          orderId: order.id, 
+          total: order.total,
+          userId: order.userId
+        });
+      }
+      
+      // Process order...
+    }
+    ```
+    
+    Inconsistent logging levels can make it difficult to filter and analyze logs, potentially causing important security events to be missed or trivial events to trigger false alarms.
+    
+    To implement consistent logging levels:
+    - Define clear guidelines for each log level
+    - Use ERROR for application errors and exceptions
+    - Use WARN for potential security issues and warnings
+    - Use INFO for normal but significant events
+    - Use DEBUG for detailed troubleshooting information
+    - Use TRACE for very detailed debugging
+    - Ensure consistent usage across the application
+  </Accordion>
+  
+  <Accordion title="Inadequate Log Retention" icon="clock">
+    ```javascript
+    // Anti-pattern: No log retention policy
+    // Application generates logs but doesn't manage retention
+    
+    // Better approach: Implementing log rotation and retention
+    const winston = require('winston');
+    require('winston-daily-rotate-file');
+    
+    const logger = winston.createLogger({
+      level: 'info',
+      format: winston.format.json(),
+      transports: [
+        // Implement log rotation and retention
+        new winston.transports.DailyRotateFile({
+          filename: 'application-%DATE%.log',
+          datePattern: 'YYYY-MM-DD',
+          zippedArchive: true,
+          maxSize: '20m',
+          maxFiles: '14d', // Keep logs for 14 days
+          dirname: '/var/log/app'
+        }),
+        
+        // Separate transport for security logs with longer retention
+        new winston.transports.DailyRotateFile({
+          level: 'warn',
+          filename: 'security-%DATE%.log',
+          datePattern: 'YYYY-MM-DD',
+          zippedArchive: true,
+          maxSize: '20m',
+          maxFiles: '90d', // Keep security logs for 90 days
+          dirname: '/var/log/app/security'
+        })
+      ]
+    });
+    ```
+    
+    Inadequate log retention can make it impossible to investigate security incidents that occurred in the past or comply with regulatory requirements.
+    
+    To implement proper log retention:
+    - Define retention periods based on security and compliance requirements
+    - Implement log rotation to manage file sizes
+    - Consider different retention periods for different log types
+    - Implement secure log archiving for long-term storage
+    - Ensure logs are retrievable when needed
+    - Implement proper access controls for archived logs
+  </Accordion>
+  
+  <Accordion title="Unprotected Log Access" icon="lock-open">
+    ```javascript
+    // Anti-pattern: Unprotected log access
+    app.get('/logs', (req, res) => {
+      // No authentication or authorization
+      fs.readFile('/var/log/app.log', 'utf8', (err, data) => {
+        if (err) {
+          return res.status(500).send('Error reading logs');
+        }
+        
+        res.send(data);
+      });
+    });
+    
+    // Better approach: Protected log access
+    app.get('/logs', authenticateUser, authorizeAdmin, (req, res) => {
+      // Authenticated and authorized access
+      fs.readFile('/var/log/app.log', 'utf8', (err, data) => {
+        if (err) {
+          return res.status(500).send('Error reading logs');
+        }
+        
+        // Log the access
+        logger.info('Logs accessed', {
+          userId: req.user.id,
+          ip: req.ip,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.send(data);
+      });
+    });
+    
+    // Authentication middleware
+    function authenticateUser(req, res, next) {
+      // Authentication logic...
+    }
+    
+    // Authorization middleware
+    function authorizeAdmin(req, res, next) {
+      if (req.user.role !== 'admin') {
+        return res.status(403).send('Access denied');
+      }
+      
+      next();
+    }
+    ```
+    
+    Unprotected log access can expose sensitive information to unauthorized users or allow attackers to cover their tracks by modifying logs.
+    
+    To implement protected log access:
+    - Restrict log access to authorized personnel only
+    - Implement proper authentication and authorization
+    - Log all access to log files
+    - Consider using a centralized logging system with access controls
+    - Implement separation of duties for log management
+    - Consider encrypting sensitive logs
+  </Accordion>
+  
+  <Accordion title="Missing Correlation IDs" icon="link">
+    ```javascript
+    // Anti-pattern: Missing correlation IDs
+    app.get('/api/order/:id', (req, res) => {
+      logger.info(`Getting order ${req.params.id}`);
+      
+      getOrder(req.params.id)
+        .then(order => {
+          logger.info(`Retrieved order ${req.params.id}`);
+          res.json(order);
+        })
+        .catch(err => {
+          logger.error(`Error getting order: ${err.message}`);
+          res.status(500).json({ error: 'Server error' });
+        });
+    });
+    
+    // Better approach: Implementing correlation IDs
+    const { v4: uuidv4 } = require('uuid');
+    
+    // Correlation ID middleware
+    app.use((req, res, next) => {
+      req.correlationId = req.headers['x-correlation-id'] || uuidv4();
+      res.setHeader('x-correlation-id', req.correlationId);
+      next();
+    });
+    
+    // Request logger middleware
+    app.use((req, res, next) => {
+      logger.info('Request received', {
+        method: req.method,
+        path: req.path,
+        correlationId: req.correlationId,
+        ip: req.ip,
+        userId: req.user?.id
+      });
+      
+      // Log response
+      const originalEnd = res.end;
+      res.end = function(...args) {
+        logger.info('Response sent', {
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          correlationId: req.correlationId,
+          responseTime: Date.now() - req.startTime
+        });
+        
+        originalEnd.apply(res, args);
+      };
+      
+      req.startTime = Date.now();
+      next();
+    });
+    
+    // Usage in route handler
+    app.get('/api/order/:id', (req, res) => {
+      getOrder(req.params.id)
+        .then(order => {
+          logger.info('Order retrieved', {
+            orderId: req.params.id,
+            correlationId: req.correlationId
+          });
+          
+          res.json(order);
+        })
+        .catch(err => {
+          logger.error('Error retrieving order', {
+            orderId: req.params.id,
+            error: err.message,
+            correlationId: req.correlationId
+          });
+          
+          res.status(500).json({ error: 'Server error' });
+        });
+    });
+    ```
+    
+    Missing correlation IDs can make it difficult to trace requests across distributed systems or to understand the sequence of events related to a specific transaction.
+    
+    To implement correlation IDs:
+    - Generate a unique ID for each incoming request
+    - Include the correlation ID in all log messages related to the request
+    - Propagate the correlation ID across service boundaries
+    - Include correlation IDs in error responses
+    - Use correlation IDs for request tracing and debugging
+    - Consider implementing distributed tracing for complex systems
+  </Accordion>
+  
+  <Accordion title="Logging Without Context" icon="circle-info">
+    ```javascript
+    // Anti-pattern: Logging without context
+    function processOrder(order) {
+      logger.info('Processing order');
+      
+      if (!validateOrder(order)) {
+        logger.error('Validation failed');
+        return false;
+      }
+      
+      // Process order...
+      
+      logger.info('Order processed');
+      return true;
+    }
+    
+    // Better approach: Contextual logging
+    function processOrder(order) {
+      logger.info('Processing order', {
+        orderId: order.id,
+        userId: order.userId,
+        items: order.items.length,
+        total: order.total,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (!validateOrder(order)) {
+        logger.error('Order validation failed', {
+          orderId: order.id,
+          userId: order.userId,
+          validationErrors: order.validationErrors,
+          timestamp: new Date().toISOString()
+        });
+        return false;
+      }
+      
+      // Process order...
+      
+      logger.info('Order processed successfully', {
+        orderId: order.id,
+        userId: order.userId,
+        processingTime: Date.now() - order.startTime,
+        timestamp: new Date().toISOString()
+      });
+      return true;
+    }
+    ```
+    
+    Logging without context can make logs difficult to interpret and analyze, reducing their usefulness for debugging and security monitoring.
+    
+    To implement contextual logging:
+    - Include relevant context with each log entry
+    - Use structured logging formats (JSON, XML)
+    - Include identifiers (user ID, request ID, transaction ID)
+    - Add timestamps to all log entries
+    - Include relevant business context
+    - Consider using logging frameworks that support contextual logging
+  </Accordion>
+  
+  <Accordion title="Insufficient Logging of Security Events" icon="shield-halved">
+    ```javascript
+    // Anti-pattern: Insufficient logging of security events
+    app.post('/api/users/:id/role', (req, res) => {
+      const { role } = req.body;
+      const userId = req.params.id;
+      
+      // No logging of permission change
+      updateUserRole(userId, role)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Comprehensive security event logging
+    app.post('/api/users/:id/role', authenticateUser, authorizeAdmin, (req, res) => {
+      const { role } = req.body;
+      const userId = req.params.id;
+      const adminId = req.user.id;
+      
+      // Get current role for audit log
+      getUserRole(userId)
+        .then(currentRole => {
+          return updateUserRole(userId, role)
+            .then(() => {
+              // Log security-relevant event
+              logger.warn('User role changed', {
+                userId,
+                adminId,
+                previousRole: currentRole,
+                newRole: role,
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                timestamp: new Date().toISOString(),
+                securityEvent: true
+              });
+              
+              res.json({ success: true });
+            });
+        })
+        .catch(err => {
+          logger.error('Error changing user role', {
+            userId,
+            adminId,
+            role,
+            error: err.message,
+            timestamp: new Date().toISOString()
+          });
+          
+          res.status(500).json({ error: 'Server error' });
+        });
+    });
+    ```
+    
+    Insufficient logging of security events can hinder incident detection, response, and forensic analysis.
+    
+    To implement security event logging:
+    - Identify and log all security-relevant events
+    - Log authentication and authorization decisions
+    - Log access to sensitive data
+    - Log changes to security configurations
+    - Log administrative actions
+    - Include detailed context for security events
+    - Consider using a separate log stream for security events
+  </Accordion>
+  
+  <Accordion title="Unstructured Logging" icon="code">
+    ```javascript
+    // Anti-pattern: Unstructured logging
+    function processPayment(payment) {
+      logger.info(`Processing payment ${payment.id} for user ${payment.userId} with amount ${payment.amount}`);
+      
+      // Process payment...
+      
+      logger.info(`Payment ${payment.id} processed successfully`);
+    }
+    
+    // Better approach: Structured logging
+    function processPayment(payment) {
+      logger.info('Processing payment', {
+        paymentId: payment.id,
+        userId: payment.userId,
+        amount: payment.amount,
+        currency: payment.currency,
+        method: payment.method,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Process payment...
+      
+      logger.info('Payment processed successfully', {
+        paymentId: payment.id,
+        userId: payment.userId,
+        processingTime: Date.now() - payment.startTime,
+        timestamp: new Date().toISOString()
+      });
+    }
+    ```
+    
+    Unstructured logging can make it difficult to parse, search, and analyze logs, reducing their usefulness for security monitoring and incident response.
+    
+    To implement structured logging:
+    - Use structured formats like JSON or XML
+    - Define consistent field names
+    - Include metadata with each log entry
+    - Use logging frameworks that support structured logging
+    - Consider implementing log schemas
+    - Ensure logs can be easily parsed by analysis tools
+  </Accordion>
+  
+  <Accordion title="Missing Logging for Failed Validations" icon="triangle-exclamation">
+    ```javascript
+    // Anti-pattern: Missing logging for failed validations
+    app.post('/api/users', (req, res) => {
+      const { username, email, password } = req.body;
+      
+      // Validation without logging
+      if (!username || !email || !password) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+      
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'Password too short' });
+      }
+      
+      // Create user...
+    });
+    
+    // Better approach: Logging failed validations
+    app.post('/api/users', (req, res) => {
+      const { username, email, password } = req.body;
+      const clientIp = req.ip;
+      
+      // Validation with logging
+      if (!username || !email || !password) {
+        logger.warn('User registration failed: Missing required fields', {
+          ip: clientIp,
+          providedFields: Object.keys(req.body),
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      if (!isValidEmail(email)) {
+        logger.warn('User registration failed: Invalid email format', {
+          ip: clientIp,
+          email: maskEmail(email),
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+      
+      if (password.length < 8) {
+        logger.warn('User registration failed: Password too short', {
+          ip: clientIp,
+          username,
+          passwordLength: password.length,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.status(400).json({ error: 'Password too short' });
+      }
+      
+      // Create user...
+    });
+    
+    function maskEmail(email) {
+      const [username, domain] = email.split('@');
+      return `${username.charAt(0)}***@${domain}`;
+    }
+    ```
+    
+    Missing logging for failed validations can make it difficult to detect potential attacks or identify usability issues.
+    
+    To implement validation logging:
+    - Log all significant validation failures
+    - Include context about the validation failure
+    - Mask sensitive data in validation logs
+    - Consider logging patterns of validation failures
+    - Use appropriate log levels for different types of validation failures
+    - Monitor for unusual patterns of validation failures
+  </Accordion>
+</AccordionGroup>

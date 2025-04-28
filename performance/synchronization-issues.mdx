@@ -1,0 +1,1513 @@
+---
+title: 'Synchronization Issues'
+description: 'Anti-patterns related to thread synchronization that can lead to performance problems.'
+---
+
+<AccordionGroup>
+  <Accordion title="Synchronization Issues Overview" icon="lock">
+    Proper thread synchronization is essential for ensuring data consistency in concurrent applications. However, excessive or improper synchronization can lead to significant performance issues, including contention, deadlocks, and reduced throughput.
+    
+    Common synchronization-related performance issues include:
+    - Over-synchronization
+    - Lock contention
+    - Improper lock granularity
+    - Inefficient synchronization mechanisms
+    - Deadlocks and livelocks
+    - Thread starvation
+    
+    This guide covers common anti-patterns related to thread synchronization, along with best practices for optimizing concurrent performance across different programming languages and application types.
+  </Accordion>
+  
+  <Accordion title="Excessive Synchronization" icon="lock-open">
+    ```java
+    // Anti-pattern: Excessive synchronization
+    public class UserRepository {
+        private final Map<Long, User> userCache = new HashMap<>();
+        
+        // Entire method is synchronized, blocking all threads
+        public synchronized User getUser(long userId) {
+            if (userCache.containsKey(userId)) {
+                return userCache.get(userId);
+            }
+            
+            // Slow I/O operation while holding lock
+            User user = loadUserFromDatabase(userId);
+            userCache.put(userId, user);
+            return user;
+        }
+        
+        private User loadUserFromDatabase(long userId) {
+            // Simulating database access
+            try {
+                Thread.sleep(100); // Slow I/O operation
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return new User(userId, "User " + userId);
+        }
+    }
+    
+    // Better approach: Minimizing synchronized blocks
+    public class OptimizedUserRepository {
+        private final Map<Long, User> userCache = new ConcurrentHashMap<>();
+        
+        public User getUser(long userId) {
+            // Check cache without synchronization
+            User user = userCache.get(userId);
+            if (user != null) {
+                return user;
+            }
+            
+            // Only synchronize when necessary
+            synchronized (this) {
+                // Double-check to avoid race condition
+                user = userCache.get(userId);
+                if (user != null) {
+                    return user;
+                }
+                
+                // Load user outside synchronized block
+                user = loadUserFromDatabase(userId);
+                userCache.put(userId, user);
+                return user;
+            }
+        }
+        
+        // Even better approach: Using computeIfAbsent
+        public User getUserOptimized(long userId) {
+            return userCache.computeIfAbsent(userId, this::loadUserFromDatabase);
+        }
+        
+        private User loadUserFromDatabase(long userId) {
+            // Same implementation as before
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return new User(userId, "User " + userId);
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Excessive locking in Node.js
+    class UserRepository {
+      constructor() {
+        this.userCache = new Map();
+        this.mutex = new Mutex(); // Using a mutex library
+      }
+      
+      async getUser(userId) {
+        // Acquire lock for the entire operation
+        const release = await this.mutex.acquire();
+        try {
+          if (this.userCache.has(userId)) {
+            return this.userCache.get(userId);
+          }
+          
+          // Slow I/O operation while holding lock
+          const user = await this.loadUserFromDatabase(userId);
+          this.userCache.set(userId, user);
+          return user;
+        } finally {
+          // Release lock
+          release();
+        }
+      }
+      
+      async loadUserFromDatabase(userId) {
+        // Simulating database access
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return { id: userId, name: `User ${userId}` };
+      }
+    }
+    
+    // Better approach: Minimizing critical sections
+    class OptimizedUserRepository {
+      constructor() {
+        this.userCache = new Map();
+        this.mutex = new Mutex();
+        this.pendingFetches = new Map();
+      }
+      
+      async getUser(userId) {
+        // Check cache without locking
+        if (this.userCache.has(userId)) {
+          return this.userCache.get(userId);
+        }
+        
+        // Check if there's already a pending fetch for this user
+        if (this.pendingFetches.has(userId)) {
+          return this.pendingFetches.get(userId);
+        }
+        
+        // Create a promise for this fetch
+        const fetchPromise = (async () => {
+          // Acquire lock only for the check and update
+          const release = await this.mutex.acquire();
+          try {
+            // Double-check to avoid race condition
+            if (this.userCache.has(userId)) {
+              return this.userCache.get(userId);
+            }
+            
+            // Release lock during I/O operation
+            release();
+            
+            // Perform slow operation without holding lock
+            const user = await this.loadUserFromDatabase(userId);
+            
+            // Acquire lock again to update cache
+            const releaseAgain = await this.mutex.acquire();
+            try {
+              this.userCache.set(userId, user);
+              return user;
+            } finally {
+              releaseAgain();
+            }
+          } catch (error) {
+            // Ensure lock is released on error
+            release();
+            throw error;
+          } finally {
+            // Remove from pending fetches
+            this.pendingFetches.delete(userId);
+          }
+        })();
+        
+        // Store the promise for other requests to use
+        this.pendingFetches.set(userId, fetchPromise);
+        return fetchPromise;
+      }
+      
+      async loadUserFromDatabase(userId) {
+        // Same implementation as before
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return { id: userId, name: `User ${userId}` };
+      }
+    }
+    ```
+    
+    Excessive synchronization, such as synchronizing entire methods or using coarse-grained locks, can lead to thread contention and reduced throughput, especially when the synchronized block contains slow operations like I/O.
+    
+    To minimize synchronization overhead:
+    - Use the smallest possible synchronized blocks
+    - Avoid performing slow operations while holding locks
+    - Consider using concurrent collections (ConcurrentHashMap, etc.)
+    - Use non-blocking algorithms when possible
+    - Consider using read-write locks for read-heavy workloads
+    - Use atomic variables for simple counters and flags
+    - Consider lock-free data structures for high-contention scenarios
+    - Use higher-level concurrency utilities (e.g., CompletableFuture in Java)
+    - Profile your application to identify synchronization bottlenecks
+    - Consider using optimistic concurrency control when appropriate
+  </Accordion>
+  
+  <Accordion title="Improper Lock Granularity" icon="layer-group">
+    ```java
+    // Anti-pattern: Coarse-grained locking
+    public class InventoryManager {
+        private final Map<String, Integer> inventory = new HashMap<>();
+        private final Object lock = new Object();
+        
+        public void updateStock(String productId, int quantity) {
+            // Single lock for all products
+            synchronized (lock) {
+                Integer currentStock = inventory.getOrDefault(productId, 0);
+                inventory.put(productId, currentStock + quantity);
+            }
+        }
+        
+        public int getStock(String productId) {
+            // Single lock for all products
+            synchronized (lock) {
+                return inventory.getOrDefault(productId, 0);
+            }
+        }
+    }
+    
+    // Better approach: Fine-grained locking
+    public class OptimizedInventoryManager {
+        private final Map<String, ProductStock> inventory = new ConcurrentHashMap<>();
+        
+        public void updateStock(String productId, int quantity) {
+            // Get or create product stock with its own lock
+            ProductStock stock = inventory.computeIfAbsent(productId, 
+                id -> new ProductStock());
+            
+            // Lock only the specific product
+            synchronized (stock) {
+                stock.quantity += quantity;
+            }
+        }
+        
+        public int getStock(String productId) {
+            ProductStock stock = inventory.get(productId);
+            if (stock == null) {
+                return 0;
+            }
+            
+            // Lock only the specific product
+            synchronized (stock) {
+                return stock.quantity;
+            }
+        }
+        
+        private static class ProductStock {
+            private int quantity;
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Coarse-grained locking in Node.js
+    class InventoryManager {
+      constructor() {
+        this.inventory = new Map();
+        this.mutex = new Mutex(); // Using a mutex library
+      }
+      
+      async updateStock(productId, quantity) {
+        // Single lock for all products
+        const release = await this.mutex.acquire();
+        try {
+          const currentStock = this.inventory.get(productId) || 0;
+          this.inventory.set(productId, currentStock + quantity);
+        } finally {
+          release();
+        }
+      }
+      
+      async getStock(productId) {
+        // Single lock for all products
+        const release = await this.mutex.acquire();
+        try {
+          return this.inventory.get(productId) || 0;
+        } finally {
+          release();
+        }
+      }
+    }
+    
+    // Better approach: Fine-grained locking
+    class OptimizedInventoryManager {
+      constructor() {
+        this.inventory = new Map();
+        this.mutexes = new Map(); // Map of mutexes per product
+      }
+      
+      async updateStock(productId, quantity) {
+        // Get or create mutex for this product
+        let mutex = this.mutexes.get(productId);
+        if (!mutex) {
+          mutex = new Mutex();
+          this.mutexes.set(productId, mutex);
+        }
+        
+        // Lock only the specific product
+        const release = await mutex.acquire();
+        try {
+          const currentStock = this.inventory.get(productId) || 0;
+          this.inventory.set(productId, currentStock + quantity);
+        } finally {
+          release();
+        }
+      }
+      
+      async getStock(productId) {
+        // Get mutex for this product
+        const mutex = this.mutexes.get(productId);
+        if (!mutex) {
+          return 0; // No mutex means no product yet
+        }
+        
+        // Lock only the specific product
+        const release = await mutex.acquire();
+        try {
+          return this.inventory.get(productId) || 0;
+        } finally {
+          release();
+        }
+      }
+    }
+    ```
+    
+    Improper lock granularity, such as using a single lock for an entire collection instead of individual locks for each element, can lead to unnecessary contention and reduced parallelism.
+    
+    To optimize lock granularity:
+    - Use fine-grained locks for independent resources
+    - Consider the trade-off between lock overhead and contention
+    - Use concurrent collections with built-in fine-grained locking
+    - Consider striped locks for large collections
+    - Be aware of lock acquisition order to prevent deadlocks
+    - Use read-write locks for read-heavy workloads
+    - Consider lock-free algorithms for high-contention scenarios
+    - Profile your application to identify lock contention hotspots
+    - Consider using optimistic concurrency control when appropriate
+    - Be mindful of the overhead of managing many locks
+  </Accordion>
+  
+  <Accordion title="Unnecessary Thread Synchronization" icon="ban">
+    ```java
+    // Anti-pattern: Unnecessary synchronization
+    public class ConfigManager {
+        private Map<String, String> config;
+        
+        public ConfigManager() {
+            // Load configuration at startup
+            config = loadConfiguration();
+        }
+        
+        // Synchronized unnecessarily for read-only data
+        public synchronized String getConfig(String key) {
+            return config.get(key);
+        }
+        
+        private Map<String, String> loadConfiguration() {
+            // Load configuration from file or database
+            Map<String, String> result = new HashMap<>();
+            result.put("app.name", "MyApp");
+            result.put("app.version", "1.0");
+            return result;
+        }
+    }
+    
+    // Better approach: Immutable configuration
+    public class OptimizedConfigManager {
+        private final Map<String, String> config;
+        
+        public OptimizedConfigManager() {
+            // Load configuration and make it immutable
+            Map<String, String> loadedConfig = loadConfiguration();
+            config = Collections.unmodifiableMap(loadedConfig);
+        }
+        
+        // No synchronization needed for immutable data
+        public String getConfig(String key) {
+            return config.get(key);
+        }
+        
+        private Map<String, String> loadConfiguration() {
+            // Same implementation as before
+            Map<String, String> result = new HashMap<>();
+            result.put("app.name", "MyApp");
+            result.put("app.version", "1.0");
+            return result;
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Unnecessary locking in Node.js
+    class ConfigManager {
+      constructor() {
+        this.config = this.loadConfiguration();
+        this.mutex = new Mutex(); // Using a mutex library
+      }
+      
+      // Locked unnecessarily for read-only data
+      async getConfig(key) {
+        const release = await this.mutex.acquire();
+        try {
+          return this.config[key];
+        } finally {
+          release();
+        }
+      }
+      
+      loadConfiguration() {
+        // Load configuration from file or database
+        return {
+          'app.name': 'MyApp',
+          'app.version': '1.0'
+        };
+      }
+    }
+    
+    // Better approach: Immutable configuration
+    class OptimizedConfigManager {
+      constructor() {
+        // Load configuration and freeze it
+        this.config = Object.freeze(this.loadConfiguration());
+      }
+      
+      // No locking needed for immutable data
+      getConfig(key) {
+        return this.config[key];
+      }
+      
+      loadConfiguration() {
+        // Same implementation as before
+        return {
+          'app.name': 'MyApp',
+          'app.version': '1.0'
+        };
+      }
+    }
+    ```
+    
+    Unnecessary thread synchronization, such as synchronizing read-only data or using synchronization when thread-safety isn't required, adds overhead without providing any benefit.
+    
+    To avoid unnecessary synchronization:
+    - Use immutable objects for shared read-only data
+    - Consider thread-local storage for thread-specific data
+    - Use final fields for one-time initialization
+    - Consider copy-on-write collections for rarely modified data
+    - Use volatile variables for simple flags without compound operations
+    - Consider using atomic variables for simple counters
+    - Be aware of the thread-safety requirements of your application
+    - Use synchronization only when necessary for thread safety
+    - Consider using concurrent collections with built-in thread safety
+    - Profile your application to identify unnecessary synchronization
+  </Accordion>
+  
+  <Accordion title="Inefficient Reader-Writer Patterns" icon="book-open-reader">
+    ```java
+    // Anti-pattern: Using synchronized for read-heavy workloads
+    public class ProductCatalog {
+        private final Map<String, Product> products = new HashMap<>();
+        private final Object lock = new Object();
+        
+        public Product getProduct(String productId) {
+            synchronized (lock) {
+                return products.get(productId);
+            }
+        }
+        
+        public void addProduct(String productId, Product product) {
+            synchronized (lock) {
+                products.put(productId, product);
+            }
+        }
+        
+        public List<Product> searchProducts(String keyword) {
+            List<Product> results = new ArrayList<>();
+            synchronized (lock) {
+                for (Product product : products.values()) {
+                    if (product.getName().contains(keyword)) {
+                        results.add(product);
+                    }
+                }
+            }
+            return results;
+        }
+    }
+    
+    // Better approach: Using ReadWriteLock
+    public class OptimizedProductCatalog {
+        private final Map<String, Product> products = new HashMap<>();
+        private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+        private final Lock readLock = rwLock.readLock();
+        private final Lock writeLock = rwLock.writeLock();
+        
+        public Product getProduct(String productId) {
+            readLock.lock();
+            try {
+                return products.get(productId);
+            } finally {
+                readLock.unlock();
+            }
+        }
+        
+        public void addProduct(String productId, Product product) {
+            writeLock.lock();
+            try {
+                products.put(productId, product);
+            } finally {
+                writeLock.unlock();
+            }
+        }
+        
+        public List<Product> searchProducts(String keyword) {
+            List<Product> results = new ArrayList<>();
+            readLock.lock();
+            try {
+                for (Product product : products.values()) {
+                    if (product.getName().contains(keyword)) {
+                        results.add(product);
+                    }
+                }
+            } finally {
+                readLock.unlock();
+            }
+            return results;
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Using single mutex for read-heavy workloads
+    class ProductCatalog {
+      constructor() {
+        this.products = new Map();
+        this.mutex = new Mutex(); // Using a mutex library
+      }
+      
+      async getProduct(productId) {
+        const release = await this.mutex.acquire();
+        try {
+          return this.products.get(productId);
+        } finally {
+          release();
+        }
+      }
+      
+      async addProduct(productId, product) {
+        const release = await this.mutex.acquire();
+        try {
+          this.products.set(productId, product);
+        } finally {
+          release();
+        }
+      }
+      
+      async searchProducts(keyword) {
+        const results = [];
+        const release = await this.mutex.acquire();
+        try {
+          for (const product of this.products.values()) {
+            if (product.name.includes(keyword)) {
+              results.push(product);
+            }
+          }
+        } finally {
+          release();
+        }
+        return results;
+      }
+    }
+    
+    // Better approach: Using read-write lock pattern
+    class OptimizedProductCatalog {
+      constructor() {
+        this.products = new Map();
+        this.rwLock = new ReadWriteLock(); // Using a RW lock library
+      }
+      
+      async getProduct(productId) {
+        return this.rwLock.readLock(async () => {
+          return this.products.get(productId);
+        });
+      }
+      
+      async addProduct(productId, product) {
+        return this.rwLock.writeLock(async () => {
+          this.products.set(productId, product);
+        });
+      }
+      
+      async searchProducts(keyword) {
+        return this.rwLock.readLock(async () => {
+          const results = [];
+          for (const product of this.products.values()) {
+            if (product.name.includes(keyword)) {
+              results.push(product);
+            }
+          }
+          return results;
+        });
+      }
+    }
+    ```
+    
+    Inefficient reader-writer patterns, such as using exclusive locks for read-heavy workloads, can lead to unnecessary contention and reduced throughput.
+    
+    To optimize reader-writer patterns:
+    - Use ReadWriteLock for read-heavy workloads
+    - Consider concurrent collections with built-in reader-writer semantics
+    - Use copy-on-write collections for rarely modified data
+    - Consider snapshot isolation for read-heavy workloads
+    - Be aware of the overhead of reader-writer locks
+    - Consider optimistic concurrency control for low-contention scenarios
+    - Use appropriate lock timeouts to prevent deadlocks
+    - Profile your application to identify reader-writer contention
+    - Consider using specialized concurrent data structures
+    - Be mindful of the trade-offs between consistency and performance
+  </Accordion>
+  
+  <Accordion title="Inefficient Thread Pool Configuration" icon="users">
+    ```java
+    // Anti-pattern: Inefficient thread pool configuration
+    public class TaskProcessor {
+        // Fixed thread pool with too many threads
+        private final ExecutorService executor = Executors.newFixedThreadPool(1000);
+        
+        public void processTask(Runnable task) {
+            executor.submit(task);
+        }
+        
+        // Method to shut down the executor
+        public void shutdown() {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+    
+    // Better approach: Properly sized thread pool
+    public class OptimizedTaskProcessor {
+        // Thread pool sized based on available processors
+        private final ExecutorService executor;
+        
+        public OptimizedTaskProcessor() {
+            int coreCount = Runtime.getRuntime().availableProcessors();
+            // For CPU-bound tasks: use core count
+            // For I/O-bound tasks: use more threads (e.g., core count * 2)
+            executor = new ThreadPoolExecutor(
+                coreCount,                  // Core pool size
+                coreCount * 2,              // Max pool size
+                60L, TimeUnit.SECONDS,      // Keep-alive time
+                new LinkedBlockingQueue<>(1000), // Work queue
+                new ThreadPoolExecutor.CallerRunsPolicy() // Rejection policy
+            );
+        }
+        
+        public void processTask(Runnable task) {
+            executor.submit(task);
+        }
+        
+        // Same shutdown method as before
+        public void shutdown() {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient worker pool in Node.js
+    const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
+    
+    class TaskProcessor {
+      constructor() {
+        // Creating too many workers
+        this.workers = [];
+        for (let i = 0; i < 1000; i++) {
+          this.workers.push(new Worker('./worker.js'));
+        }
+        this.nextWorker = 0;
+      }
+      
+      processTask(task) {
+        // Round-robin assignment to workers
+        const worker = this.workers[this.nextWorker];
+        this.nextWorker = (this.nextWorker + 1) % this.workers.length;
+        
+        return new Promise((resolve, reject) => {
+          worker.once('message', resolve);
+          worker.once('error', reject);
+          worker.postMessage(task);
+        });
+      }
+      
+      shutdown() {
+        for (const worker of this.workers) {
+          worker.terminate();
+        }
+      }
+    }
+    
+    // Better approach: Properly sized worker pool
+    class OptimizedTaskProcessor {
+      constructor() {
+        // Create workers based on CPU cores
+        const cpuCount = require('os').cpus().length;
+        this.workers = [];
+        for (let i = 0; i < cpuCount; i++) {
+          this.workers.push(new Worker('./worker.js'));
+        }
+        this.nextWorker = 0;
+      }
+      
+      processTask(task) {
+        // Same implementation as before
+        const worker = this.workers[this.nextWorker];
+        this.nextWorker = (this.nextWorker + 1) % this.workers.length;
+        
+        return new Promise((resolve, reject) => {
+          worker.once('message', resolve);
+          worker.once('error', reject);
+          worker.postMessage(task);
+        });
+      }
+      
+      shutdown() {
+        for (const worker of this.workers) {
+          worker.terminate();
+        }
+      }
+    }
+    ```
+    
+    Inefficient thread pool configuration, such as creating too many threads or using inappropriate queue sizes, can lead to resource exhaustion, increased context switching, and reduced performance.
+    
+    To optimize thread pool configuration:
+    - Size thread pools based on available processors and workload type
+    - Use fewer threads for CPU-bound tasks (typically core count)
+    - Use more threads for I/O-bound tasks (typically core count * N)
+    - Consider using different thread pools for different types of tasks
+    - Configure appropriate work queue sizes
+    - Implement proper rejection policies
+    - Monitor thread pool metrics (queue size, active threads, etc.)
+    - Consider using a thread pool with dynamic sizing
+    - Be mindful of thread pool starvation and deadlocks
+    - Profile your application to identify optimal thread pool configuration
+  </Accordion>
+  <Accordion title="Deadlock-Prone Lock Ordering" icon="arrows-spin">
+    ```java
+    // Anti-pattern: Inconsistent lock ordering leading to deadlocks
+    public class AccountManager {
+        public void transfer(Account from, Account to, double amount) {
+            // Lock accounts in arbitrary order (based on parameter order)
+            synchronized (from) {
+                synchronized (to) {
+                    if (from.getBalance() >= amount) {
+                        from.withdraw(amount);
+                        to.deposit(amount);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Example of deadlock:
+    // Thread 1: transfer(accountA, accountB, 100)
+    // Thread 2: transfer(accountB, accountA, 50)
+    // Thread 1 locks accountA, Thread 2 locks accountB, both wait for the other's lock
+    
+    // Better approach: Consistent lock ordering
+    public class SafeAccountManager {
+        public void transfer(Account from, Account to, double amount) {
+            // Determine a consistent locking order based on account ID
+            Account firstLock = from.getId() < to.getId() ? from : to;
+            Account secondLock = from.getId() < to.getId() ? to : from;
+            
+            // Always acquire locks in the same order
+            synchronized (firstLock) {
+                synchronized (secondLock) {
+                    // If we need to swap the order of operations based on which account is which
+                    if (from.getBalance() >= amount) {
+                        from.withdraw(amount);
+                        to.deposit(amount);
+                    }
+                }
+            }
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inconsistent lock ordering in Node.js
+    class AccountManager {
+      async transfer(from, to, amount) {
+        // Lock accounts in arbitrary order (based on parameter order)
+        await from.lock.acquire();
+        try {
+          await to.lock.acquire();
+          try {
+            if (from.balance >= amount) {
+              from.balance -= amount;
+              to.balance += amount;
+            }
+          } finally {
+            to.lock.release();
+          }
+        } finally {
+          from.lock.release();
+        }
+      }
+    }
+    
+    // Better approach: Consistent lock ordering
+    class SafeAccountManager {
+      async transfer(from, to, amount) {
+        // Determine a consistent locking order based on account ID
+        const firstLock = from.id < to.id ? from : to;
+        const secondLock = from.id < to.id ? to : from;
+        
+        // Always acquire locks in the same order
+        await firstLock.lock.acquire();
+        try {
+          await secondLock.lock.acquire();
+          try {
+            // If we need to swap the order of operations based on which account is which
+            if (from.balance >= amount) {
+              from.balance -= amount;
+              to.balance += amount;
+            }
+          } finally {
+            secondLock.lock.release();
+          }
+        } finally {
+          firstLock.lock.release();
+        }
+      }
+    }
+    ```
+    
+    Deadlock-prone lock ordering, such as acquiring locks in an inconsistent order across different threads, can lead to deadlocks where threads are permanently blocked waiting for locks held by each other.
+    
+    To prevent deadlocks through proper lock ordering:
+    - Always acquire locks in a consistent, predetermined order
+    - Use a natural ordering (e.g., based on object IDs) for lock acquisition
+    - Consider using tryLock with timeout to detect and recover from potential deadlocks
+    - Minimize the number of locks held simultaneously
+    - Keep critical sections as small as possible
+    - Consider using higher-level concurrency utilities that handle lock ordering
+    - Document the locking strategy and order for complex systems
+    - Use deadlock detection tools during development and testing
+    - Consider using lock hierarchies to enforce ordering
+    - Implement proper error handling and recovery mechanisms
+  </Accordion>
+  
+  <Accordion title="Busy Waiting" icon="spinner">
+    ```java
+    // Anti-pattern: Busy waiting
+    public class TaskCoordinator {
+        private volatile boolean isTaskComplete = false;
+        
+        public void waitForTask() {
+            // Continuously check flag, consuming CPU
+            while (!isTaskComplete) {
+                // Do nothing, just spin
+            }
+            
+            // Process completed task
+            processCompletedTask();
+        }
+        
+        public void completeTask() {
+            // Set flag when task is complete
+            isTaskComplete = true;
+        }
+        
+        private void processCompletedTask() {
+            // Process the completed task
+        }
+    }
+    
+    // Better approach: Using proper synchronization primitives
+    public class OptimizedTaskCoordinator {
+        private final Object lock = new Object();
+        private boolean isTaskComplete = false;
+        
+        public void waitForTask() {
+            synchronized (lock) {
+                // Wait until notified, releasing CPU
+                while (!isTaskComplete) {
+                    try {
+                        lock.wait();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+            
+            // Process completed task
+            processCompletedTask();
+        }
+        
+        public void completeTask() {
+            synchronized (lock) {
+                // Set flag and notify waiting threads
+                isTaskComplete = true;
+                lock.notifyAll();
+            }
+        }
+        
+        private void processCompletedTask() {
+            // Process the completed task
+        }
+    }
+    
+    // Even better: Using higher-level concurrency utilities
+    public class ModernTaskCoordinator {
+        private final CountDownLatch taskLatch = new CountDownLatch(1);
+        
+        public void waitForTask() {
+            try {
+                // Wait for latch to count down to zero
+                taskLatch.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            
+            // Process completed task
+            processCompletedTask();
+        }
+        
+        public void completeTask() {
+            // Count down the latch to release waiting threads
+            taskLatch.countDown();
+        }
+        
+        private void processCompletedTask() {
+            // Process the completed task
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Busy waiting in JavaScript
+    class TaskCoordinator {
+      constructor() {
+        this.isTaskComplete = false;
+      }
+      
+      async waitForTask() {
+        // Continuously check flag, consuming CPU
+        while (!this.isTaskComplete) {
+          // Small delay to prevent 100% CPU usage, but still inefficient
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        // Process completed task
+        this.processCompletedTask();
+      }
+      
+      completeTask() {
+        // Set flag when task is complete
+        this.isTaskComplete = true;
+      }
+      
+      processCompletedTask() {
+        // Process the completed task
+      }
+    }
+    
+    // Better approach: Using proper async patterns
+    class OptimizedTaskCoordinator {
+      constructor() {
+        this.taskPromise = new Promise(resolve => {
+          this.resolveTask = resolve;
+        });
+      }
+      
+      async waitForTask() {
+        // Efficiently wait for promise resolution
+        await this.taskPromise;
+        
+        // Process completed task
+        this.processCompletedTask();
+      }
+      
+      completeTask() {
+        // Resolve the promise to notify waiting functions
+        this.resolveTask();
+      }
+      
+      processCompletedTask() {
+        // Process the completed task
+      }
+    }
+    ```
+    
+    Busy waiting, or spinning, is a synchronization anti-pattern where a thread continuously checks a condition without releasing the CPU, wasting computational resources and potentially causing performance issues.
+    
+    To avoid busy waiting:
+    - Use proper synchronization primitives (wait/notify, semaphores, etc.)
+    - Consider using higher-level concurrency utilities (CountDownLatch, CyclicBarrier, etc.)
+    - Use blocking queues for producer-consumer patterns
+    - Implement proper backoff strategies when polling is necessary
+    - Consider using event-driven architectures
+    - Use proper asynchronous programming patterns
+    - Be mindful of CPU usage in waiting threads
+    - Consider using timeouts to prevent indefinite waiting
+    - Use proper interrupt handling for cancellation
+    - In JavaScript, use promises and async/await for asynchronous coordination
+  </Accordion>
+  
+  <Accordion title="Synchronized Method Cascades" icon="chart-network">
+    ```java
+    // Anti-pattern: Synchronized method cascades
+    public class UserService {
+        private final UserRepository userRepository = new UserRepository();
+        private final AuditService auditService = new AuditService();
+        
+        public synchronized User createUser(String username, String email) {
+            // Check if user exists
+            if (userRepository.findByUsername(username) != null) {
+                throw new IllegalArgumentException("Username already exists");
+            }
+            
+            // Create user
+            User user = new User(username, email);
+            userRepository.save(user);
+            
+            // Audit the action
+            auditService.logUserCreation(user);
+            
+            return user;
+        }
+    }
+    
+    public class UserRepository {
+        private final Map<String, User> users = new HashMap<>();
+        
+        public synchronized User findByUsername(String username) {
+            return users.get(username);
+        }
+        
+        public synchronized void save(User user) {
+            users.put(user.getUsername(), user);
+        }
+    }
+    
+    public class AuditService {
+        private final List<AuditLog> logs = new ArrayList<>();
+        
+        public synchronized void logUserCreation(User user) {
+            logs.add(new AuditLog("USER_CREATED", user.getUsername()));
+        }
+    }
+    
+    // Better approach: Minimizing lock scope and avoiding cascades
+    public class OptimizedUserService {
+        private final OptimizedUserRepository userRepository = new OptimizedUserRepository();
+        private final OptimizedAuditService auditService = new OptimizedAuditService();
+        
+        public User createUser(String username, String email) {
+            // Check if user exists
+            User existingUser = userRepository.findByUsername(username);
+            if (existingUser != null) {
+                throw new IllegalArgumentException("Username already exists");
+            }
+            
+            // Create user
+            User user = new User(username, email);
+            userRepository.save(user);
+            
+            // Audit the action
+            auditService.logUserCreation(user);
+            
+            return user;
+        }
+    }
+    
+    public class OptimizedUserRepository {
+        private final ConcurrentHashMap<String, User> users = new ConcurrentHashMap<>();
+        
+        public User findByUsername(String username) {
+            return users.get(username);
+        }
+        
+        public void save(User user) {
+            users.put(user.getUsername(), user);
+        }
+    }
+    
+    public class OptimizedAuditService {
+        private final Queue<AuditLog> logs = new ConcurrentLinkedQueue<>();
+        
+        public void logUserCreation(User user) {
+            logs.add(new AuditLog("USER_CREATED", user.getUsername()));
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Lock cascades in Node.js
+    class UserService {
+      constructor() {
+        this.userRepository = new UserRepository();
+        this.auditService = new AuditService();
+        this.mutex = new Mutex();
+      }
+      
+      async createUser(username, email) {
+        const release = await this.mutex.acquire();
+        try {
+          // Check if user exists
+          const existingUser = await this.userRepository.findByUsername(username);
+          if (existingUser) {
+            throw new Error("Username already exists");
+          }
+          
+          // Create user
+          const user = { username, email };
+          await this.userRepository.save(user);
+          
+          // Audit the action
+          await this.auditService.logUserCreation(user);
+          
+          return user;
+        } finally {
+          release();
+        }
+      }
+    }
+    
+    class UserRepository {
+      constructor() {
+        this.users = new Map();
+        this.mutex = new Mutex();
+      }
+      
+      async findByUsername(username) {
+        const release = await this.mutex.acquire();
+        try {
+          return this.users.get(username);
+        } finally {
+          release();
+        }
+      }
+      
+      async save(user) {
+        const release = await this.mutex.acquire();
+        try {
+          this.users.set(user.username, user);
+        } finally {
+          release();
+        }
+      }
+    }
+    
+    class AuditService {
+      constructor() {
+        this.logs = [];
+        this.mutex = new Mutex();
+      }
+      
+      async logUserCreation(user) {
+        const release = await this.mutex.acquire();
+        try {
+          this.logs.push({ action: "USER_CREATED", username: user.username });
+        } finally {
+          release();
+        }
+      }
+    }
+    
+    // Better approach: Minimizing lock scope and avoiding cascades
+    class OptimizedUserService {
+      constructor() {
+        this.userRepository = new OptimizedUserRepository();
+        this.auditService = new OptimizedAuditService();
+      }
+      
+      async createUser(username, email) {
+        // Check if user exists
+        const existingUser = await this.userRepository.findByUsername(username);
+        if (existingUser) {
+          throw new Error("Username already exists");
+        }
+        
+        // Create user
+        const user = { username, email };
+        await this.userRepository.save(user);
+        
+        // Audit the action
+        await this.auditService.logUserCreation(user);
+        
+        return user;
+      }
+    }
+    
+    class OptimizedUserRepository {
+      constructor() {
+        // Using a concurrent map implementation or database would be better in practice
+        this.users = new Map();
+      }
+      
+      async findByUsername(username) {
+        return this.users.get(username);
+      }
+      
+      async save(user) {
+        this.users.set(user.username, user);
+      }
+    }
+    
+    class OptimizedAuditService {
+      constructor() {
+        // Using a concurrent queue or database would be better in practice
+        this.logs = [];
+        this.mutex = new Mutex(); // Still need synchronization for array operations
+      }
+      
+      async logUserCreation(user) {
+        const release = await this.mutex.acquire();
+        try {
+          this.logs.push({ action: "USER_CREATED", username: user.username });
+        } finally {
+          release();
+        }
+      }
+    }
+    ```
+    
+    Synchronized method cascades occur when synchronized methods call other synchronized methods, potentially leading to nested locks, increased contention, and reduced concurrency.
+    
+    To avoid synchronized method cascades:
+    - Minimize the scope of synchronization
+    - Use concurrent collections instead of synchronized methods
+    - Consider using atomic operations for simple state changes
+    - Avoid calling synchronized methods from within synchronized blocks
+    - Break down large synchronized methods into smaller, non-synchronized ones
+    - Use lock striping to reduce contention
+    - Consider using optimistic concurrency control
+    - Be aware of the locking hierarchy in your application
+    - Document synchronization dependencies
+    - Profile your application to identify synchronization bottlenecks
+  </Accordion>
+  
+  <Accordion title="Contended Locks" icon="shield-halved">
+    ```java
+    // Anti-pattern: Highly contended locks
+    public class GlobalCounter {
+        private int count = 0;
+        private final Object lock = new Object();
+        
+        public void increment() {
+            synchronized (lock) {
+                count++;
+            }
+        }
+        
+        public int getCount() {
+            synchronized (lock) {
+                return count;
+            }
+        }
+    }
+    
+    // Usage that leads to contention
+    public class ContentionExample {
+        private final GlobalCounter counter = new GlobalCounter();
+        
+        public void runHighContentionWorkload() {
+            // Create many threads that all increment the same counter
+            ExecutorService executor = Executors.newFixedThreadPool(100);
+            for (int i = 0; i < 1000000; i++) {
+                executor.submit(() -> counter.increment());
+            }
+            executor.shutdown();
+        }
+    }
+    
+    // Better approach: Using atomic variables
+    public class AtomicCounter {
+        private final AtomicInteger count = new AtomicInteger(0);
+        
+        public void increment() {
+            count.incrementAndGet();
+        }
+        
+        public int getCount() {
+            return count.get();
+        }
+    }
+    
+    // Even better: Using striped locks for different counters
+    public class StripedCounter {
+        private static final int STRIPE_COUNT = 16;
+        private final AtomicInteger[] counters = new AtomicInteger[STRIPE_COUNT];
+        
+        public StripedCounter() {
+            for (int i = 0; i < STRIPE_COUNT; i++) {
+                counters[i] = new AtomicInteger(0);
+            }
+        }
+        
+        public void increment(Object key) {
+            // Use the key's hash to determine which stripe to use
+            int stripe = Math.abs(key.hashCode() % STRIPE_COUNT);
+            counters[stripe].incrementAndGet();
+        }
+        
+        public int getCount() {
+            int sum = 0;
+            for (AtomicInteger counter : counters) {
+                sum += counter.get();
+            }
+            return sum;
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Highly contended locks in Node.js
+    class GlobalCounter {
+      constructor() {
+        this.count = 0;
+        this.mutex = new Mutex();
+      }
+      
+      async increment() {
+        const release = await this.mutex.acquire();
+        try {
+          this.count++;
+        } finally {
+          release();
+        }
+      }
+      
+      async getCount() {
+        const release = await this.mutex.acquire();
+        try {
+          return this.count;
+        } finally {
+          release();
+        }
+      }
+    }
+    
+    // Usage that leads to contention
+    async function runHighContentionWorkload() {
+      const counter = new GlobalCounter();
+      const promises = [];
+      
+      // Create many promises that all increment the same counter
+      for (let i = 0; i < 10000; i++) {
+        promises.push(counter.increment());
+      }
+      
+      await Promise.all(promises);
+    }
+    
+    // Better approach: Using atomic operations
+    class AtomicCounter {
+      constructor() {
+        this.count = 0;
+        this.mutex = new Mutex();
+      }
+      
+      // In JavaScript, we can use a more efficient approach with batching
+      async increment(batchSize = 1) {
+        const release = await this.mutex.acquire();
+        try {
+          this.count += batchSize;
+        } finally {
+          release();
+        }
+      }
+      
+      async getCount() {
+        // No need for lock for a simple read in JS
+        return this.count;
+      }
+    }
+    
+    // Even better: Using striped locks
+    class StripedCounter {
+      constructor(stripeCount = 16) {
+        this.stripeCount = stripeCount;
+        this.counters = Array(stripeCount).fill(0);
+        this.mutexes = Array(stripeCount).fill(null).map(() => new Mutex());
+      }
+      
+      async increment(key) {
+        // Use the key's hash to determine which stripe to use
+        const stripe = Math.abs(this.hashCode(key) % this.stripeCount);
+        const release = await this.mutexes[stripe].acquire();
+        try {
+          this.counters[stripe]++;
+        } finally {
+          release();
+        }
+      }
+      
+      async getCount() {
+        // Sum all counters (might not be perfectly accurate due to race conditions)
+        return this.counters.reduce((sum, count) => sum + count, 0);
+      }
+      
+      // Simple hash function for JavaScript
+      hashCode(obj) {
+        const str = String(obj);
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          hash = ((hash << 5) - hash) + str.charCodeAt(i);
+          hash |= 0; // Convert to 32-bit integer
+        }
+        return hash;
+      }
+    }
+    ```
+    
+    Contended locks occur when many threads compete for the same lock, leading to significant thread blocking, context switching overhead, and reduced throughput.
+    
+    To reduce lock contention:
+    - Use atomic variables for simple counters and flags
+    - Implement lock striping to distribute contention
+    - Consider using concurrent collections with built-in concurrency control
+    - Reduce the scope and duration of synchronized blocks
+    - Use thread-local variables for thread-specific data
+    - Consider using optimistic concurrency control
+    - Batch operations to reduce lock acquisition frequency
+    - Use non-blocking algorithms when possible
+    - Consider using specialized concurrent data structures
+    - Profile your application to identify contention hotspots
+  </Accordion>
+  
+  <Accordion title="Synchronization Best Practices Checklist" icon="clipboard-check">
+    ```text
+    Synchronization Best Practices Checklist:
+    
+    1. Minimize Synchronization Scope
+       - Keep synchronized blocks as small as possible
+       - Avoid performing I/O or expensive operations while holding locks
+       - Use fine-grained locking for independent resources
+       - Consider using read-write locks for read-heavy workloads
+       - Use immutable objects for shared read-only data
+    
+    2. Choose Appropriate Synchronization Mechanisms
+       - Use concurrent collections when possible (ConcurrentHashMap, etc.)
+       - Use atomic variables for simple counters and flags
+       - Consider lock-free algorithms for high-contention scenarios
+       - Use higher-level concurrency utilities (CountDownLatch, etc.)
+       - Choose the right thread pool configuration for your workload
+    
+    3. Prevent Deadlocks
+       - Acquire locks in a consistent, predetermined order
+       - Use tryLock with timeout to detect and recover from potential deadlocks
+       - Minimize the number of locks held simultaneously
+       - Document locking strategies and dependencies
+       - Use deadlock detection tools during development
+    
+    4. Optimize for Contention
+       - Implement lock striping for high-contention resources
+       - Consider optimistic concurrency control for low-contention scenarios
+       - Batch operations to reduce lock acquisition frequency
+       - Use thread-local storage for thread-specific data
+       - Monitor and profile lock contention in production
+    
+    5. Follow Concurrency Best Practices
+       - Prefer immutable objects for shared data
+       - Document thread-safety guarantees for classes and methods
+       - Use final fields for thread safety
+       - Consider the memory model implications of your code
+       - Test thoroughly for concurrency issues
+    ```
+    
+    Proper thread synchronization is a balancing act between ensuring data consistency and maintaining good performance. By following best practices, you can minimize synchronization overhead while still ensuring thread safety.
+    
+    Key principles for efficient synchronization:
+    - Synchronize only when necessary
+    - Minimize the scope and duration of synchronization
+    - Choose the right synchronization mechanism for each use case
+    - Be aware of potential deadlocks and contention issues
+    - Use higher-level concurrency utilities when possible
+    - Profile and measure synchronization performance
+    - Document thread-safety guarantees and requirements
+    - Test thoroughly for concurrency issues
+    - Consider the trade-offs between consistency and performance
+    - Stay updated on modern concurrency patterns and libraries
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,636 @@
+---
+title: 'Regular Expression Denial of Service (ReDoS)'
+description: 'Regular Expression Denial of Service (ReDoS) vulnerabilities occur when poorly designed regular expressions can be exploited to cause excessive CPU consumption, potentially leading to application unavailability.'
+---
+
+<AccordionGroup>
+  <Accordion title="Regular Expression Denial of Service Overview" icon="gauge-high">
+    Regular Expression Denial of Service (ReDoS) is a vulnerability that occurs when a regular expression contains patterns that can cause exponential or catastrophic backtracking. When these regular expressions process maliciously crafted input, they can consume excessive CPU resources, potentially leading to denial of service.
+    
+    The root cause of ReDoS is the backtracking behavior in regex engines. When a regex engine attempts to match a pattern but encounters a situation where multiple paths could be taken, it may need to try all possible paths before determining that a match is impossible. With carefully crafted input, this can lead to exponential time complexity.
+    
+    Preventing ReDoS requires careful design of regular expressions, avoiding vulnerable patterns, and implementing proper timeouts and input validation.
+  </Accordion>
+  
+  <Accordion title="Catastrophic Backtracking" icon="arrow-rotate-left">
+    ```javascript
+    // Anti-pattern: Regex vulnerable to catastrophic backtracking
+    function validateEmail(email) {
+      // This regex is vulnerable to catastrophic backtracking
+      const emailRegex = /^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$/;
+      
+      return emailRegex.test(email);
+    }
+    
+    // Example attack string: "a".repeat(100000) + "@example.com"
+    // This will cause the regex engine to backtrack extensively
+    
+    // Better approach: Using a safer regex pattern
+    function validateEmailSafely(email) {
+      // Limit repetition and avoid nested quantifiers
+      const safeEmailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      
+      // Add input length validation
+      if (email.length > 254) { // RFC 5321 SMTP limit
+        return false;
+      }
+      
+      return safeEmailRegex.test(email);
+    }
+    ```
+    
+    Catastrophic backtracking occurs when a regular expression contains patterns that can match the same input in multiple ways, causing the regex engine to try all possible combinations.
+    
+    Common patterns that can lead to catastrophic backtracking:
+    - Nested repetition quantifiers (e.g., `(a+)+`)
+    - Overlapping character classes with repetition
+    - Multiple optional groups with repetition
+    - Alternation with shared prefixes or suffixes
+    - Greedy quantifiers followed by similar patterns
+    
+    To prevent catastrophic backtracking:
+    - Avoid nested repetition quantifiers
+    - Use atomic groups or possessive quantifiers when available
+    - Limit the use of backtracking by using non-capturing groups
+    - Implement input length validation before regex processing
+    - Consider using regex engines with linear time guarantees
+  </Accordion>
+  
+  <Accordion title="Vulnerable Regex Patterns" icon="bug">
+    ```javascript
+    // Anti-pattern: Vulnerable regex patterns
+    
+    // Example 1: Nested repetition - (a+)+ pattern
+    const nestedRepetitionRegex = /^(a+)+$/;
+    // Attack string: "a".repeat(100) + "X"
+    
+    // Example 2: Alternation with repetition
+    const alternationRegex = /(ab|a)+c/;
+    // Attack string: "ab".repeat(100)
+    
+    // Example 3: Adjacent repetition quantifiers
+    const adjacentRepetitionRegex = /^a+b+$/;
+    // Attack string: "a".repeat(100000)
+    
+    // Example 4: Complex backreferences
+    const backreferenceRegex = /^(a+)\1+$/;
+    // Attack string: "a".repeat(50000)
+    
+    // Better approach: Safer regex patterns
+    
+    // Example 1: Using atomic groups (?>...)
+    const atomicGroupRegex = /^(?>(a+))+$/;
+    
+    // Example 2: Using possessive quantifiers a++
+    const possessiveRegex = /^a++b++$/;
+    
+    // Example 3: Using non-backtracking alternatives
+    const nonBacktrackingRegex = /^[a]+[b]+$/;
+    
+    // Example 4: Using lookahead for validation
+    const lookaheadRegex = /^(?=.{1,255}$)a+b+$/;
+    ```
+    
+    ```python
+    # Python examples
+    import re
+    
+    # Anti-pattern: Vulnerable regex
+    vulnerable_regex = re.compile(r'^(a+)*b$')
+    
+    # Better approach: Using atomic groups in Python
+    # Python doesn't support atomic groups directly, but we can use lookahead
+    safer_regex = re.compile(r'^(?=(a*))\1b$')
+    
+    # Even better: Use the 're2' library which guarantees linear time
+    # pip install re2
+    import re2
+    linear_time_regex = re2.compile(r'^(a+)*b$')
+    ```
+    
+    Certain regex patterns are particularly vulnerable to ReDoS attacks due to their backtracking behavior.
+    
+    To identify and fix vulnerable patterns:
+    - Avoid nested repetition like `(a+)+` or `(a*b*)*`
+    - Be cautious with alternation that has common prefixes like `(ab|abc)+`
+    - Avoid backreferences in combination with repetition
+    - Use atomic groups `(?>...)` when available (in languages that support them)
+    - Use possessive quantifiers `a++` when available (in languages that support them)
+    - Consider using character classes `[a]` instead of single characters with quantifiers
+    - Implement proper input validation before applying regex
+  </Accordion>
+  
+  <Accordion title="Timeout Mechanisms" icon="clock">
+    ```javascript
+    // Anti-pattern: No timeout for regex operations
+    function validateInput(input) {
+      const complexRegex = /^(a+)*b$/;
+      return complexRegex.test(input);
+    }
+    
+    // Better approach: Implementing timeout mechanisms
+    function validateInputWithTimeout(input, timeoutMs = 100) {
+      return new Promise((resolve, reject) => {
+        // Create a worker to run the regex in a separate thread
+        const worker = new Worker(URL.createObjectURL(new Blob([`
+          self.onmessage = function(e) {
+            const input = e.data;
+            const complexRegex = /^(a+)*b$/;
+            const result = complexRegex.test(input);
+            self.postMessage(result);
+          }
+        `], { type: 'application/javascript' })));
+        
+        // Set timeout
+        const timeoutId = setTimeout(() => {
+          worker.terminate();
+          reject(new Error('Regex execution timed out'));
+        }, timeoutMs);
+        
+        // Handle response
+        worker.onmessage = (e) => {
+          clearTimeout(timeoutId);
+          worker.terminate();
+          resolve(e.data);
+        };
+        
+        // Start the worker
+        worker.postMessage(input);
+      });
+    }
+    
+    // Usage with async/await
+    async function processUserInput(input) {
+      try {
+        // Validate input length first
+        if (input.length > 1000) {
+          return false;
+        }
+        
+        const isValid = await validateInputWithTimeout(input);
+        return isValid;
+      } catch (error) {
+        console.error('Validation error:', error);
+        return false; // Fail closed on timeout
+      }
+    }
+    ```
+    
+    ```python
+    # Python timeout example
+    import re
+    import signal
+    
+    class TimeoutException(Exception):
+        pass
+    
+    def timeout_handler(signum, frame):
+        raise TimeoutException("Regex execution timed out")
+    
+    def validate_with_timeout(pattern, input_str, timeout_sec=1):
+        # Set the timeout
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_sec)
+        
+        try:
+            # Run the regex
+            result = re.match(pattern, input_str) is not None
+            # Cancel the timeout
+            signal.alarm(0)
+            return result
+        except TimeoutException:
+            # Handle timeout
+            return False
+        finally:
+            # Reset the alarm
+            signal.alarm(0)
+    
+    # Usage
+    pattern = r'^(a+)*b$'
+    input_str = 'a' * 100000
+    is_valid = validate_with_timeout(pattern, input_str)
+    ```
+    
+    Implementing timeout mechanisms is crucial for mitigating the impact of ReDoS attacks, as they limit the resources that can be consumed by a single regex operation.
+    
+    To implement effective timeout mechanisms:
+    - Use asynchronous processing or separate threads for regex operations
+    - Set appropriate timeout values based on expected regex complexity
+    - Implement proper error handling for timeouts
+    - Consider using worker threads or child processes for isolation
+    - Fail closed (reject input) when timeouts occur
+    - Log timeout incidents for monitoring and alerting
+    - Consider implementing circuit breakers for regex operations
+    - Test timeout mechanisms with known problematic inputs
+  </Accordion>
+  
+  <Accordion title="Alternative Regex Engines" icon="gears">
+    ```javascript
+    // Anti-pattern: Using standard regex engine for security-critical operations
+    function validateUserInput(input) {
+      const vulnerableRegex = /^(a|aa)+$/;
+      return vulnerableRegex.test(input);
+    }
+    
+    // Better approach: Using alternative regex engines
+    // Example with RE2 in Node.js
+    const RE2 = require('re2');
+    
+    function validateUserInputSafely(input) {
+      try {
+        // RE2 guarantees linear time complexity
+        const safeRegex = new RE2('^(a|aa)+$');
+        return safeRegex.test(input);
+      } catch (error) {
+        console.error('Regex error:', error);
+        return false;
+      }
+    }
+    ```
+    
+    ```python
+    # Python example with re2
+    # Standard library regex (potentially vulnerable)
+    import re
+    
+    def validate_standard(input_str):
+        pattern = re.compile(r'^(a|aa)+$')
+        return bool(pattern.match(input_str))
+    
+    # Using Google's RE2 engine
+    import re2
+    
+    def validate_re2(input_str):
+        pattern = re2.compile(r'^(a|aa)+$')
+        return bool(pattern.match(input_str))
+    ```
+    
+    ```java
+    // Java example with different regex engines
+    import java.util.regex.Pattern;
+    import com.google.re2j.Pattern as RE2Pattern;
+    
+    // Standard Java regex (potentially vulnerable)
+    public boolean validateStandard(String input) {
+        Pattern pattern = Pattern.compile("^(a|aa)+$");
+        return pattern.matcher(input).matches();
+    }
+    
+    // Using Google's RE2J
+    public boolean validateRE2(String input) {
+        RE2Pattern pattern = RE2Pattern.compile("^(a|aa)+$");
+        return pattern.matcher(input).matches();
+    }
+    ```
+    
+    Alternative regex engines with guaranteed linear time complexity can eliminate the risk of ReDoS vulnerabilities.
+    
+    Popular alternative regex engines:
+    - Google's RE2: Guarantees linear time complexity (available for multiple languages)
+    - re2j: Java port of RE2
+    - node-re2: Node.js binding for RE2
+    - Rust's regex crate: Guarantees linear time complexity
+    
+    Considerations when using alternative engines:
+    - They may not support all features of traditional regex engines (e.g., backreferences)
+    - There may be syntax differences or compatibility issues
+    - Performance characteristics may differ for non-pathological cases
+    - Implementation and integration may require additional dependencies
+    - Testing is essential to ensure equivalent functionality
+  </Accordion>
+  
+  <Accordion title="Input Validation Strategies" icon="filter">
+    ```javascript
+    // Anti-pattern: Applying regex directly to unchecked input
+    function validateEmail(email) {
+      const emailRegex = /^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$/;
+      return emailRegex.test(email);
+    }
+    
+    // Better approach: Input validation before regex
+    function validateEmailSafely(email) {
+      // Check input type
+      if (typeof email !== 'string') {
+        return false;
+      }
+      
+      // Check input length
+      if (email.length > 254 || email.length < 3) {
+        return false;
+      }
+      
+      // Check for basic structure before applying regex
+      if (!email.includes('@') || !email.includes('.')) {
+        return false;
+      }
+      
+      // Apply simpler checks first
+      const parts = email.split('@');
+      if (parts.length !== 2 || parts[0].length === 0 || parts[1].length === 0) {
+        return false;
+      }
+      
+      // Finally apply the regex
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      return emailRegex.test(email);
+    }
+    ```
+    
+    ```python
+    # Python input validation example
+    def validate_email_safely(email):
+        # Check input type
+        if not isinstance(email, str):
+            return False
+        
+        # Check input length
+        if len(email) > 254 or len(email) < 3:
+            return False
+        
+        # Check for basic structure
+        if '@' not in email or '.' not in email:
+            return False
+        
+        # Apply simpler checks
+        parts = email.split('@')
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            return False
+        
+        # Apply regex only after preliminary checks
+        import re
+        email_regex = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        return bool(email_regex.match(email))
+    ```
+    
+    Proper input validation before applying regular expressions can significantly reduce the risk of ReDoS attacks.
+    
+    Effective input validation strategies:
+    - Validate input type and structure before applying regex
+    - Implement input length limits appropriate to the expected data
+    - Use simpler, faster checks before complex regex patterns
+    - Consider breaking complex regex patterns into multiple simpler patterns
+    - Validate against a whitelist of allowed values when possible
+    - Implement proper error handling for invalid input
+    - Log validation failures for monitoring and alerting
+    - Consider using input normalization before validation
+  </Accordion>
+  
+  <Accordion title="Testing for ReDoS Vulnerabilities" icon="vial">
+    ```javascript
+    // Example: Testing regex patterns for ReDoS vulnerabilities
+    function testRegexPerformance(regex, inputs) {
+      const results = [];
+      
+      for (const input of inputs) {
+        const startTime = performance.now();
+        const result = regex.test(input);
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        results.push({
+          input,
+          length: input.length,
+          result,
+          duration,
+          isSuspicious: duration > 100 // Flag if takes more than 100ms
+        });
+      }
+      
+      return results;
+    }
+    
+    // Generate test inputs of increasing length
+    function generateTestInputs(basePattern, lengths) {
+      return lengths.map(length => basePattern.repeat(length));
+    }
+    
+    // Example usage
+    const vulnerableRegex = /^(a+)+$/;
+    const testInputs = generateTestInputs('a', [10, 100, 1000, 10000]);
+    const results = testRegexPerformance(vulnerableRegex, testInputs);
+    
+    // Analyze results to detect exponential behavior
+    function analyzeResults(results) {
+      // Calculate growth rate
+      for (let i = 1; i < results.length; i++) {
+        const prev = results[i-1];
+        const curr = results[i];
+        const lengthRatio = curr.length / prev.length;
+        const timeRatio = curr.duration / prev.duration;
+        
+        // If time grows much faster than input length, likely exponential
+        if (timeRatio > lengthRatio * 2) {
+          console.warn(`Potential ReDoS vulnerability detected: Time ratio (${timeRatio.toFixed(2)}) > Length ratio (${lengthRatio.toFixed(2)})`);
+          return true;
+        }
+      }
+      
+      return false;
+    }
+    ```
+    
+    ```python
+    # Python testing example
+    import time
+    import re
+    
+    def test_regex_performance(pattern, inputs):
+        results = []
+        compiled_regex = re.compile(pattern)
+        
+        for input_str in inputs:
+            start_time = time.time()
+            result = bool(compiled_regex.match(input_str))
+            end_time = time.time()
+            duration = (end_time - start_time) * 1000  # Convert to ms
+            
+            results.append({
+                "input": input_str[:20] + "..." if len(input_str) > 20 else input_str,
+                "length": len(input_str),
+                "result": result,
+                "duration": duration,
+                "suspicious": duration > 100
+            })
+        
+        return results
+    
+    # Generate test cases with increasing complexity
+    def generate_test_inputs(base_pattern, lengths):
+        return [base_pattern * length for length in lengths]
+    
+    # Example usage
+    pattern = r'^(a+)+$'
+    test_inputs = generate_test_inputs('a', [10, 100, 1000, 5000])
+    results = test_regex_performance(pattern, test_inputs)
+    
+    # Analyze for exponential behavior
+    def is_vulnerable(results):
+        for i in range(1, len(results)):
+            prev, curr = results[i-1], results[i]
+            length_ratio = curr["length"] / prev["length"]
+            time_ratio = curr["duration"] / prev["duration"] if prev["duration"] > 0 else float('inf')
+            
+            if time_ratio > length_ratio * 2:
+                print(f"Potential vulnerability: Time ratio ({time_ratio:.2f}) > Length ratio ({length_ratio:.2f})")
+                return True
+        
+        return False
+    ```
+    
+    Testing for ReDoS vulnerabilities is essential to identify problematic regex patterns before they can be exploited.
+    
+    Effective testing strategies:
+    - Test regex patterns with inputs of increasing length
+    - Measure execution time to detect exponential behavior
+    - Use automated tools designed to detect vulnerable patterns
+    - Implement regex testing as part of the CI/CD pipeline
+    - Use fuzzing techniques to generate potentially problematic inputs
+    - Test with known attack patterns for common regex vulnerabilities
+    - Consider using static analysis tools that can identify vulnerable patterns
+    - Benchmark regex performance against expected time complexity
+  </Accordion>
+  
+  <Accordion title="Static Analysis for ReDoS" icon="magnifying-glass-chart">
+    ```javascript
+    // Example: Using static analysis tools
+    
+    // Install tools:
+    // npm install safe-regex
+    // npm install vuln-regex-detector
+    
+    // Using safe-regex
+    const safeRegex = require('safe-regex');
+    
+    function checkRegexSafety(pattern) {
+      const isSafe = safeRegex(pattern);
+      if (!isSafe) {
+        console.warn(`Potentially vulnerable regex pattern detected: ${pattern}`);
+      }
+      return isSafe;
+    }
+    
+    // Check some patterns
+    checkRegexSafety(/^(a+)+$/); // Should return false (unsafe)
+    checkRegexSafety(/^[a-z]+$/); // Should return true (safe)
+    
+    // Using vuln-regex-detector
+    const { isVulnerable } = require('vuln-regex-detector');
+    
+    async function analyzeRegexVulnerability(pattern) {
+      try {
+        const result = await isVulnerable(pattern);
+        if (result.vulnerable) {
+          console.warn(`Vulnerable regex detected: ${pattern}`);
+          console.warn(`Attack string: ${result.attackString}`);
+        }
+        return result;
+      } catch (error) {
+        console.error('Error analyzing regex:', error);
+        return { vulnerable: false, error: error.message };
+      }
+    }
+    
+    // Usage
+    analyzeRegexVulnerability('^(a+)+$').then(result => {
+      console.log('Vulnerability analysis:', result);
+    });
+    ```
+    
+    ```python
+    # Python static analysis example
+    
+    # Using the rexploitable library
+    # pip install rexploitable
+    
+    from rexploitable import analyze_pattern
+    
+    def check_regex_safety(pattern):
+        result = analyze_pattern(pattern)
+        if result.vulnerable:
+            print(f"Vulnerable regex detected: {pattern}")
+            print(f"Vulnerability type: {result.vulnerability_type}")
+            print(f"Example attack string: {result.attack_string}")
+        return result
+    
+    # Check patterns
+    check_regex_safety(r'^(a+)+$')  # Should be vulnerable
+    check_regex_safety(r'^[a-z]+$')  # Should be safe
+    ```
+    
+    Static analysis tools can help identify potentially vulnerable regex patterns during development, before they can be exploited.
+    
+    Popular static analysis tools for ReDoS:
+    - safe-regex (JavaScript): Identifies potentially vulnerable patterns
+    - vuln-regex-detector (JavaScript): Analyzes regex vulnerability with attack string generation
+    - rexploitable (Python): Analyzes regex patterns for vulnerabilities
+    - RegexStaticAnalysis (Java): Static analysis for Java regex patterns
+    - RXXR2: Research tool for regex vulnerability analysis
+    
+    Benefits of static analysis:
+    - Early detection of vulnerable patterns
+    - Integration into development workflows and CI/CD pipelines
+    - Automated scanning of codebases
+    - Education of developers about vulnerable patterns
+    - Reduced risk of deploying vulnerable code
+  </Accordion>
+  
+  <Accordion title="ReDoS Prevention Checklist" icon="clipboard-check">
+    ```text
+    ReDoS Prevention Checklist:
+    
+    1. Regex Pattern Design
+       - Avoid nested repetition quantifiers (e.g., (a+)+)
+       - Limit the use of alternation with overlapping patterns
+       - Use atomic groups or possessive quantifiers when available
+       - Prefer character classes over alternation when possible
+       - Avoid backreferences in combination with repetition
+       - Keep regex patterns as simple as possible
+    
+    2. Input Validation
+       - Implement strict input validation before applying regex
+       - Set appropriate length limits for inputs
+       - Use simpler checks before complex regex patterns
+       - Consider breaking complex patterns into multiple simpler ones
+       - Validate against a whitelist when possible
+    
+    3. Execution Controls
+       - Implement timeout mechanisms for regex operations
+       - Run complex regex in separate threads or processes
+       - Consider using worker pools for regex processing
+       - Implement circuit breakers for regex operations
+       - Fail closed (reject) when timeouts occur
+    
+    4. Alternative Approaches
+       - Consider using alternative regex engines with linear time guarantees
+       - Use parser generators or state machines for complex parsing
+       - Consider non-regex approaches for input validation when appropriate
+       - Use specialized validation libraries for common formats
+    
+    5. Testing and Analysis
+       - Test regex patterns with inputs of increasing length
+       - Use static analysis tools to identify vulnerable patterns
+       - Include regex performance testing in CI/CD pipelines
+       - Benchmark regex performance against expected time complexity
+       - Use fuzzing to identify potentially problematic inputs
+    
+    6. Monitoring and Response
+       - Monitor regex execution times in production
+       - Implement alerting for abnormal regex processing times
+       - Log and analyze regex timeout incidents
+       - Have a response plan for ReDoS attacks
+       - Regularly review and update regex patterns
+    ```
+    
+    Preventing ReDoS vulnerabilities requires a comprehensive approach that addresses regex pattern design, input validation, execution controls, and monitoring.
+    
+    Key prevention strategies:
+    - Design regex patterns carefully to avoid vulnerable constructs
+    - Implement proper input validation before applying regex
+    - Use timeout mechanisms to limit resource consumption
+    - Consider alternative regex engines with linear time guarantees
+    - Test regex patterns for performance issues
+    - Use static analysis tools to identify vulnerable patterns
+    - Monitor regex execution in production
+    - Keep regex-related libraries and tools updated
+  </Accordion>
+</AccordionGroup>

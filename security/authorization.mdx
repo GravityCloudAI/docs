@@ -1,0 +1,663 @@
+---
+title: 'Authorization Vulnerabilities'
+description: 'Authorization vulnerabilities occur when a system fails to properly verify that a user has the necessary permissions to access a resource or perform an action.'
+---
+
+<AccordionGroup>
+  <Accordion title="Authorization Vulnerabilities Overview" icon="shield-xmark">
+    Authorization is the process of determining whether an authenticated user has permission to access a resource or perform an action. Authorization vulnerabilities arise when these permission checks are missing, incomplete, or can be bypassed.
+    
+    These vulnerabilities can allow attackers to access unauthorized data, perform privileged operations, or completely take over accounts and systems. Proper authorization is a critical component of a secure application's defense-in-depth strategy.
+  </Accordion>
+  
+  <Accordion title="Missing Function Level Authorization" icon="lock-open">
+    ```javascript
+    // Anti-pattern: Missing function level authorization
+    app.post('/api/users/:id/delete', (req, res) => {
+      const userId = req.params.id;
+      db.deleteUser(userId)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Implementing function level authorization
+    app.post('/api/users/:id/delete', authenticateUser, authorizeAdmin, (req, res) => {
+      const userId = req.params.id;
+      db.deleteUser(userId)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Authorization middleware
+    function authorizeAdmin(req, res, next) {
+      if (req.user && req.user.role === 'admin') {
+        next();
+      } else {
+        res.status(403).json({ error: 'Unauthorized access' });
+      }
+    }
+    ```
+    
+    Missing function level authorization occurs when an application fails to check if the authenticated user has the necessary permissions to perform a specific function.
+    
+    To implement proper function level authorization:
+    - Apply authorization checks to all sensitive functions
+    - Use role-based access control (RBAC) or attribute-based access control (ABAC)
+    - Implement middleware for common authorization patterns
+    - Apply the principle of least privilege
+    - Log authorization decisions for sensitive operations
+  </Accordion>
+  
+  <Accordion title="Insecure Direct Object References (IDOR)" icon="database">
+    ```javascript
+    // Anti-pattern: Insecure direct object references
+    app.get('/api/documents/:id', (req, res) => {
+      const documentId = req.params.id;
+      db.getDocument(documentId)
+        .then(document => res.json(document))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Checking ownership or permissions
+    app.get('/api/documents/:id', authenticateUser, (req, res) => {
+      const documentId = req.params.id;
+      const userId = req.user.id;
+      
+      db.getDocument(documentId)
+        .then(document => {
+          if (document.ownerId === userId || hasAccess(userId, document)) {
+            res.json(document);
+          } else {
+            res.status(403).json({ error: 'Access denied' });
+          }
+        })
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Insecure Direct Object References (IDOR) occur when an application exposes references to internal implementation objects, allowing attackers to manipulate these references to access unauthorized data.
+    
+    To prevent IDOR vulnerabilities:
+    - Implement proper access control checks for each object access
+    - Use indirect references that are mapped to actual database IDs
+    - Validate that the current user has permission to access the requested object
+    - Implement proper error handling that doesn't reveal sensitive information
+    - Use database queries that include user permissions in the selection criteria
+  </Accordion>
+  
+  <Accordion title="Broken Object Level Authorization" icon="triangle-exclamation">
+    ```javascript
+    // Anti-pattern: Broken object level authorization
+    app.put('/api/accounts/:accountId', authenticateUser, (req, res) => {
+      const accountId = req.params.accountId;
+      const updates = req.body;
+      
+      db.updateAccount(accountId, updates)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Proper object level authorization
+    app.put('/api/accounts/:accountId', authenticateUser, (req, res) => {
+      const accountId = req.params.accountId;
+      const userId = req.user.id;
+      const updates = req.body;
+      
+      // Check if user has access to this account
+      db.getAccount(accountId)
+        .then(account => {
+          if (account.userId !== userId && !isAdmin(req.user)) {
+            return res.status(403).json({ error: 'Access denied' });
+          }
+          
+          return db.updateAccount(accountId, updates);
+        })
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Broken Object Level Authorization occurs when an application does not properly verify that a user has permission to access or modify a specific object.
+    
+    To implement proper object level authorization:
+    - Verify ownership or permission for every object access
+    - Implement a consistent authorization model across all objects
+    - Use database queries that include user permissions
+    - Consider using an authorization framework
+    - Test authorization logic thoroughly with different user roles
+  </Accordion>
+  
+  <Accordion title="Privilege Escalation" icon="arrow-up-right-from-square">
+    ```javascript
+    // Anti-pattern: Vulnerable to privilege escalation
+    app.post('/api/users/:id/update', authenticateUser, (req, res) => {
+      const userId = req.params.id;
+      const updates = req.body;
+      
+      // No check if the authenticated user can modify this user
+      db.updateUser(userId, updates)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Preventing privilege escalation
+    app.post('/api/users/:id/update', authenticateUser, (req, res) => {
+      const targetUserId = req.params.id;
+      const currentUserId = req.user.id;
+      const updates = req.body;
+      
+      // Check if user is updating their own profile or is an admin
+      if (targetUserId !== currentUserId && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      // Prevent role escalation
+      if (updates.role && req.user.role !== 'admin') {
+        delete updates.role;
+      }
+      
+      db.updateUser(targetUserId, updates)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Privilege escalation occurs when a user can gain access to resources or functionality that should be protected from them, either by elevating their own privileges or accessing another user's resources.
+    
+    To prevent privilege escalation:
+    - Implement strict role checks for sensitive operations
+    - Prevent users from modifying their own roles or permissions
+    - Validate that users can only access or modify their own data unless explicitly authorized
+    - Implement proper access control for administrative functions
+    - Log and monitor privilege changes
+  </Accordion>
+  
+  <Accordion title="Missing Authorization Headers" icon="code">
+    ```javascript
+    // Anti-pattern: Missing authorization headers in API requests
+    function fetchUserData(userId) {
+      return fetch(`/api/users/${userId}`)
+        .then(response => response.json());
+    }
+    
+    // Better approach: Including authorization headers
+    function fetchUserData(userId) {
+      const token = getAuthToken();
+      return fetch(`/api/users/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }).then(response => response.json());
+    }
+    ```
+    
+    Missing authorization headers in API requests can lead to unauthorized access if the server doesn't properly enforce authentication requirements.
+    
+    To implement proper authorization headers:
+    - Always include authorization tokens in API requests
+    - Implement consistent token validation on the server
+    - Use secure methods for storing and transmitting tokens
+    - Implement token expiration and refresh mechanisms
+    - Consider using standardized authentication schemes like OAuth 2.0 or JWT
+  </Accordion>
+  
+  <Accordion title="Improper Access Control" icon="user-shield">
+    ```java
+    // Anti-pattern: Improper access control
+    @RequestMapping("/api/users/{id}")
+    public User getUserDetails(@PathVariable Long id) {
+        return userRepository.findById(id).orElse(null);
+    }
+    
+    // Better approach: Proper access control
+    @RequestMapping("/api/users/{id}")
+    public ResponseEntity<?> getUserDetails(@PathVariable Long id, Authentication authentication) {
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        User currentUser = userRepository.findByUsername(userDetails.getUsername());
+        
+        // Check if user is requesting their own data or is an admin
+        if (currentUser.getId().equals(id) || currentUser.getRole().equals("ADMIN")) {
+            User requestedUser = userRepository.findById(id).orElse(null);
+            if (requestedUser != null) {
+                return ResponseEntity.ok(requestedUser);
+            }
+            return ResponseEntity.notFound().build();
+        }
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+    }
+    ```
+    
+    Improper access control occurs when an application does not correctly restrict access to resources based on the user's identity and permissions.
+    
+    To implement proper access control:
+    - Verify user permissions for every protected resource
+    - Implement role-based or attribute-based access control
+    - Apply the principle of least privilege
+    - Use declarative security when possible
+    - Centralize access control logic
+    - Regularly audit access control implementations
+  </Accordion>
+  
+  <Accordion title="JWT Without Signature Verification" icon="signature">
+    ```javascript
+    // Anti-pattern: Not verifying JWT signature
+    app.get('/api/protected', (req, res) => {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
+      }
+      
+      // Dangerous: Decoding JWT without verifying signature
+      const decoded = jwt.decode(token);
+      if (!decoded) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+      
+      // Using the unverified token payload
+      req.user = decoded;
+      // Process the request...
+    });
+    
+    // Better approach: Properly verifying JWT signature
+    app.get('/api/protected', (req, res) => {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
+      }
+      
+      try {
+        // Verify the token with the secret key
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        // Process the request...
+      } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+    });
+    ```
+    
+    Not verifying JWT signatures allows attackers to forge tokens and gain unauthorized access to protected resources.
+    
+    To implement proper JWT handling:
+    - Always verify JWT signatures using the appropriate algorithm and key
+    - Validate all JWT claims (expiration, issuer, audience, etc.)
+    - Use strong, properly secured signing keys
+    - Implement token expiration and refresh mechanisms
+    - Consider using a JWT library that handles security best practices
+  </Accordion>
+  
+  <Accordion title="Relying on Client-Side Authorization" icon="browser">
+    ```javascript
+    // Anti-pattern: Relying on client-side authorization
+    // Client-side code
+    function showAdminControls() {
+      if (currentUser.isAdmin) {
+        document.getElementById('adminPanel').style.display = 'block';
+      }
+    }
+    
+    // API endpoint with no server-side checks
+    app.delete('/api/users/:id', (req, res) => {
+      const userId = req.params.id;
+      db.deleteUser(userId)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Server-side authorization
+    // Client-side code remains the same for UI purposes
+    function showAdminControls() {
+      if (currentUser.isAdmin) {
+        document.getElementById('adminPanel').style.display = 'block';
+      }
+    }
+    
+    // API endpoint with proper server-side checks
+    app.delete('/api/users/:id', authenticateUser, (req, res) => {
+      // Server-side verification of admin status
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
+      
+      const userId = req.params.id;
+      db.deleteUser(userId)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Relying solely on client-side authorization is dangerous because client-side code can be modified or bypassed by attackers.
+    
+    To implement proper authorization:
+    - Always enforce authorization on the server side
+    - Treat client-side authorization as a UI convenience only
+    - Implement consistent authorization checks across all API endpoints
+    - Validate all incoming requests regardless of the client
+    - Test API endpoints directly to ensure proper authorization
+  </Accordion>
+  
+  <Accordion title="Insufficient Authorization Granularity" icon="sitemap">
+    ```javascript
+    // Anti-pattern: Insufficient authorization granularity
+    app.get('/api/reports', authenticateUser, (req, res) => {
+      // Only checks if user is authenticated, not what reports they can access
+      db.getAllReports()
+        .then(reports => res.json(reports))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Fine-grained authorization
+    app.get('/api/reports', authenticateUser, (req, res) => {
+      const userId = req.user.id;
+      const userRole = req.user.role;
+      
+      // Get reports based on user's role and permissions
+      if (userRole === 'admin') {
+        // Admins can see all reports
+        db.getAllReports()
+          .then(reports => res.json(reports))
+          .catch(err => res.status(500).json({ error: err.message }));
+      } else if (userRole === 'manager') {
+        // Managers can see reports for their department
+        db.getReportsByDepartment(req.user.department)
+          .then(reports => res.json(reports))
+          .catch(err => res.status(500).json({ error: err.message }));
+      } else {
+        // Regular users can only see their own reports
+        db.getReportsByUser(userId)
+          .then(reports => res.json(reports))
+          .catch(err => res.status(500).json({ error: err.message }));
+      }
+    });
+    ```
+    
+    Insufficient authorization granularity occurs when an application uses overly broad permissions that don't properly restrict access to specific resources or actions.
+    
+    To implement fine-grained authorization:
+    - Define specific permissions for different resources and actions
+    - Implement role-based access control with detailed permission sets
+    - Consider attribute-based access control for complex authorization requirements
+    - Apply data filtering based on user permissions
+    - Regularly review and refine authorization rules
+  </Accordion>
+  
+  <Accordion title="Hardcoded Roles or Permissions" icon="code">
+    ```java
+    // Anti-pattern: Hardcoded roles or permissions
+    @RequestMapping("/admin/dashboard")
+    public String adminDashboard(Model model, Principal principal) {
+        User user = userService.findByUsername(principal.getName());
+        
+        // Hardcoded role check
+        if ("admin".equals(user.getRole())) {
+            // Show admin dashboard
+            return "admin/dashboard";
+        }
+        
+        return "redirect:/access-denied";
+    }
+    
+    // Better approach: Using a permission system
+    @RequestMapping("/admin/dashboard")
+    @PreAuthorize("hasAuthority('ADMIN_DASHBOARD_ACCESS')")
+    public String adminDashboard(Model model) {
+        // Method is only executed if user has the required permission
+        return "admin/dashboard";
+    }
+    ```
+    
+    Hardcoded roles or permissions make it difficult to manage access control and can lead to authorization bugs when roles change.
+    
+    To avoid hardcoded roles:
+    - Use a configurable permission system
+    - Implement declarative security with annotations or configuration
+    - Store permissions in a database or configuration file
+    - Use role hierarchies or permission inheritance when appropriate
+    - Implement a centralized authorization service
+  </Accordion>
+  
+  <Accordion title="Missing Re-Authentication for Sensitive Operations" icon="key">
+    ```javascript
+    // Anti-pattern: No re-authentication for sensitive operations
+    app.post('/api/users/change-password', authenticateUser, (req, res) => {
+      const userId = req.user.id;
+      const newPassword = req.body.newPassword;
+      
+      // Change password without requiring current password
+      updatePassword(userId, newPassword)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Requiring re-authentication
+    app.post('/api/users/change-password', authenticateUser, (req, res) => {
+      const userId = req.user.id;
+      const currentPassword = req.body.currentPassword;
+      const newPassword = req.body.newPassword;
+      
+      // Verify current password before allowing change
+      verifyPassword(userId, currentPassword)
+        .then(isValid => {
+          if (!isValid) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+          }
+          
+          return updatePassword(userId, newPassword);
+        })
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Missing re-authentication for sensitive operations can lead to account takeover if a user's session is compromised.
+    
+    To implement proper re-authentication:
+    - Require password verification for sensitive operations
+    - Implement step-up authentication for high-risk actions
+    - Consider using multi-factor authentication for critical operations
+    - Implement proper session management
+    - Log all sensitive operations
+  </Accordion>
+  
+  <Accordion title="Insecure Authorization Decisions" icon="scale-balanced">
+    ```javascript
+    // Anti-pattern: Insecure authorization decisions
+    app.get('/api/documents/:id', authenticateUser, (req, res) => {
+      const documentId = req.params.id;
+      
+      // Insecure: Using user-supplied data for authorization decision
+      if (req.query.role === 'admin') {
+        // Process as admin
+        db.getDocument(documentId)
+          .then(document => res.json(document))
+          .catch(err => res.status(500).json({ error: err.message }));
+      } else {
+        // Limited access
+        db.getDocumentLimited(documentId, req.user.id)
+          .then(document => res.json(document))
+          .catch(err => res.status(500).json({ error: err.message }));
+      }
+    });
+    
+    // Better approach: Secure authorization decisions
+    app.get('/api/documents/:id', authenticateUser, (req, res) => {
+      const documentId = req.params.id;
+      
+      // Secure: Using server-verified user data for authorization
+      getUserRole(req.user.id)
+        .then(role => {
+          if (role === 'admin') {
+            // Process as admin
+            return db.getDocument(documentId);
+          } else {
+            // Limited access
+            return db.getDocumentLimited(documentId, req.user.id);
+          }
+        })
+        .then(document => res.json(document))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Insecure authorization decisions occur when an application bases access control on untrusted input or client-controlled data.
+    
+    To implement secure authorization decisions:
+    - Base authorization decisions only on server-verified data
+    - Never trust client-supplied role or permission information
+    - Implement proper session management
+    - Use secure, tamper-proof tokens for authorization
+    - Validate all inputs used in authorization decisions
+  </Accordion>
+  
+  <Accordion title="Lack of Context-Aware Authorization" icon="sitemap">
+    ```javascript
+    // Anti-pattern: Lack of context-aware authorization
+    app.post('/api/transfer', authenticateUser, (req, res) => {
+      const { fromAccount, toAccount, amount } = req.body;
+      
+      // Only checks if user is authenticated, not contextual factors
+      transferFunds(fromAccount, toAccount, amount)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Context-aware authorization
+    app.post('/api/transfer', authenticateUser, (req, res) => {
+      const { fromAccount, toAccount, amount } = req.body;
+      const userId = req.user.id;
+      
+      // Check account ownership
+      isAccountOwner(userId, fromAccount)
+        .then(isOwner => {
+          if (!isOwner) {
+            return res.status(403).json({ error: 'Unauthorized' });
+          }
+          
+          // Check transfer limits based on user's verification level
+          return getUserVerificationLevel(userId);
+        })
+        .then(verificationLevel => {
+          const transferLimit = getTransferLimit(verificationLevel);
+          if (amount > transferLimit) {
+            return res.status(403).json({ 
+              error: `Transfer amount exceeds limit for your verification level (${transferLimit})`
+            });
+          }
+          
+          // Check for suspicious activity
+          return isTransferSuspicious(userId, fromAccount, toAccount, amount);
+        })
+        .then(isSuspicious => {
+          if (isSuspicious) {
+            // Require additional verification
+            return res.status(403).json({ 
+              error: 'Additional verification required for this transfer',
+              requiresVerification: true
+            });
+          }
+          
+          return transferFunds(fromAccount, toAccount, amount);
+        })
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Lack of context-aware authorization occurs when an application doesn't consider relevant contextual factors when making authorization decisions.
+    
+    To implement context-aware authorization:
+    - Consider factors like time, location, device, and behavior patterns
+    - Implement risk-based authentication for sensitive operations
+    - Apply different authorization rules based on the context
+    - Use anomaly detection for suspicious activities
+    - Implement step-up authentication when context changes
+  </Accordion>
+  
+  <Accordion title="Failure to Validate Authorization on Each Request" icon="repeat">
+    ```javascript
+    // Anti-pattern: Validating authorization only once
+    // Initial login and token generation
+    app.post('/api/login', (req, res) => {
+      const { username, password } = req.body;
+      authenticateUser(username, password)
+        .then(user => {
+          if (!user) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+          }
+          
+          // Generate token with user roles and permissions
+          const token = jwt.sign(
+            { id: user.id, role: user.role, permissions: user.permissions },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+          );
+          
+          res.json({ token });
+        })
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // API endpoint that only checks token validity, not current permissions
+    app.delete('/api/users/:id', (req, res) => {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
+      }
+      
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // Only checks permissions in the token, not current permissions
+        if (decoded.role !== 'admin') {
+          return res.status(403).json({ error: 'Unauthorized' });
+        }
+        
+        const userId = req.params.id;
+        db.deleteUser(userId)
+          .then(() => res.json({ success: true }))
+          .catch(err => res.status(500).json({ error: err.message }));
+      } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+    });
+    
+    // Better approach: Validating current permissions on each request
+    app.delete('/api/users/:id', (req, res) => {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
+      }
+      
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
+        
+        // Check current permissions from the database
+        getCurrentUserPermissions(userId)
+          .then(permissions => {
+            if (!permissions.includes('user:delete')) {
+              return res.status(403).json({ error: 'Unauthorized' });
+            }
+            
+            const targetUserId = req.params.id;
+            return db.deleteUser(targetUserId);
+          })
+          .then(() => res.json({ success: true }))
+          .catch(err => res.status(500).json({ error: err.message }));
+      } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+    });
+    ```
+    
+    Failing to validate authorization on each request can lead to unauthorized access if a user's permissions change after their token is issued.
+    
+    To implement proper authorization validation:
+    - Validate permissions on every request
+    - Consider using short-lived tokens
+    - Implement a token revocation mechanism
+    - Check current permissions from the database when needed
+    - Use a centralized authorization service
+  </Accordion>
+</AccordionGroup>

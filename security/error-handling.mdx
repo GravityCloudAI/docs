@@ -1,0 +1,765 @@
+---
+title: 'Error Handling Vulnerabilities'
+description: 'Error handling vulnerabilities occur when applications fail to properly manage, report, or respond to error conditions, potentially exposing sensitive information or creating security weaknesses.'
+---
+
+<AccordionGroup>
+  <Accordion title="Error Handling Vulnerabilities Overview" icon="shield-xmark">
+    Proper error handling is crucial for application security and reliability. Error handling vulnerabilities arise when applications fail to properly manage, report, or respond to error conditions. These vulnerabilities can lead to information disclosure, application crashes, or even security bypasses.
+    
+    Implementing secure error handling practices helps protect sensitive information, maintain application stability, and prevent attackers from gaining insights into application internals that could be used for further attacks.
+  </Accordion>
+  
+  <Accordion title="Verbose Error Messages" icon="message-exclamation">
+    ```javascript
+    // Anti-pattern: Verbose error messages
+    app.get('/api/user/:id', (req, res) => {
+      db.query('SELECT * FROM users WHERE id = ?', [req.params.id])
+        .then(user => res.json(user))
+        .catch(err => {
+          // Sending detailed error to client
+          res.status(500).json({ 
+            error: err.message, 
+            stack: err.stack,
+            query: err.sql
+          });
+        });
+    });
+    
+    // Better approach: Generic error messages
+    app.get('/api/user/:id', (req, res) => {
+      db.query('SELECT * FROM users WHERE id = ?', [req.params.id])
+        .then(user => res.json(user))
+        .catch(err => {
+          // Log detailed error server-side
+          console.error('Database error:', err);
+          
+          // Send generic message to client
+          res.status(500).json({ 
+            error: 'An error occurred while retrieving user data' 
+          });
+        });
+    });
+    ```
+    
+    Verbose error messages can reveal sensitive information about the application's internal workings, database structure, or system configuration.
+    
+    To implement secure error handling:
+    - Display generic error messages to users
+    - Log detailed errors server-side for debugging
+    - Avoid revealing technical details in production environments
+    - Implement different error handling for development and production
+    - Use error codes instead of descriptive messages when possible
+  </Accordion>
+  
+  <Accordion title="Uncaught Exceptions" icon="bug">
+    ```javascript
+    // Anti-pattern: Uncaught exceptions
+    app.get('/api/data', (req, res) => {
+      // No error handling
+      const result = processData(req.query.data);
+      res.json(result);
+    });
+    
+    // Better approach: Proper exception handling
+    app.get('/api/data', (req, res) => {
+      try {
+        const result = processData(req.query.data);
+        res.json(result);
+      } catch (err) {
+        console.error('Error processing data:', err);
+        res.status(500).json({ error: 'An error occurred while processing data' });
+      }
+    });
+    
+    // Even better: Global error handler for Express
+    app.use((err, req, res, next) => {
+      console.error('Unhandled error:', err);
+      
+      // Don't expose error details in production
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(500).json({ error: 'An unexpected error occurred' });
+      }
+      
+      // More details in development
+      res.status(500).json({ 
+        error: 'An unexpected error occurred', 
+        message: err.message,
+        stack: err.stack
+      });
+    });
+    ```
+    
+    Uncaught exceptions can crash applications, lead to denial of service, or leave the application in an inconsistent state.
+    
+    To handle exceptions properly:
+    - Use try-catch blocks for error-prone operations
+    - Implement global error handlers
+    - Log all exceptions for monitoring and debugging
+    - Gracefully degrade functionality when errors occur
+    - Implement proper error recovery mechanisms
+    - Consider using error monitoring services
+  </Accordion>
+  
+  <Accordion title="Error Information Disclosure" icon="eye">
+    ```java
+    // Anti-pattern: Error information disclosure
+    @RequestMapping("/api/user/{id}")
+    public ResponseEntity<?> getUser(@PathVariable Long id) {
+        try {
+            User user = userService.findById(id);
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            // Disclosing sensitive information
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Error: " + e.getMessage() + "\nStack trace: " + Arrays.toString(e.getStackTrace()));
+        }
+    }
+    
+    // Better approach: Controlled error information
+    @RequestMapping("/api/user/{id}")
+    public ResponseEntity<?> getUser(@PathVariable Long id) {
+        try {
+            User user = userService.findById(id);
+            if (user == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            // Log the detailed error server-side
+            logger.error("Error retrieving user: {}", e.getMessage(), e);
+            
+            // Return generic message to client
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("An error occurred while retrieving user data");
+        }
+    }
+    ```
+    
+    Error information disclosure can reveal sensitive details about the application, its infrastructure, or user data.
+    
+    To prevent error information disclosure:
+    - Log detailed errors server-side only
+    - Return generic error messages to clients
+    - Implement proper error handling for different error types
+    - Use appropriate HTTP status codes
+    - Consider implementing custom error pages
+    - Regularly review error logs for sensitive information
+  </Accordion>
+  
+  <Accordion title="Missing Error Handling for External Services" icon="server">
+    ```javascript
+    // Anti-pattern: Missing error handling for external services
+    app.get('/api/weather', (req, res) => {
+      const location = req.query.location;
+      
+      // No timeout, no error handling for external API
+      axios.get(`https://weather-api.example.com/forecast?location=${location}`)
+        .then(response => res.json(response.data))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Proper error handling for external services
+    app.get('/api/weather', (req, res) => {
+      const location = req.query.location;
+      
+      // Set timeout and handle different error scenarios
+      axios.get(`https://weather-api.example.com/forecast?location=${location}`, {
+        timeout: 5000 // 5 seconds timeout
+      })
+        .then(response => res.json(response.data))
+        .catch(err => {
+          // Log the detailed error
+          console.error('Weather API error:', err);
+          
+          // Handle different error types
+          if (err.code === 'ECONNABORTED') {
+            return res.status(503).json({ error: 'Weather service is temporarily unavailable' });
+          }
+          
+          if (err.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            if (err.response.status === 404) {
+              return res.status(404).json({ error: 'Weather data not found for this location' });
+            }
+            
+            if (err.response.status === 401 || err.response.status === 403) {
+              return res.status(503).json({ error: 'Weather service is temporarily unavailable' });
+            }
+          } else if (err.request) {
+            // The request was made but no response was received
+            return res.status(503).json({ error: 'Weather service is temporarily unavailable' });
+          }
+          
+          // Generic error for other cases
+          res.status(500).json({ error: 'An error occurred while fetching weather data' });
+        });
+    });
+    ```
+    
+    Missing error handling for external services can lead to application crashes, timeouts, or information leakage when external dependencies fail.
+    
+    To implement proper error handling for external services:
+    - Set appropriate timeouts for external requests
+    - Implement retry mechanisms with backoff strategies
+    - Handle different error scenarios appropriately
+    - Provide fallback mechanisms when services are unavailable
+    - Monitor external service availability and performance
+    - Implement circuit breakers for critical dependencies
+  </Accordion>
+  
+  <Accordion title="Improper Error Logging" icon="file-lines">
+    ```javascript
+    // Anti-pattern: Improper error logging
+    function processPayment(user, paymentDetails) {
+      try {
+        // Process payment...
+      } catch (err) {
+        // Logging sensitive information
+        console.error(`Payment error for user ${user.email} with card ${paymentDetails.cardNumber}: ${err.message}`);
+        throw err;
+      }
+    }
+    
+    // Better approach: Secure error logging
+    function processPayment(user, paymentDetails) {
+      try {
+        // Process payment...
+      } catch (err) {
+        // Logging without sensitive information
+        const maskedCardNumber = maskCreditCard(paymentDetails.cardNumber);
+        console.error(`Payment error for user ID ${user.id} with card ${maskedCardNumber}: ${err.message}`);
+        
+        // Log detailed error information securely
+        secureLogger.error('Payment processing error', {
+          userId: user.id,
+          error: err.message,
+          errorCode: err.code,
+          timestamp: new Date().toISOString()
+        });
+        
+        throw new Error('Payment processing failed');
+      }
+    }
+    
+    function maskCreditCard(cardNumber) {
+      // Show only last 4 digits
+      return `XXXX-XXXX-XXXX-${cardNumber.slice(-4)}`;
+    }
+    ```
+    
+    Improper error logging can expose sensitive information in log files, which may be accessible to unauthorized personnel or attackers.
+    
+    To implement secure error logging:
+    - Avoid logging sensitive data (passwords, credit cards, personal identifiers)
+    - Implement data masking for any potentially sensitive information
+    - Use structured logging formats
+    - Implement proper log levels and categories
+    - Secure access to log files and log management systems
+    - Implement log rotation and retention policies
+  </Accordion>
+  
+  <Accordion title="Revealing Database Errors" icon="database">
+    ```javascript
+    // Anti-pattern: Revealing database errors
+    app.post('/api/users', (req, res) => {
+      const { username, email, password } = req.body;
+      
+      db.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', 
+        [username, email, password])
+        .then(() => res.json({ success: true }))
+        .catch(err => {
+          // Revealing database error details
+          res.status(500).json({ error: err.message, code: err.code });
+        });
+    });
+    
+    // Better approach: Generic database error messages
+    app.post('/api/users', (req, res) => {
+      const { username, email, password } = req.body;
+      
+      db.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', 
+        [username, email, password])
+        .then(() => res.json({ success: true }))
+        .catch(err => {
+          // Log the detailed error server-side
+          console.error('Database error:', err);
+          
+          // Send appropriate user-friendly messages based on error type
+          if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ error: 'Username or email already exists' });
+          }
+          
+          // Generic error for other cases
+          res.status(500).json({ error: 'An error occurred while creating user' });
+        });
+    });
+    ```
+    
+    Revealing database errors can expose information about database structure, query syntax, or data constraints, which attackers can use to craft more targeted attacks.
+    
+    To handle database errors securely:
+    - Log detailed database errors server-side
+    - Return user-friendly error messages to clients
+    - Map database error codes to appropriate user messages
+    - Avoid revealing table names, column names, or SQL syntax in error messages
+    - Implement proper input validation to prevent database errors
+    - Use parameterized queries to prevent SQL injection
+  </Accordion>
+  
+  <Accordion title="Missing Error Handling for File Operations" icon="file">
+    ```javascript
+    // Anti-pattern: Missing error handling for file operations
+    app.get('/api/download/:filename', (req, res) => {
+      const filename = req.params.filename;
+      const filePath = path.join(__dirname, 'uploads', filename);
+      
+      // No error handling for file operations
+      res.download(filePath);
+    });
+    
+    // Better approach: Proper error handling for file operations
+    app.get('/api/download/:filename', (req, res) => {
+      const filename = req.params.filename;
+      
+      // Validate filename to prevent path traversal
+      if (!filename.match(/^[a-zA-Z0-9._-]+$/)) {
+        return res.status(400).json({ error: 'Invalid filename' });
+      }
+      
+      const filePath = path.join(__dirname, 'uploads', filename);
+      
+      // Check if file exists before attempting to download
+      fs.access(filePath, fs.constants.F_OK, (err) => {
+        if (err) {
+          console.error(`File not found: ${filePath}`);
+          return res.status(404).json({ error: 'File not found' });
+        }
+        
+        // Use error handling with download
+        res.download(filePath, (err) => {
+          if (err) {
+            console.error(`Download error for ${filePath}:`, err);
+            
+            // Check if headers have already been sent
+            if (res.headersSent) {
+              return;
+            }
+            
+            return res.status(500).json({ error: 'An error occurred during file download' });
+          }
+        });
+      });
+    });
+    ```
+    
+    Missing error handling for file operations can lead to application crashes, information disclosure, or security vulnerabilities like path traversal.
+    
+    To implement proper file operation error handling:
+    - Validate file paths and names
+    - Check file existence before operations
+    - Handle permission errors appropriately
+    - Implement proper error recovery for file operations
+    - Use try-catch blocks for synchronous file operations
+    - Handle errors in callbacks for asynchronous file operations
+  </Accordion>
+  
+  <Accordion title="Unhandled Promise Rejections" icon="code">
+    ```javascript
+    // Anti-pattern: Unhandled promise rejections
+    function fetchUserData(userId) {
+      // No error handling for promise
+      return fetch(`/api/users/${userId}`)
+        .then(response => response.json());
+    }
+    
+    // Usage without error handling
+    fetchUserData(123)
+      .then(userData => updateUI(userData));
+    
+    // Better approach: Proper promise error handling
+    function fetchUserData(userId) {
+      return fetch(`/api/users/${userId}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .catch(err => {
+          console.error(`Error fetching user data: ${err.message}`);
+          throw err; // Re-throw or handle appropriately
+        });
+    }
+    
+    // Usage with error handling
+    fetchUserData(123)
+      .then(userData => updateUI(userData))
+      .catch(err => {
+        displayErrorMessage('Unable to load user data');
+        // Fallback behavior
+      });
+    ```
+    
+    Unhandled promise rejections can lead to silent failures, making debugging difficult and potentially leaving the application in an inconsistent state.
+    
+    To handle promises properly:
+    - Always include .catch() handlers for promises
+    - Check response status in fetch requests
+    - Implement global unhandled rejection handlers
+    - Consider using async/await with try-catch for cleaner error handling
+    - Propagate errors appropriately up the call stack
+    - Implement proper fallback behavior when promises fail
+  </Accordion>
+  
+  <Accordion title="Improper HTTP Status Codes" icon="globe">
+    ```javascript
+    // Anti-pattern: Improper HTTP status codes
+    app.get('/api/users/:id', (req, res) => {
+      const userId = req.params.id;
+      
+      db.getUser(userId)
+        .then(user => {
+          if (!user) {
+            // Using 200 status for not found
+            return res.status(200).json({ error: 'User not found' });
+          }
+          
+          res.json(user);
+        })
+        .catch(err => {
+          // Using 200 status for server errors
+          res.status(200).json({ error: 'Server error' });
+        });
+    });
+    
+    // Better approach: Proper HTTP status codes
+    app.get('/api/users/:id', (req, res) => {
+      const userId = req.params.id;
+      
+      db.getUser(userId)
+        .then(user => {
+          if (!user) {
+            // Using appropriate 404 status
+            return res.status(404).json({ error: 'User not found' });
+          }
+          
+          res.status(200).json(user);
+        })
+        .catch(err => {
+          console.error('Error retrieving user:', err);
+          
+          // Using appropriate 500 status
+          res.status(500).json({ error: 'An error occurred while retrieving user data' });
+        });
+    });
+    ```
+    
+    Improper HTTP status codes can confuse clients, break error handling logic, and make debugging more difficult.
+    
+    To implement proper HTTP status codes:
+    - Use appropriate status codes for different scenarios (200 for success, 400 for client errors, 500 for server errors)
+    - Be consistent with status code usage across the application
+    - Include meaningful error messages with appropriate status codes
+    - Consider implementing custom error handlers for different status codes
+    - Document API error responses for client developers
+  </Accordion>
+  
+  <Accordion title="Error Handling Bypass" icon="shield-xmark">
+    ```javascript
+    // Anti-pattern: Error handling bypass
+    function validateUser(user) {
+      try {
+        // Validation logic
+        if (!user.name) {
+          throw new Error('Name is required');
+        }
+        if (!user.email) {
+          throw new Error('Email is required');
+        }
+        // More validation...
+        
+        return true;
+      } catch (err) {
+        // Error handling bypass - returning true despite error
+        console.error('Validation error:', err);
+        return true; // Should return false
+      }
+    }
+    
+    // Better approach: Proper error propagation
+    function validateUser(user) {
+      try {
+        // Validation logic
+        if (!user.name) {
+          throw new Error('Name is required');
+        }
+        if (!user.email) {
+          throw new Error('Email is required');
+        }
+        // More validation...
+        
+        return true;
+      } catch (err) {
+        console.error('Validation error:', err);
+        return false; // Correctly indicate validation failure
+      }
+    }
+    ```
+    
+    Error handling bypass occurs when errors are caught but not properly handled, allowing the application to continue as if no error occurred.
+    
+    To prevent error handling bypass:
+    - Ensure caught errors are properly handled
+    - Return appropriate error indicators from functions
+    - Don't suppress errors without proper handling
+    - Implement consistent error handling patterns
+    - Consider using error types or codes for different error categories
+    - Regularly review error handling logic
+  </Accordion>
+  
+  <Accordion title="Missing Error Boundary in UI" icon="window">
+    ```jsx
+    // Anti-pattern: Missing error boundary in UI
+    function UserProfile({ userId }) {
+      const [user, setUser] = useState(null);
+      const [loading, setLoading] = useState(true);
+      
+      useEffect(() => {
+        // No error handling
+        fetchUser(userId)
+          .then(data => {
+            setUser(data);
+            setLoading(false);
+          });
+      }, [userId]);
+      
+      if (loading) return <div>Loading...</div>;
+      
+      // Will crash if user is null or has missing properties
+      return (
+        <div>
+          <h1>{user.name}</h1>
+          <p>Email: {user.email}</p>
+          <p>Role: {user.role}</p>
+        </div>
+      );
+    }
+    
+    // Better approach: Implementing error boundaries and proper error handling
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+      }
+      
+      static getDerivedStateFromError(error) {
+        return { hasError: true };
+      }
+      
+      componentDidCatch(error, errorInfo) {
+        console.error('UI Error:', error, errorInfo);
+        // Log to error reporting service
+      }
+      
+      render() {
+        if (this.state.hasError) {
+          return this.props.fallback || <div>Something went wrong.</div>;
+        }
+        
+        return this.props.children;
+      }
+    }
+    
+    function UserProfile({ userId }) {
+      const [user, setUser] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      
+      useEffect(() => {
+        fetchUser(userId)
+          .then(data => {
+            setUser(data);
+            setLoading(false);
+          })
+          .catch(err => {
+            console.error('Error fetching user:', err);
+            setError('Failed to load user data');
+            setLoading(false);
+          });
+      }, [userId]);
+      
+      if (loading) return <div>Loading...</div>;
+      if (error) return <div>Error: {error}</div>;
+      if (!user) return <div>User not found</div>;
+      
+      return (
+        <ErrorBoundary fallback={<div>Error displaying user profile</div>}>
+          <div>
+            <h1>{user.name}</h1>
+            <p>Email: {user.email}</p>
+            <p>Role: {user.role}</p>
+          </div>
+        </ErrorBoundary>
+      );
+    }
+    ```
+    
+    Missing error boundaries in UI components can cause the entire application to crash when a single component encounters an error.
+    
+    To implement proper UI error handling:
+    - Use error boundaries to contain component errors
+    - Implement component-level error states
+    - Handle data fetching errors properly
+    - Provide fallback UI for error states
+    - Log UI errors for debugging
+    - Consider implementing retry mechanisms for transient errors
+  </Accordion>
+  
+  <Accordion title="Insecure Error Handling in Authentication" icon="user-lock">
+    ```javascript
+    // Anti-pattern: Insecure error handling in authentication
+    app.post('/api/login', (req, res) => {
+      const { username, password } = req.body;
+      
+      db.getUser(username)
+        .then(user => {
+          if (!user) {
+            // Revealing that the username doesn't exist
+            return res.status(401).json({ error: 'Username not found' });
+          }
+          
+          bcrypt.compare(password, user.password)
+            .then(match => {
+              if (!match) {
+                // Revealing that the password is incorrect
+                return res.status(401).json({ error: 'Incorrect password' });
+              }
+              
+              // Login successful
+              const token = generateToken(user);
+              res.json({ token });
+            });
+        })
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Secure error handling in authentication
+    app.post('/api/login', (req, res) => {
+      const { username, password } = req.body;
+      
+      db.getUser(username)
+        .then(user => {
+          if (!user) {
+            // Generic error message that doesn't reveal whether username exists
+            return res.status(401).json({ error: 'Invalid credentials' });
+          }
+          
+          bcrypt.compare(password, user.password)
+            .then(match => {
+              if (!match) {
+                // Generic error message that doesn't reveal whether password is incorrect
+                return res.status(401).json({ error: 'Invalid credentials' });
+              }
+              
+              // Login successful
+              const token = generateToken(user);
+              res.json({ token });
+            });
+        })
+        .catch(err => {
+          console.error('Login error:', err);
+          res.status(500).json({ error: 'An error occurred during authentication' });
+        });
+    });
+    ```
+    
+    Insecure error handling in authentication can reveal information about valid usernames or password policies, aiding attackers in credential stuffing or brute force attacks.
+    
+    To implement secure authentication error handling:
+    - Use generic error messages that don't reveal whether username or password is incorrect
+    - Implement consistent response times to prevent timing attacks
+    - Log authentication failures for security monitoring
+    - Implement rate limiting and account lockout policies
+    - Consider using multi-factor authentication
+    - Monitor for brute force and credential stuffing attacks
+  </Accordion>
+  
+  <Accordion title="Lack of Centralized Error Handling" icon="sitemap">
+    ```javascript
+    // Anti-pattern: Duplicated error handling logic
+    app.get('/api/users', (req, res) => {
+      db.getUsers()
+        .then(users => res.json(users))
+        .catch(err => {
+          console.error('Error fetching users:', err);
+          res.status(500).json({ error: 'An error occurred while fetching users' });
+        });
+    });
+    
+    app.get('/api/products', (req, res) => {
+      db.getProducts()
+        .then(products => res.json(products))
+        .catch(err => {
+          console.error('Error fetching products:', err);
+          res.status(500).json({ error: 'An error occurred while fetching products' });
+        });
+    });
+    
+    // Better approach: Centralized error handling
+    // Error handling middleware
+    function errorHandler(err, req, res, next) {
+      // Log the error
+      console.error(`Error processing ${req.method} ${req.path}:`, err);
+      
+      // Handle different types of errors
+      if (err.name === 'ValidationError') {
+        return res.status(400).json({ error: 'Validation error', details: err.details });
+      }
+      
+      if (err.name === 'UnauthorizedError') {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      if (err.name === 'ForbiddenError') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      // Generic error for unhandled cases
+      res.status(500).json({ error: 'An unexpected error occurred' });
+    }
+    
+    // Error wrapper for route handlers
+    function asyncHandler(fn) {
+      return (req, res, next) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+      };
+    }
+    
+    // Using the error wrapper
+    app.get('/api/users', asyncHandler(async (req, res) => {
+      const users = await db.getUsers();
+      res.json(users);
+    }));
+    
+    app.get('/api/products', asyncHandler(async (req, res) => {
+      const products = await db.getProducts();
+      res.json(products);
+    }));
+    
+    // Register error handling middleware last
+    app.use(errorHandler);
+    ```
+    
+    Lack of centralized error handling leads to duplicated code, inconsistent error responses, and potential security vulnerabilities.
+    
+    To implement centralized error handling:
+    - Create error handling middleware
+    - Define custom error types for different scenarios
+    - Implement consistent error logging and reporting
+    - Use error wrappers for async route handlers
+    - Ensure all errors are properly propagated to the central handler
+    - Implement different handling strategies for different error types
+  </Accordion>
+</AccordionGroup>

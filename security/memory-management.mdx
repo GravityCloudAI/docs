@@ -1,0 +1,634 @@
+---
+title: 'Memory Management Vulnerabilities'
+description: 'Memory management vulnerabilities occur when applications improperly handle memory allocation, deallocation, or access, potentially leading to crashes, data corruption, or code execution.'
+---
+
+<AccordionGroup>
+  <Accordion title="Memory Management Vulnerabilities Overview" icon="microchip">
+    Memory management vulnerabilities arise when applications fail to properly allocate, use, or deallocate memory. These vulnerabilities can lead to various security issues, including buffer overflows, use-after-free, memory leaks, and null pointer dereferences.
+    
+    Proper memory management is essential for maintaining the security and stability of applications, especially those written in languages that provide direct memory access like C and C++.
+  </Accordion>
+  
+  <Accordion title="Buffer Overflow" icon="memory">
+    ```c
+    // Anti-pattern: Buffer overflow vulnerability
+    void copy_user_input(char *input) {
+      char buffer[10];
+      
+      // No bounds checking
+      strcpy(buffer, input);
+      
+      // Process buffer...
+    }
+    
+    // Better approach: Preventing buffer overflow
+    void copy_user_input(char *input) {
+      char buffer[10];
+      
+      // Use strncpy to limit copy to buffer size
+      strncpy(buffer, input, sizeof(buffer) - 1);
+      
+      // Ensure null termination
+      buffer[sizeof(buffer) - 1] = '\0';
+      
+      // Process buffer...
+    }
+    ```
+    
+    Buffer overflow vulnerabilities occur when a program writes data beyond the allocated memory buffer, potentially overwriting adjacent memory and leading to crashes or code execution.
+    
+    To prevent buffer overflows:
+    - Use safe string functions (strncpy, strncat, snprintf)
+    - Validate input lengths before processing
+    - Use buffer size as an explicit parameter
+    - Consider using safer alternatives like std::string in C++
+    - Implement proper bounds checking
+    - Use static analysis tools to detect potential overflows
+  </Accordion>
+  
+  <Accordion title="Use-After-Free" icon="skull-crossbones">
+    ```c
+    // Anti-pattern: Use-after-free vulnerability
+    void process_data() {
+      char *data = (char *)malloc(100);
+      
+      // Fill data...
+      
+      if (some_error_condition) {
+        free(data);
+        return; // Early return
+      }
+      
+      // Potential use-after-free if error condition was met
+      process_buffer(data);
+      free(data);
+    }
+    
+    // Better approach: Preventing use-after-free
+    void process_data() {
+      char *data = (char *)malloc(100);
+      if (data == NULL) {
+        // Handle allocation failure
+        return;
+      }
+      
+      // Fill data...
+      
+      if (some_error_condition) {
+        free(data);
+        return; // Early return
+      }
+      
+      process_buffer(data);
+      free(data);
+      data = NULL; // Set pointer to NULL after freeing
+    }
+    ```
+    
+    Use-after-free vulnerabilities occur when a program continues to use memory after it has been freed, potentially leading to crashes or code execution.
+    
+    To prevent use-after-free:
+    - Set pointers to NULL after freeing
+    - Use smart pointers in C++ (std::unique_ptr, std::shared_ptr)
+    - Implement proper error handling
+    - Consider using memory safe languages
+    - Use static analysis tools to detect potential use-after-free issues
+    - Implement proper object lifecycle management
+  </Accordion>
+  
+  <Accordion title="Double Free" icon="trash-can">
+    ```c
+    // Anti-pattern: Double free vulnerability
+    void process_data(int condition) {
+      char *data = (char *)malloc(100);
+      
+      // Fill data...
+      
+      if (condition) {
+        // Process data in one way
+        process_type_a(data);
+        free(data);
+      } else {
+        // Process data in another way
+        process_type_b(data);
+        free(data);
+      }
+      
+      // Double free if cleanup function is called
+      cleanup(data); // This function also calls free(data)
+    }
+    
+    // Better approach: Preventing double free
+    void process_data(int condition) {
+      char *data = (char *)malloc(100);
+      if (data == NULL) {
+        // Handle allocation failure
+        return;
+      }
+      
+      // Fill data...
+      
+      if (condition) {
+        // Process data in one way
+        process_type_a(data);
+        free(data);
+        data = NULL; // Set to NULL after freeing
+      } else {
+        // Process data in another way
+        process_type_b(data);
+        free(data);
+        data = NULL; // Set to NULL after freeing
+      }
+      
+      // Cleanup function checks for NULL
+      cleanup(data); // This function checks if data is NULL before freeing
+    }
+    
+    // Improved cleanup function
+    void cleanup(char *ptr) {
+      if (ptr != NULL) {
+        free(ptr);
+      }
+    }
+    ```
+    
+    Double free vulnerabilities occur when a program attempts to free the same memory block twice, potentially corrupting memory management structures and leading to crashes or code execution.
+    
+    To prevent double free:
+    - Set pointers to NULL after freeing
+    - Check for NULL before freeing
+    - Use smart pointers in C++ (std::unique_ptr, std::shared_ptr)
+    - Implement proper error handling
+    - Consider using memory safe languages
+    - Use static analysis tools to detect potential double free issues
+  </Accordion>
+  
+  <Accordion title="Memory Leak" icon="droplet">
+    ```c
+    // Anti-pattern: Memory leak
+    void process_request() {
+      char *data = (char *)malloc(1024);
+      
+      // Fill data...
+      
+      if (validate_data(data) != SUCCESS) {
+        return; // Early return without freeing data
+      }
+      
+      process_data(data);
+      free(data);
+    }
+    
+    // Better approach: Preventing memory leak
+    void process_request() {
+      char *data = (char *)malloc(1024);
+      if (data == NULL) {
+        // Handle allocation failure
+        return;
+      }
+      
+      // Fill data...
+      
+      if (validate_data(data) != SUCCESS) {
+        free(data); // Free memory before returning
+        return;
+      }
+      
+      process_data(data);
+      free(data);
+    }
+    ```
+    
+    Memory leaks occur when a program allocates memory but fails to free it when no longer needed, potentially leading to resource exhaustion and denial of service.
+    
+    To prevent memory leaks:
+    - Ensure all allocated memory is freed
+    - Use smart pointers in C++ (std::unique_ptr, std::shared_ptr)
+    - Implement proper error handling with cleanup
+    - Consider using memory safe languages with garbage collection
+    - Use static analysis tools to detect potential memory leaks
+    - Implement proper resource management patterns (RAII in C++)
+  </Accordion>
+  
+  <Accordion title="Null Pointer Dereference" icon="circle-exclamation">
+    ```c
+    // Anti-pattern: Null pointer dereference
+    void process_data(char *data) {
+      // No null check
+      strcpy(buffer, data); // Crash if data is NULL
+      
+      // Process buffer...
+    }
+    
+    // Better approach: Preventing null pointer dereference
+    void process_data(char *data) {
+      // Check for NULL before using pointer
+      if (data == NULL) {
+        // Handle null pointer case
+        return;
+      }
+      
+      strcpy(buffer, data);
+      
+      // Process buffer...
+    }
+    ```
+    
+    Null pointer dereference vulnerabilities occur when a program attempts to access memory through a NULL pointer, leading to crashes or potential security issues.
+    
+    To prevent null pointer dereferences:
+    - Check pointers for NULL before using them
+    - Initialize pointers to NULL when declared
+    - Use defensive programming techniques
+    - Consider using references instead of pointers in C++
+    - Use static analysis tools to detect potential null pointer issues
+    - Implement proper error handling
+  </Accordion>
+  
+  <Accordion title="Integer Overflow" icon="calculator">
+    ```c
+    // Anti-pattern: Integer overflow leading to buffer overflow
+    void allocate_buffer(size_t size) {
+      size_t buffer_size = size + 10; // Can overflow if size is close to SIZE_MAX
+      char *buffer = (char *)malloc(buffer_size);
+      
+      // Use buffer...
+      
+      free(buffer);
+    }
+    
+    // Better approach: Preventing integer overflow
+    void allocate_buffer(size_t size) {
+      // Check for potential overflow
+      if (size > SIZE_MAX - 10) {
+        // Handle overflow case
+        return;
+      }
+      
+      size_t buffer_size = size + 10;
+      char *buffer = (char *)malloc(buffer_size);
+      
+      if (buffer == NULL) {
+        // Handle allocation failure
+        return;
+      }
+      
+      // Use buffer...
+      
+      free(buffer);
+    }
+    ```
+    
+    Integer overflow vulnerabilities occur when arithmetic operations produce a result that exceeds the maximum value for the integer type, potentially leading to incorrect behavior or security issues.
+    
+    To prevent integer overflows:
+    - Check for potential overflows before performing arithmetic
+    - Use appropriate integer types for the expected range of values
+    - Consider using safe integer libraries
+    - Implement proper bounds checking
+    - Use static analysis tools to detect potential integer overflow issues
+    - Consider using languages with built-in overflow protection
+  </Accordion>
+  
+  <Accordion title="Uninitialized Memory Use" icon="triangle-exclamation">
+    ```c
+    // Anti-pattern: Using uninitialized memory
+    void process_data() {
+      char buffer[100];
+      
+      // No initialization
+      
+      send_data(buffer, 100); // Sending uninitialized data
+    }
+    
+    // Better approach: Initializing memory before use
+    void process_data() {
+      char buffer[100];
+      
+      // Initialize buffer
+      memset(buffer, 0, sizeof(buffer));
+      
+      // Now it's safe to use buffer
+      send_data(buffer, 100);
+    }
+    ```
+    
+    Uninitialized memory use vulnerabilities occur when a program uses memory that has not been initialized, potentially leading to information disclosure or unpredictable behavior.
+    
+    To prevent uninitialized memory use:
+    - Initialize variables when declared
+    - Use memset or similar functions to initialize buffers
+    - Use static analysis tools to detect potential uninitialized memory issues
+    - Consider using languages with automatic initialization
+    - Implement proper error handling
+    - Be aware of compiler optimizations that might affect initialization
+  </Accordion>
+  
+  <Accordion title="Format String Vulnerability" icon="percent">
+    ```c
+    // Anti-pattern: Format string vulnerability
+    void log_message(char *user_input) {
+      printf(user_input); // User can control format string
+    }
+    
+    // Better approach: Preventing format string vulnerability
+    void log_message(char *user_input) {
+      printf("%s", user_input); // Format string is fixed
+    }
+    ```
+    
+    Format string vulnerabilities occur when user input is used as a format string in functions like printf, potentially leading to information disclosure or code execution.
+    
+    To prevent format string vulnerabilities:
+    - Never use user input as a format string
+    - Use a fixed format string with appropriate placeholders
+    - Consider using safer alternatives like puts for simple string output
+    - Use static analysis tools to detect potential format string issues
+    - Implement proper input validation
+    - Consider using languages with safer string handling
+  </Accordion>
+  
+  <Accordion title="Out-of-bounds Read" icon="book-open">
+    ```c
+    // Anti-pattern: Out-of-bounds read
+    void process_array(int *array, int size, int index) {
+      // No bounds checking
+      int value = array[index]; // Can read out of bounds if index >= size
+      
+      // Process value...
+    }
+    
+    // Better approach: Preventing out-of-bounds read
+    void process_array(int *array, int size, int index) {
+      // Check bounds before accessing array
+      if (index < 0 || index >= size) {
+        // Handle invalid index
+        return;
+      }
+      
+      int value = array[index];
+      
+      // Process value...
+    }
+    ```
+    
+    Out-of-bounds read vulnerabilities occur when a program reads memory beyond the bounds of an allocated buffer, potentially leading to information disclosure.
+    
+    To prevent out-of-bounds reads:
+    - Implement proper bounds checking
+    - Validate indices before array access
+    - Consider using safe array alternatives (std::vector in C++)
+    - Use static analysis tools to detect potential out-of-bounds issues
+    - Implement proper error handling
+    - Consider using memory safe languages
+  </Accordion>
+  
+  <Accordion title="Out-of-bounds Write" icon="pen-to-square">
+    ```c
+    // Anti-pattern: Out-of-bounds write
+    void update_array(int *array, int size, int index, int value) {
+      // No bounds checking
+      array[index] = value; // Can write out of bounds if index >= size
+    }
+    
+    // Better approach: Preventing out-of-bounds write
+    void update_array(int *array, int size, int index, int value) {
+      // Check bounds before accessing array
+      if (index < 0 || index >= size) {
+        // Handle invalid index
+        return;
+      }
+      
+      array[index] = value;
+    }
+    ```
+    
+    Out-of-bounds write vulnerabilities occur when a program writes memory beyond the bounds of an allocated buffer, potentially leading to memory corruption or code execution.
+    
+    To prevent out-of-bounds writes:
+    - Implement proper bounds checking
+    - Validate indices before array access
+    - Consider using safe array alternatives (std::vector in C++)
+    - Use static analysis tools to detect potential out-of-bounds issues
+    - Implement proper error handling
+    - Consider using memory safe languages
+  </Accordion>
+  
+  <Accordion title="Stack Overflow" icon="layer-group">
+    ```c
+    // Anti-pattern: Stack overflow vulnerability
+    void recursive_function(int n) {
+      char large_buffer[10000]; // Large stack allocation
+      
+      // No base case or insufficient base case
+      if (n > 0) {
+        recursive_function(n - 1);
+      }
+    }
+    
+    // Better approach: Preventing stack overflow
+    void recursive_function(int n) {
+      // Limit recursion depth
+      if (n > 100) {
+        // Handle excessive recursion
+        return;
+      }
+      
+      // Use smaller buffers or heap allocation for large buffers
+      char *large_buffer = (char *)malloc(10000);
+      if (large_buffer == NULL) {
+        // Handle allocation failure
+        return;
+      }
+      
+      // Proper base case
+      if (n > 0) {
+        recursive_function(n - 1);
+      }
+      
+      free(large_buffer);
+    }
+    ```
+    
+    Stack overflow vulnerabilities occur when a program exceeds the allocated stack space, typically due to excessive recursion or large stack allocations, potentially leading to crashes or security issues.
+    
+    To prevent stack overflows:
+    - Limit recursion depth
+    - Use iteration instead of recursion when possible
+    - Allocate large buffers on the heap instead of the stack
+    - Implement proper base cases for recursive functions
+    - Consider using tail recursion optimization
+    - Be aware of platform-specific stack size limitations
+  </Accordion>
+  
+  <Accordion title="Heap Overflow" icon="database">
+    ```c
+    // Anti-pattern: Heap overflow vulnerability
+    void copy_data(char *src, int src_len) {
+      char *dest = (char *)malloc(10);
+      
+      // No bounds checking
+      memcpy(dest, src, src_len); // Can overflow if src_len > 10
+      
+      // Process dest...
+      
+      free(dest);
+    }
+    
+    // Better approach: Preventing heap overflow
+    void copy_data(char *src, int src_len) {
+      // Allocate sufficient memory
+      char *dest = (char *)malloc(src_len);
+      if (dest == NULL) {
+        // Handle allocation failure
+        return;
+      }
+      
+      // Safe copy with proper size
+      memcpy(dest, src, src_len);
+      
+      // Process dest...
+      
+      free(dest);
+    }
+    ```
+    
+    Heap overflow vulnerabilities occur when a program writes beyond the bounds of a heap-allocated buffer, potentially corrupting heap structures and leading to crashes or code execution.
+    
+    To prevent heap overflows:
+    - Allocate sufficient memory for the expected data
+    - Implement proper bounds checking
+    - Use safe memory functions with explicit sizes
+    - Validate input sizes before processing
+    - Use static analysis tools to detect potential heap overflow issues
+    - Consider using memory safe languages
+  </Accordion>
+  
+  <Accordion title="Memory Disclosure" icon="eye">
+    ```c
+    // Anti-pattern: Memory disclosure vulnerability
+    void send_data(int fd) {
+      char buffer[100];
+      
+      // Partial initialization
+      strncpy(buffer, "Header: ", 8);
+      
+      // Send entire buffer including uninitialized portion
+      send(fd, buffer, 100, 0);
+    }
+    
+    // Better approach: Preventing memory disclosure
+    void send_data(int fd) {
+      char buffer[100];
+      
+      // Initialize entire buffer
+      memset(buffer, 0, sizeof(buffer));
+      
+      // Set data
+      strncpy(buffer, "Header: ", 8);
+      
+      // Only send initialized portion or fully initialized buffer
+      send(fd, buffer, strlen(buffer), 0);
+    }
+    ```
+    
+    Memory disclosure vulnerabilities occur when a program exposes uninitialized or sensitive memory to unauthorized parties, potentially leading to information leakage.
+    
+    To prevent memory disclosure:
+    - Initialize memory before use
+    - Only send or expose initialized portions of buffers
+    - Clear sensitive data after use
+    - Implement proper bounds checking
+    - Use static analysis tools to detect potential memory disclosure issues
+    - Consider using memory safe languages
+  </Accordion>
+  
+  <Accordion title="Dangling Pointer" icon="ghost">
+    ```c
+    // Anti-pattern: Dangling pointer vulnerability
+    char *get_message() {
+      char buffer[100];
+      
+      strcpy(buffer, "Hello, World!");
+      
+      return buffer; // Returning pointer to stack memory
+    }
+    
+    // Better approach: Preventing dangling pointer
+    char *get_message() {
+      // Allocate memory that persists beyond function scope
+      char *buffer = (char *)malloc(100);
+      if (buffer == NULL) {
+        // Handle allocation failure
+        return NULL;
+      }
+      
+      strcpy(buffer, "Hello, World!");
+      
+      return buffer; // Caller is responsible for freeing
+    }
+    
+    // Or even better, use a safer approach with output parameter
+    void get_message(char *out_buffer, size_t buffer_size) {
+      if (out_buffer == NULL || buffer_size == 0) {
+        return;
+      }
+      
+      strncpy(out_buffer, "Hello, World!", buffer_size - 1);
+      out_buffer[buffer_size - 1] = '\0'; // Ensure null termination
+    }
+    ```
+    
+    Dangling pointer vulnerabilities occur when a program continues to use a pointer after the memory it points to has been deallocated or gone out of scope, potentially leading to crashes or security issues.
+    
+    To prevent dangling pointers:
+    - Set pointers to NULL after freeing
+    - Avoid returning pointers to stack memory
+    - Use smart pointers in C++ (std::unique_ptr, std::shared_ptr)
+    - Implement proper object lifecycle management
+    - Use static analysis tools to detect potential dangling pointer issues
+    - Consider using memory safe languages
+  </Accordion>
+  
+  <Accordion title="Memory Corruption" icon="bug">
+    ```c
+    // Anti-pattern: Memory corruption vulnerability
+    struct User {
+      char name[10];
+      int admin;
+    };
+    
+    void set_user_name(struct User *user, char *name) {
+      // No bounds checking
+      strcpy(user->name, name); // Can overflow into admin field
+    }
+    
+    // Better approach: Preventing memory corruption
+    struct User {
+      char name[10];
+      int admin;
+    };
+    
+    void set_user_name(struct User *user, char *name) {
+      if (user == NULL || name == NULL) {
+        return;
+      }
+      
+      // Safe copy with size limit
+      strncpy(user->name, name, sizeof(user->name) - 1);
+      user->name[sizeof(user->name) - 1] = '\0'; // Ensure null termination
+    }
+    ```
+    
+    Memory corruption vulnerabilities occur when a program improperly modifies memory, potentially leading to crashes, data corruption, or security issues.
+    
+    To prevent memory corruption:
+    - Implement proper bounds checking
+    - Use safe memory functions with explicit sizes
+    - Validate input before processing
+    - Consider using memory safe languages
+    - Use static analysis tools to detect potential memory corruption issues
+    - Implement proper error handling
+  </Accordion>
+</AccordionGroup>

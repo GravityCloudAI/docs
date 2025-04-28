@@ -1,0 +1,725 @@
+---
+title: 'Input Validation Vulnerabilities'
+description: 'Input validation vulnerabilities occur when applications fail to properly validate, filter, or sanitize user-supplied data, potentially leading to security breaches.'
+---
+
+<AccordionGroup>
+  <Accordion title="Input Validation Vulnerabilities Overview" icon="shield-xmark">
+    Input validation is the process of verifying that user-supplied data meets the expected format, type, and range before processing it. Inadequate input validation is a root cause of many security vulnerabilities, as it allows attackers to inject malicious data that can manipulate application behavior.
+    
+    These vulnerabilities can lead to various attacks, including injection attacks, cross-site scripting, buffer overflows, and more. Implementing proper input validation is a fundamental security practice that helps prevent a wide range of security issues.
+  </Accordion>
+  
+  <Accordion title="Missing Input Validation" icon="triangle-exclamation">
+    ```javascript
+    // Anti-pattern: Missing input validation
+    app.post('/api/users', (req, res) => {
+      const { username, email, age } = req.body;
+      
+      // No validation before processing
+      db.createUser({ username, email, age })
+        .then(user => res.json(user))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Proper input validation
+    app.post('/api/users', (req, res) => {
+      const { username, email, age } = req.body;
+      
+      // Validate input
+      if (!username || typeof username !== 'string' || username.length < 3 || username.length > 50) {
+        return res.status(400).json({ error: 'Invalid username' });
+      }
+      
+      if (!email || !isValidEmail(email)) {
+        return res.status(400).json({ error: 'Invalid email' });
+      }
+      
+      if (!Number.isInteger(age) || age < 13 || age > 120) {
+        return res.status(400).json({ error: 'Invalid age' });
+      }
+      
+      db.createUser({ username, email, age })
+        .then(user => res.json(user))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+    ```
+    
+    Missing input validation allows attackers to submit unexpected or malicious data that can lead to various security vulnerabilities.
+    
+    To implement proper input validation:
+    - Validate all user inputs for type, length, format, and range
+    - Implement both client-side and server-side validation
+    - Use validation libraries or frameworks
+    - Apply the principle of positive validation (allowlist approach)
+    - Implement proper error handling for invalid inputs
+  </Accordion>
+  
+  <Accordion title="Relying Solely on Client-Side Validation" icon="browser">
+    ```javascript
+    // Anti-pattern: Relying solely on client-side validation
+    // Client-side code
+    function validateForm() {
+      const username = document.getElementById('username').value;
+      const email = document.getElementById('email').value;
+      
+      if (username.length < 3) {
+        alert('Username must be at least 3 characters');
+        return false;
+      }
+      
+      if (!isValidEmail(email)) {
+        alert('Invalid email address');
+        return false;
+      }
+      
+      return true;
+    }
+    
+    // Server-side code with no validation
+    app.post('/api/users', (req, res) => {
+      const { username, email } = req.body;
+      
+      // No server-side validation
+      db.createUser({ username, email })
+        .then(user => res.json(user))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Implementing both client-side and server-side validation
+    // Client-side code remains the same
+    
+    // Server-side code with validation
+    app.post('/api/users', (req, res) => {
+      const { username, email } = req.body;
+      
+      // Server-side validation
+      if (!username || typeof username !== 'string' || username.length < 3) {
+        return res.status(400).json({ error: 'Invalid username' });
+      }
+      
+      if (!email || !isValidEmail(email)) {
+        return res.status(400).json({ error: 'Invalid email' });
+      }
+      
+      db.createUser({ username, email })
+        .then(user => res.json(user))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Relying solely on client-side validation is dangerous because client-side code can be modified or bypassed by attackers.
+    
+    To implement proper validation:
+    - Always implement server-side validation
+    - Use client-side validation for user experience
+    - Treat all client-side data as untrusted
+    - Implement consistent validation logic on both client and server
+    - Consider using validation libraries that work on both client and server
+  </Accordion>
+  
+  <Accordion title="Improper Handling of Special Characters" icon="code">
+    ```javascript
+    // Anti-pattern: Improper handling of special characters
+    function createUser(username) {
+      // Directly using user input in a query
+      const query = `INSERT INTO users (username) VALUES ('${username}')`;
+      return db.execute(query);
+    }
+    
+    // Better approach: Proper handling of special characters
+    function createUser(username) {
+      // Using parameterized queries
+      const query = 'INSERT INTO users (username) VALUES (?)';
+      return db.execute(query, [username]);
+    }
+    ```
+    
+    Improper handling of special characters can lead to various injection attacks, including SQL injection, XSS, and command injection.
+    
+    To properly handle special characters:
+    - Use parameterized queries for database operations
+    - Implement context-specific encoding (HTML, URL, JavaScript, etc.)
+    - Use template engines that automatically escape output
+    - Validate input against allowlists of permitted characters
+    - Consider using libraries for specific validation needs (e.g., email, phone numbers)
+  </Accordion>
+  
+  <Accordion title="Insufficient Type Checking" icon="code">
+    ```javascript
+    // Anti-pattern: Insufficient type checking
+    function calculateTotal(quantity, price) {
+      // No type checking
+      return quantity * price;
+    }
+    
+    // Usage
+    const total = calculateTotal('10', '5.99'); // Returns '10' repeated 5.99 times
+    
+    // Better approach: Proper type checking
+    function calculateTotal(quantity, price) {
+      // Convert to appropriate types and validate
+      const parsedQuantity = parseInt(quantity, 10);
+      const parsedPrice = parseFloat(price);
+      
+      if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+        throw new Error('Invalid quantity');
+      }
+      
+      if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        throw new Error('Invalid price');
+      }
+      
+      return parsedQuantity * parsedPrice;
+    }
+    ```
+    
+    Insufficient type checking can lead to unexpected behavior, type confusion vulnerabilities, and other security issues.
+    
+    To implement proper type checking:
+    - Validate the type of all user inputs
+    - Convert inputs to the expected types when necessary
+    - Use strict equality operators (===, !==)
+    - Consider using TypeScript or other statically typed languages
+    - Implement proper error handling for type conversion failures
+  </Accordion>
+  
+  <Accordion title="Improper Numeric Validation" icon="calculator">
+    ```javascript
+    // Anti-pattern: Improper numeric validation
+    function withdrawMoney(account, amount) {
+      // No proper numeric validation
+      if (amount > 0) {
+        account.balance -= amount;
+        return { success: true, newBalance: account.balance };
+      }
+      
+      return { success: false, error: 'Invalid amount' };
+    }
+    
+    // Better approach: Proper numeric validation
+    function withdrawMoney(account, amount) {
+      // Convert to number and validate
+      const parsedAmount = parseFloat(amount);
+      
+      if (isNaN(parsedAmount)) {
+        return { success: false, error: 'Amount must be a number' };
+      }
+      
+      if (parsedAmount <= 0) {
+        return { success: false, error: 'Amount must be positive' };
+      }
+      
+      if (parsedAmount > account.balance) {
+        return { success: false, error: 'Insufficient funds' };
+      }
+      
+      // Use toFixed to handle floating point precision issues
+      account.balance = (account.balance - parsedAmount).toFixed(2);
+      return { success: true, newBalance: account.balance };
+    }
+    ```
+    
+    Improper numeric validation can lead to various issues, including financial calculation errors, buffer overflows, or denial-of-service attacks.
+    
+    To implement proper numeric validation:
+    - Validate that inputs are valid numbers
+    - Check for appropriate ranges and boundaries
+    - Handle floating-point precision issues
+    - Consider using specialized libraries for financial calculations
+    - Implement proper error handling for invalid numeric inputs
+  </Accordion>
+  
+  <Accordion title="Missing File Type Validation" icon="file">
+    ```javascript
+    // Anti-pattern: Missing file type validation
+    app.post('/upload', (req, res) => {
+      const file = req.files.file;
+      const path = `./uploads/${file.name}`;
+      
+      // No file type validation
+      file.mv(path, (err) => {
+        if (err) {
+          return res.status(500).send(err);
+        }
+        
+        res.send('File uploaded!');
+      });
+    });
+    
+    // Better approach: Proper file type validation
+    app.post('/upload', (req, res) => {
+      const file = req.files.file;
+      
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        return res.status(400).send('Invalid file type');
+      }
+      
+      // Validate file extension
+      const extension = path.extname(file.name).toLowerCase();
+      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif'];
+      if (!allowedExtensions.includes(extension)) {
+        return res.status(400).send('Invalid file extension');
+      }
+      
+      // Generate a secure filename
+      const secureFilename = `${Date.now()}-${Math.random().toString(36).substring(2)}${extension}`;
+      const filePath = `./uploads/${secureFilename}`;
+      
+      file.mv(filePath, (err) => {
+        if (err) {
+          return res.status(500).send(err);
+        }
+        
+        res.send('File uploaded!');
+      });
+    });
+    ```
+    
+    Missing file type validation can allow attackers to upload malicious files, potentially leading to code execution or other security vulnerabilities.
+    
+    To implement proper file type validation:
+    - Validate both the MIME type and file extension
+    - Use an allowlist of permitted file types
+    - Consider validating file content (magic bytes)
+    - Generate secure filenames to prevent path traversal
+    - Implement file size limits
+    - Store uploaded files outside the web root
+    - Consider using a CDN or dedicated file storage service
+  </Accordion>
+  
+  <Accordion title="Improper Validation of Redirects and Forwards" icon="arrow-right-to-bracket">
+    ```javascript
+    // Anti-pattern: Improper validation of redirects
+    app.get('/redirect', (req, res) => {
+      const url = req.query.url;
+      
+      // No validation of redirect URL
+      res.redirect(url);
+    });
+    
+    // Better approach: Proper validation of redirects
+    app.get('/redirect', (req, res) => {
+      const url = req.query.url;
+      
+      // Validate URL
+      if (!url) {
+        return res.redirect('/default-page');
+      }
+      
+      // Option 1: Allowlist of permitted domains
+      const allowedDomains = ['example.com', 'subdomain.example.com'];
+      try {
+        const parsedUrl = new URL(url);
+        if (!allowedDomains.includes(parsedUrl.hostname)) {
+          return res.redirect('/default-page');
+        }
+      } catch (error) {
+        // Invalid URL
+        return res.redirect('/default-page');
+      }
+      
+      // Option 2: Only allow relative URLs
+      // if (url.startsWith('http://') || url.startsWith('https://')) {
+      //   return res.redirect('/default-page');
+      // }
+      
+      res.redirect(url);
+    });
+    ```
+    
+    Improper validation of redirects and forwards can lead to open redirect vulnerabilities, which can be used for phishing attacks or other malicious purposes.
+    
+    To implement proper validation of redirects:
+    - Validate redirect URLs against an allowlist
+    - Consider using relative URLs instead of absolute URLs
+    - Implement proper URL parsing and validation
+    - Use indirect reference maps for redirects
+    - Implement proper error handling for invalid redirect URLs
+  </Accordion>
+  
+  <Accordion title="Insufficient Validation of JSON Data" icon="brackets-curly">
+    ```javascript
+    // Anti-pattern: Insufficient validation of JSON data
+    app.post('/api/process', (req, res) => {
+      const data = req.body;
+      
+      // No schema validation
+      processData(data)
+        .then(result => res.json(result))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Proper JSON schema validation
+    const Ajv = require('ajv');
+    const ajv = new Ajv();
+    
+    // Define JSON schema
+    const schema = {
+      type: 'object',
+      properties: {
+        name: { type: 'string', minLength: 1, maxLength: 100 },
+        email: { type: 'string', format: 'email' },
+        age: { type: 'integer', minimum: 13, maximum: 120 }
+      },
+      required: ['name', 'email'],
+      additionalProperties: false
+    };
+    
+    // Compile schema
+    const validate = ajv.compile(schema);
+    
+    app.post('/api/process', (req, res) => {
+      const data = req.body;
+      
+      // Validate against schema
+      const valid = validate(data);
+      if (!valid) {
+        return res.status(400).json({ 
+          error: 'Invalid data', 
+          details: validate.errors 
+        });
+      }
+      
+      processData(data)
+        .then(result => res.json(result))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Insufficient validation of JSON data can lead to various security vulnerabilities, including injection attacks, denial-of-service, or application logic manipulation.
+    
+    To implement proper JSON validation:
+    - Use JSON schema validation
+    - Validate structure, types, and value ranges
+    - Implement protection against oversized payloads
+    - Consider using validation libraries (Ajv, Joi, Yup)
+    - Implement proper error handling for invalid JSON data
+  </Accordion>
+  
+  <Accordion title="Improper Validation of XML Data" icon="code">
+    ```java
+    // Anti-pattern: Improper validation of XML data
+    public void processXML(String xmlData) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document document = builder.parse(new InputSource(new StringReader(xmlData)));
+        
+        // Process XML...
+    }
+    
+    // Better approach: Proper XML validation
+    public void processXML(String xmlData) throws Exception {
+        // Create a secure DocumentBuilderFactory
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        
+        // Disable external entities and DTDs
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setExpandEntityReferences(false);
+        
+        // Validate against schema if needed
+        factory.setValidating(true);
+        factory.setNamespaceAware(true);
+        
+        SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+        factory.setSchema(schemaFactory.newSchema(new File("schema.xsd")));
+        
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        builder.setErrorHandler(new XMLErrorHandler());
+        
+        Document document = builder.parse(new InputSource(new StringReader(xmlData)));
+        
+        // Process XML...
+    }
+    ```
+    
+    Improper validation of XML data can lead to various vulnerabilities, including XML External Entity (XXE) attacks, billion laughs attacks, or injection vulnerabilities.
+    
+    To implement proper XML validation:
+    - Disable external entities and DTDs
+    - Validate against a schema
+    - Implement protection against oversized payloads
+    - Use secure XML parsing libraries
+    - Consider using alternatives to XML (JSON, YAML) for less complex needs
+  </Accordion>
+  
+  <Accordion title="Insufficient Validation of Date and Time Inputs" icon="calendar">
+    ```javascript
+    // Anti-pattern: Insufficient validation of date inputs
+    function processDateRange(startDate, endDate) {
+      // No proper validation
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      return getDataForDateRange(start, end);
+    }
+    
+    // Better approach: Proper date validation
+    function processDateRange(startDate, endDate) {
+      // Parse and validate dates
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      // Check if dates are valid
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      
+      // Check if start date is before end date
+      if (start > end) {
+        throw new Error('Start date must be before end date');
+      }
+      
+      // Check if dates are within acceptable range
+      const now = new Date();
+      const oneYearAgo = new Date(now);
+      oneYearAgo.setFullYear(now.getFullYear() - 1);
+      
+      if (start < oneYearAgo) {
+        throw new Error('Start date cannot be more than one year in the past');
+      }
+      
+      if (end > now) {
+        throw new Error('End date cannot be in the future');
+      }
+      
+      return getDataForDateRange(start, end);
+    }
+    ```
+    
+    Insufficient validation of date and time inputs can lead to various issues, including application logic errors, denial-of-service attacks, or data retrieval problems.
+    
+    To implement proper date and time validation:
+    - Validate that inputs are valid dates
+    - Check for appropriate date ranges
+    - Consider time zones when processing dates
+    - Use date libraries (Moment.js, date-fns, Luxon) for complex date operations
+    - Implement proper error handling for invalid date inputs
+  </Accordion>
+  
+  <Accordion title="Improper Validation of Email Addresses" icon="envelope">
+    ```javascript
+    // Anti-pattern: Improper validation of email addresses
+    function isValidEmail(email) {
+      // Overly simplistic email validation
+      return email.includes('@');
+    }
+    
+    // Better approach: Proper email validation
+    function isValidEmail(email) {
+      // More comprehensive regex for email validation
+      const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+      
+      if (!emailRegex.test(email)) {
+        return false;
+      }
+      
+      // Check length constraints
+      if (email.length > 254) {
+        return false;
+      }
+      
+      // Additional checks if needed
+      const parts = email.split('@');
+      if (parts[0].length > 64) {
+        return false;
+      }
+      
+      return true;
+    }
+    
+    // Even better: Using a validation library
+    const validator = require('validator');
+    
+    function isValidEmail(email) {
+      return validator.isEmail(email);
+    }
+    ```
+    
+    Improper validation of email addresses can lead to various issues, including communication failures, account security problems, or injection vulnerabilities.
+    
+    To implement proper email validation:
+    - Use comprehensive regex patterns or validation libraries
+    - Check length constraints
+    - Consider implementing two-step verification for critical applications
+    - Be aware of internationalized email addresses (IDN)
+    - Consider using email verification services for critical applications
+  </Accordion>
+  
+  <Accordion title="Missing Cross-Site Request Forgery (CSRF) Protection" icon="shield-xmark">
+    ```javascript
+    // Anti-pattern: Missing CSRF protection
+    app.post('/api/change-password', (req, res) => {
+      const { currentPassword, newPassword } = req.body;
+      
+      // No CSRF token validation
+      changePassword(req.user.id, currentPassword, newPassword)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(400).json({ error: err.message }));
+    });
+    
+    // Better approach: Implementing CSRF protection
+    const csrf = require('csurf');
+    const csrfProtection = csrf({ cookie: true });
+    
+    // Generate CSRF token
+    app.get('/change-password', csrfProtection, (req, res) => {
+      res.render('change-password', { csrfToken: req.csrfToken() });
+    });
+    
+    // Validate CSRF token
+    app.post('/api/change-password', csrfProtection, (req, res) => {
+      const { currentPassword, newPassword } = req.body;
+      
+      changePassword(req.user.id, currentPassword, newPassword)
+        .then(() => res.json({ success: true }))
+        .catch(err => res.status(400).json({ error: err.message }));
+    });
+    ```
+    
+    Missing CSRF protection can allow attackers to trick users into performing unwanted actions on a website where they're authenticated.
+    
+    To implement CSRF protection:
+    - Use CSRF tokens for state-changing operations
+    - Implement proper token validation
+    - Use the SameSite cookie attribute
+    - Consider using CSRF protection middleware
+    - Implement proper error handling for CSRF validation failures
+  </Accordion>
+  
+  <Accordion title="Improper Validation of URL Parameters" icon="link">
+    ```javascript
+    // Anti-pattern: Improper validation of URL parameters
+    app.get('/api/user/:id', (req, res) => {
+      const userId = req.params.id;
+      
+      // No validation of user ID
+      db.getUser(userId)
+        .then(user => res.json(user))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Proper validation of URL parameters
+    app.get('/api/user/:id', (req, res) => {
+      const userId = req.params.id;
+      
+      // Validate user ID format
+      if (!/^[0-9a-f]{24}$/.test(userId)) { // Example for MongoDB ObjectId
+        return res.status(400).json({ error: 'Invalid user ID format' });
+      }
+      
+      db.getUser(userId)
+        .then(user => {
+          if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+          }
+          
+          res.json(user);
+        })
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    
+    Improper validation of URL parameters can lead to various vulnerabilities, including injection attacks, information disclosure, or application logic manipulation.
+    
+    To implement proper URL parameter validation:
+    - Validate parameter types, formats, and ranges
+    - Use path parameter validation in your web framework
+    - Implement proper error handling for invalid parameters
+    - Consider using parameter validation middleware
+    - Log suspicious parameter manipulation attempts
+  </Accordion>
+  
+  <Accordion title="Insufficient Validation of File Uploads" icon="file-arrow-up">
+    ```javascript
+    // Anti-pattern: Insufficient validation of file uploads
+    app.post('/upload', (req, res) => {
+      const file = req.files.file;
+      const path = `./uploads/${file.name}`;
+      
+      // Minimal validation
+      file.mv(path, (err) => {
+        if (err) {
+          return res.status(500).send(err);
+        }
+        
+        res.send('File uploaded!');
+      });
+    });
+    
+    // Better approach: Comprehensive file upload validation
+    app.post('/upload', (req, res) => {
+      // Check if file exists
+      if (!req.files || !req.files.file) {
+        return res.status(400).send('No file uploaded');
+      }
+      
+      const file = req.files.file;
+      
+      // Validate file size
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        return res.status(400).send('File too large (max 5MB)');
+      }
+      
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        return res.status(400).send('Invalid file type');
+      }
+      
+      // Validate file extension
+      const extension = path.extname(file.name).toLowerCase();
+      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif'];
+      if (!allowedExtensions.includes(extension)) {
+        return res.status(400).send('Invalid file extension');
+      }
+      
+      // Scan file content (example)
+      if (!isValidImageContent(file.data)) {
+        return res.status(400).send('Invalid image content');
+      }
+      
+      // Generate a secure filename
+      const secureFilename = `${Date.now()}-${Math.random().toString(36).substring(2)}${extension}`;
+      const filePath = `./uploads/${secureFilename}`;
+      
+      // Move file to uploads directory
+      file.mv(filePath, (err) => {
+        if (err) {
+          return res.status(500).send(err);
+        }
+        
+        // Save file metadata to database
+        saveFileMetadata({
+          originalName: file.name,
+          storedName: secureFilename,
+          mimeType: file.mimetype,
+          size: file.size,
+          uploadedBy: req.user.id
+        });
+        
+        res.send('File uploaded successfully');
+      });
+    });
+    ```
+    
+    Insufficient validation of file uploads can lead to various vulnerabilities, including code execution, denial-of-service attacks, or storage of malicious content.
+    
+    To implement proper file upload validation:
+    - Validate file size, type, and extension
+    - Generate secure filenames
+    - Scan file content when possible
+    - Store files outside the web root
+    - Implement proper access controls for uploaded files
+    - Consider using a CDN or dedicated file storage service
+  </Accordion>
+</AccordionGroup>

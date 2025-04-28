@@ -1,0 +1,1174 @@
+---
+title: 'I/O Bottlenecks'
+description: 'Anti-patterns related to input/output operations that can lead to performance issues.'
+---
+
+<AccordionGroup>
+  <Accordion title="I/O Bottlenecks Overview" icon="hard-drive">
+    Input/Output (I/O) operations are often the slowest part of an application, whether it's reading from or writing to files, databases, networks, or other external resources. Inefficient I/O patterns can lead to significant performance degradation, resource exhaustion, and poor user experience.
+    
+    Common I/O-related performance issues include:
+    - Blocking I/O in responsive applications
+    - Excessive disk access
+    - Inefficient network communication
+    - Poor resource management
+    - Unnecessary serialization/deserialization
+    - Improper buffering strategies
+    
+    This guide covers common anti-patterns related to I/O operations, along with best practices for optimizing I/O performance across different programming languages and application types.
+  </Accordion>
+  
+  <Accordion title="Blocking I/O in Responsive Applications" icon="stop">
+    ```java
+    // Anti-pattern: Blocking I/O in UI thread
+    public class FileProcessor {
+        public void processFileOnClick(String filePath) {
+            try {
+                // Blocking I/O operation on UI thread
+                byte[] fileContent = Files.readAllBytes(Paths.get(filePath));
+                String content = new String(fileContent, StandardCharsets.UTF_8);
+                
+                // Process content
+                processContent(content);
+                
+                // Update UI
+                updateUI("File processed successfully");
+            } catch (IOException e) {
+                updateUI("Error: " + e.getMessage());
+            }
+        }
+        
+        private void processContent(String content) {
+            // Process file content
+        }
+        
+        private void updateUI(String message) {
+            // Update UI with message
+        }
+    }
+    
+    // Better approach: Asynchronous I/O
+    public class AsyncFileProcessor {
+        private final ExecutorService executor = Executors.newCachedThreadPool();
+        
+        public void processFileOnClick(String filePath) {
+            // Update UI to show loading state
+            updateUI("Loading file...");
+            
+            // Perform I/O operation in background thread
+            CompletableFuture.supplyAsync(() -> {
+                try {
+                    byte[] fileContent = Files.readAllBytes(Paths.get(filePath));
+                    return new String(fileContent, StandardCharsets.UTF_8);
+                } catch (IOException e) {
+                    throw new CompletionException(e);
+                }
+            }, executor).thenApply(content -> {
+                // Process content in background thread
+                return processContent(content);
+            }).thenAccept(result -> {
+                // Update UI on UI thread
+                Platform.runLater(() -> updateUI("File processed successfully"));
+            }).exceptionally(e -> {
+                // Handle errors on UI thread
+                Platform.runLater(() -> updateUI("Error: " + e.getMessage()));
+                return null;
+            });
+        }
+        
+        private String processContent(String content) {
+            // Process file content
+            return "Processed: " + content.substring(0, Math.min(100, content.length()));
+        }
+        
+        private void updateUI(String message) {
+            // Update UI with message
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Blocking I/O in UI thread
+    function processFileOnClick(filePath) {
+      try {
+        // Blocking I/O operation on UI thread (Node.js synchronous API)
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        
+        // Process content
+        const result = processContent(fileContent);
+        
+        // Update UI
+        updateUI("File processed successfully");
+      } catch (error) {
+        updateUI("Error: " + error.message);
+      }
+    }
+    
+    // Better approach: Asynchronous I/O
+    async function processFileOnClick(filePath) {
+      // Update UI to show loading state
+      updateUI("Loading file...");
+      
+      try {
+        // Non-blocking I/O operation
+        const fileContent = await fs.promises.readFile(filePath, 'utf8');
+        
+        // Process content
+        const result = processContent(fileContent);
+        
+        // Update UI
+        updateUI("File processed successfully");
+      } catch (error) {
+        updateUI("Error: " + error.message);
+      }
+    }
+    
+    // Even better: With proper error handling and loading state
+    async function processFileOnClickWithErrorHandling(filePath) {
+      // Update UI to show loading state
+      updateUI("Loading file...");
+      
+      try {
+        // Non-blocking I/O operation with timeout
+        const fileContentPromise = fs.promises.readFile(filePath, 'utf8');
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('File read timed out')), 5000)
+        );
+        
+        const fileContent = await Promise.race([fileContentPromise, timeoutPromise]);
+        
+        // Process content
+        const result = await processContent(fileContent);
+        
+        // Update UI
+        updateUI("File processed successfully");
+      } catch (error) {
+        updateUI("Error: " + error.message);
+      } finally {
+        // Reset loading state if needed
+        resetLoadingState();
+      }
+    }
+    ```
+    
+    Performing blocking I/O operations on the main thread or UI thread can lead to unresponsive applications, poor user experience, and in some cases, application crashes or "Not Responding" states.
+    
+    To avoid blocking I/O in responsive applications:
+    - Use asynchronous I/O APIs (CompletableFuture, Promises, async/await)
+    - Offload I/O operations to background threads or worker pools
+    - Implement proper loading states and progress indicators
+    - Use reactive programming patterns for data flow
+    - Consider using non-blocking I/O libraries and frameworks
+    - Implement timeouts for I/O operations to prevent indefinite blocking
+    - Use proper error handling and recovery mechanisms
+    - Consider using event-driven architectures
+    - Batch small I/O operations when possible
+    - Use proper thread management and avoid thread leaks
+  </Accordion>
+  
+  <Accordion title="Inefficient File Reading Patterns" icon="file">
+    ```java
+    // Anti-pattern: Inefficient file reading
+    public List<String> readLinesInefficiently(String filePath) throws IOException {
+        List<String> lines = new ArrayList<>();
+        try (FileReader fr = new FileReader(filePath);
+             BufferedReader br = new BufferedReader(fr)) {
+            
+            // Reading one character at a time
+            StringBuilder line = new StringBuilder();
+            int c;
+            while ((c = br.read()) != -1) {
+                if (c == '\n') {
+                    lines.add(line.toString());
+                    line = new StringBuilder();
+                } else {
+                    line.append((char) c);
+                }
+            }
+            if (line.length() > 0) {
+                lines.add(line.toString());
+            }
+        }
+        return lines;
+    }
+    
+    // Better approach: Efficient file reading
+    public List<String> readLinesEfficiently(String filePath) throws IOException {
+        // Using built-in line reading and proper buffering
+        return Files.readAllLines(Paths.get(filePath), StandardCharsets.UTF_8);
+    }
+    
+    // For large files: Streaming approach
+    public void processLargeFile(String filePath) throws IOException {
+        // Stream lines instead of loading entire file into memory
+        try (Stream<String> lines = Files.lines(Paths.get(filePath), StandardCharsets.UTF_8)) {
+            lines.forEach(this::processLine);
+        }
+    }
+    
+    private void processLine(String line) {
+        // Process each line
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient file reading
+    function readLinesInefficiently(filePath) {
+      // Reading entire file into memory at once
+      const content = fs.readFileSync(filePath, 'utf8');
+      return content.split('\n');
+    }
+    
+    // Better approach: Streaming for large files
+    function processLargeFile(filePath) {
+      return new Promise((resolve, reject) => {
+        const lines = [];
+        
+        // Create a readable stream
+        const readStream = fs.createReadStream(filePath, { encoding: 'utf8' });
+        
+        // Use a line-by-line reader
+        const rl = readline.createInterface({
+          input: readStream,
+          crlfDelay: Infinity
+        });
+        
+        // Process each line as it's read
+        rl.on('line', (line) => {
+          processLine(line);
+        });
+        
+        rl.on('close', () => {
+          resolve();
+        });
+        
+        rl.on('error', (err) => {
+          reject(err);
+        });
+      });
+    }
+    
+    // Process each line
+    function processLine(line) {
+      // Process the line
+    }
+    ```
+    
+    Inefficient file reading patterns, such as reading one character at a time, using inappropriate buffer sizes, or loading entire large files into memory, can lead to poor performance and excessive memory usage.
+    
+    To optimize file reading:
+    - Use buffered I/O with appropriate buffer sizes
+    - Use built-in line reading utilities when reading text files
+    - Stream large files instead of loading them entirely into memory
+    - Use memory-mapped files for very large files with random access patterns
+    - Consider using specialized libraries for specific file formats
+    - Use appropriate character encodings and specify them explicitly
+    - Close resources properly using try-with-resources or equivalent patterns
+    - Consider parallel processing for large files when appropriate
+    - Use appropriate data structures for storing and processing file content
+    - Profile file I/O operations to identify bottlenecks
+  </Accordion>
+  
+  <Accordion title="Excessive Database Queries" icon="database">
+    ```java
+    // Anti-pattern: N+1 query problem
+    public List<OrderSummary> getOrderSummariesInefficiently() {
+        List<OrderSummary> summaries = new ArrayList<>();
+        
+        // First query to get all orders
+        List<Order> orders = orderRepository.findAll();
+        
+        for (Order order : orders) {
+            // Separate query for each order's items (N additional queries)
+            List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+            
+            // Separate query for each order's customer (N additional queries)
+            Customer customer = customerRepository.findById(order.getCustomerId());
+            
+            OrderSummary summary = new OrderSummary(order, items, customer);
+            summaries.add(summary);
+        }
+        
+        return summaries;
+    }
+    
+    // Better approach: Using joins and eager fetching
+    public List<OrderSummary> getOrderSummariesEfficiently() {
+        // Single query with joins to fetch orders, items, and customers
+        List<OrderData> orderData = orderRepository.findAllOrdersWithItemsAndCustomers();
+        
+        // Process the results
+        Map<Long, OrderSummary> summaryMap = new HashMap<>();
+        for (OrderData data : orderData) {
+            Long orderId = data.getOrderId();
+            if (!summaryMap.containsKey(orderId)) {
+                Order order = data.getOrder();
+                Customer customer = data.getCustomer();
+                summaryMap.put(orderId, new OrderSummary(order, new ArrayList<>(), customer));
+            }
+            
+            OrderItem item = data.getOrderItem();
+            if (item != null) {
+                summaryMap.get(orderId).getItems().add(item);
+            }
+        }
+        
+        return new ArrayList<>(summaryMap.values());
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: N+1 query problem
+    async function getOrderSummariesInefficiently() {
+      const summaries = [];
+      
+      // First query to get all orders
+      const orders = await Order.findAll();
+      
+      for (const order of orders) {
+        // Separate query for each order's items (N additional queries)
+        const items = await OrderItem.findAll({ where: { orderId: order.id } });
+        
+        // Separate query for each order's customer (N additional queries)
+        const customer = await Customer.findByPk(order.customerId);
+        
+        summaries.push({
+          order,
+          items,
+          customer
+        });
+      }
+      
+      return summaries;
+    }
+    
+    // Better approach: Using eager loading (with Sequelize ORM)
+    async function getOrderSummariesEfficiently() {
+      // Single query with eager loading to fetch orders, items, and customers
+      const orders = await Order.findAll({
+        include: [
+          { model: OrderItem },
+          { model: Customer }
+        ]
+      });
+      
+      // Transform the results
+      return orders.map(order => ({
+        order,
+        items: order.OrderItems,
+        customer: order.Customer
+      }));
+    }
+    ```
+    
+    Excessive database queries, particularly the N+1 query problem where a single query is followed by N additional queries (one for each result), can lead to significant performance degradation and database load.
+    
+    To optimize database queries:
+    - Use joins and eager loading to fetch related data in a single query
+    - Implement batch fetching for related entities
+    - Use appropriate indexing for frequently queried columns
+    - Consider using query caching for frequently accessed data
+    - Use database-specific optimizations (e.g., query hints)
+    - Implement pagination for large result sets
+    - Use projections to fetch only needed columns
+    - Consider denormalization for read-heavy workloads
+    - Monitor and analyze query performance using database tools
+    - Use connection pooling for efficient connection management
+  </Accordion>
+  
+  <Accordion title="Inefficient Network Communication" icon="network-wired">
+    ```java
+    // Anti-pattern: Inefficient network communication
+    public List<User> fetchUsersInefficiently() {
+        List<User> users = new ArrayList<>();
+        List<Long> userIds = getUserIds(); // Get list of user IDs to fetch
+        
+        // Make a separate HTTP request for each user
+        for (Long userId : userIds) {
+            // Create new HTTP client for each request
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.example.com/users/" + userId))
+                .build();
+            
+            try {
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 200) {
+                    User user = parseUser(response.body());
+                    users.add(user);
+                }
+            } catch (Exception e) {
+                // Handle exception
+            }
+        }
+        
+        return users;
+    }
+    
+    // Better approach: Batched requests and connection reuse
+    public List<User> fetchUsersEfficiently() {
+        List<Long> userIds = getUserIds(); // Get list of user IDs to fetch
+        
+        // Create a single HTTP client to reuse connections
+        HttpClient client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+        
+        // Make a single batch request for all users
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.example.com/users?ids=" + String.join(",", userIds.stream().map(String::valueOf).collect(Collectors.toList()))))
+            .build();
+        
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return parseUsers(response.body());
+            }
+        } catch (Exception e) {
+            // Handle exception
+        }
+        
+        return Collections.emptyList();
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient network communication
+    async function fetchUsersInefficiently() {
+      const userIds = await getUserIds(); // Get list of user IDs to fetch
+      const users = [];
+      
+      // Make a separate HTTP request for each user
+      for (const userId of userIds) {
+        try {
+          // No connection reuse, new connection for each request
+          const response = await fetch(`https://api.example.com/users/${userId}`);
+          if (response.ok) {
+            const user = await response.json();
+            users.push(user);
+          }
+        } catch (error) {
+          console.error(`Error fetching user ${userId}:`, error);
+        }
+      }
+      
+      return users;
+    }
+    
+    // Better approach: Batched requests
+    async function fetchUsersEfficiently() {
+      const userIds = await getUserIds(); // Get list of user IDs to fetch
+      
+      // Make a single batch request for all users
+      try {
+        const response = await fetch(`https://api.example.com/users?ids=${userIds.join(',')}`);
+        if (response.ok) {
+          return await response.json();
+        }
+        return [];
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        return [];
+      }
+    }
+    
+    // Even better: With proper error handling and retries
+    async function fetchUsersWithRetries() {
+      const userIds = await getUserIds();
+      const maxRetries = 3;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await fetch(`https://api.example.com/users?ids=${userIds.join(',')}`);
+          if (response.ok) {
+            return await response.json();
+          }
+          // If server error, retry; if client error, don't retry
+          if (response.status < 500) break;
+        } catch (error) {
+          if (attempt === maxRetries) throw error;
+          // Exponential backoff
+          await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+        }
+      }
+      return [];
+    }
+    ```
+    
+    Inefficient network communication, such as making many small requests instead of batched requests, not reusing connections, or failing to implement proper error handling and retries, can lead to poor performance and reliability issues.
+    
+    To optimize network communication:
+    - Batch multiple small requests into larger ones when possible
+    - Reuse HTTP connections through connection pooling
+    - Implement proper timeout handling
+    - Use compression for request and response payloads
+    - Implement retry mechanisms with exponential backoff
+    - Consider using HTTP/2 or HTTP/3 for multiplexing
+    - Implement proper caching strategies
+    - Use CDNs for static content delivery
+    - Consider using GraphQL or similar technologies to reduce over-fetching
+    - Monitor and analyze network performance
+  </Accordion>
+  
+  <Accordion title="Improper Resource Management" icon="recycle">
+    ```java
+    // Anti-pattern: Improper resource management
+    public void processFilesInefficiently(List<String> filePaths) {
+        for (String filePath : filePaths) {
+            FileInputStream fis = null;
+            try {
+                // Open file but don't close it properly
+                fis = new FileInputStream(filePath);
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = fis.read(buffer)) != -1) {
+                    processData(buffer, bytesRead);
+                }
+                // Missing fis.close() in normal execution path
+            } catch (IOException e) {
+                // Handle exception
+            } finally {
+                // Improper cleanup in finally block
+                if (fis != null) {
+                    try {
+                        fis.close();
+                    } catch (IOException e) {
+                        // Swallow exception
+                    }
+                }
+            }
+        }
+    }
+    
+    // Better approach: Proper resource management
+    public void processFilesEfficiently(List<String> filePaths) {
+        for (String filePath : filePaths) {
+            // Use try-with-resources for automatic resource cleanup
+            try (InputStream is = Files.newInputStream(Paths.get(filePath));
+                 BufferedInputStream bis = new BufferedInputStream(is)) {
+                
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = bis.read(buffer)) != -1) {
+                    processData(buffer, bytesRead);
+                }
+            } catch (IOException e) {
+                // Handle exception properly
+                logger.error("Error processing file: " + filePath, e);
+            }
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Improper resource management
+    function processFilesInefficiently(filePaths) {
+      for (const filePath of filePaths) {
+        let fileDescriptor;
+        try {
+          // Open file but don't handle closing properly
+          fileDescriptor = fs.openSync(filePath, 'r');
+          const buffer = Buffer.alloc(8192);
+          let bytesRead;
+          
+          // Loop until end of file
+          while ((bytesRead = fs.readSync(fileDescriptor, buffer, 0, buffer.length, null)) > 0) {
+            processData(buffer, bytesRead);
+          }
+          
+          // Missing fs.closeSync() in normal execution path
+        } catch (error) {
+          console.error(`Error processing file ${filePath}:`, error);
+        } finally {
+          // Improper cleanup in finally block
+          if (fileDescriptor !== undefined) {
+            try {
+              fs.closeSync(fileDescriptor);
+            } catch (error) {
+              // Swallow exception
+            }
+          }
+        }
+      }
+    }
+    
+    // Better approach: Proper resource management
+    async function processFilesEfficiently(filePaths) {
+      for (const filePath of filePaths) {
+        // Use streams for automatic resource management
+        const readStream = fs.createReadStream(filePath, { highWaterMark: 8192 });
+        
+        try {
+          // Process the stream
+          for await (const chunk of readStream) {
+            processData(chunk, chunk.length);
+          }
+        } catch (error) {
+          console.error(`Error processing file ${filePath}:`, error);
+        } finally {
+          // Ensure stream is closed
+          readStream.destroy();
+        }
+      }
+    }
+    ```
+    
+    Improper resource management, such as failing to close files, database connections, or network sockets, can lead to resource leaks, degraded performance, and eventually application crashes.
+    
+    To implement proper resource management:
+    - Use try-with-resources (Java) or equivalent patterns
+    - Always close resources in finally blocks when automatic resource management isn't available
+    - Use resource pools for expensive resources (database connections, thread pools)
+    - Implement proper error handling for resource cleanup
+    - Consider using decorators or wrappers that handle resource management
+    - Use streaming APIs for processing large data sets
+    - Monitor resource usage and implement proper limits
+    - Implement timeouts for resource acquisition and operations
+    - Use appropriate buffer sizes for I/O operations
+    - Consider using resource management libraries
+  </Accordion>
+  <Accordion title="Inefficient Logging Practices" icon="clipboard-list">
+    ```java
+    // Anti-pattern: Inefficient logging
+    public class IneffientLogger {
+        private static final Logger logger = LoggerFactory.getLogger(IneffientLogger.class);
+        
+        public void processRequest(Request request) {
+            // String concatenation in logging statements
+            logger.debug("Processing request with ID: " + request.getId() + " and payload: " + request.getPayload());
+            
+            // Expensive toString() calls even when debug is disabled
+            logger.debug("Request details: " + request.toDetailedString());
+            
+            // Excessive logging of large objects
+            logger.info("Full request: " + request);
+            
+            // Process the request
+            Result result = processRequestInternal(request);
+            
+            // Log every step, even routine operations
+            logger.info("Request processed successfully");
+            logger.debug("Result: " + result);
+        }
+        
+        private Result processRequestInternal(Request request) {
+            // Process the request
+            return new Result();
+        }
+    }
+    
+    // Better approach: Efficient logging
+    public class EfficientLogger {
+        private static final Logger logger = LoggerFactory.getLogger(EfficientLogger.class);
+        
+        public void processRequest(Request request) {
+            // Use parameterized logging
+            logger.debug("Processing request with ID: {} and payload: {}", request.getId(), request.getPayload());
+            
+            // Guard expensive operations with level checks
+            if (logger.isDebugEnabled()) {
+                logger.debug("Request details: {}", request.toDetailedString());
+            }
+            
+            // Log appropriate level of detail
+            logger.info("Processing request {}", request.getId());
+            
+            // Process the request
+            Result result = processRequestInternal(request);
+            
+            // Log meaningful events at appropriate levels
+            logger.info("Request {} processed with status {}", request.getId(), result.getStatus());
+            if (logger.isDebugEnabled()) {
+                logger.debug("Result details for request {}: {}", request.getId(), result);
+            }
+        }
+        
+        private Result processRequestInternal(Request request) {
+            // Process the request
+            return new Result();
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient logging
+    class IneffientLogger {
+      processRequest(request) {
+        // String concatenation in logging statements
+        console.debug("Processing request with ID: " + request.id + " and payload: " + request.payload);
+        
+        // Expensive operations in logging statements
+        console.debug("Request details: " + JSON.stringify(request, null, 2));
+        
+        // Excessive logging of large objects
+        console.info("Full request: " + request);
+        
+        // Process the request
+        const result = this.processRequestInternal(request);
+        
+        // Log every step, even routine operations
+        console.info("Request processed successfully");
+        console.debug("Result: " + JSON.stringify(result));
+      }
+      
+      processRequestInternal(request) {
+        // Process the request
+        return { status: "success" };
+      }
+    }
+    
+    // Better approach: Efficient logging
+    class EfficientLogger {
+      constructor() {
+        // Configure log level
+        this.debugEnabled = process.env.LOG_LEVEL === 'debug';
+      }
+      
+      processRequest(request) {
+        // Use template literals for better readability
+        console.debug(`Processing request with ID: ${request.id}`);
+        
+        // Guard expensive operations with level checks
+        if (this.debugEnabled) {
+          console.debug(`Request details: ${JSON.stringify(request.getDetails())}`);
+        }
+        
+        // Log appropriate level of detail
+        console.info(`Processing request ${request.id}`);
+        
+        // Process the request
+        const result = this.processRequestInternal(request);
+        
+        // Log meaningful events at appropriate levels
+        console.info(`Request ${request.id} processed with status ${result.status}`);
+        if (this.debugEnabled) {
+          console.debug(`Result details for request ${request.id}:`, result);
+        }
+      }
+      
+      processRequestInternal(request) {
+        // Process the request
+        return { status: "success" };
+      }
+    }
+    ```
+    
+    Inefficient logging practices, such as excessive logging, string concatenation in log statements, or performing expensive operations regardless of log level, can lead to significant performance overhead, especially in high-throughput applications.
+    
+    To optimize logging:
+    - Use parameterized logging instead of string concatenation
+    - Guard expensive logging operations with level checks
+    - Configure appropriate log levels for different environments
+    - Use asynchronous logging for high-throughput applications
+    - Implement log rotation and archiving strategies
+    - Consider using structured logging formats (JSON, etc.)
+    - Log meaningful events at appropriate levels
+    - Avoid logging sensitive information
+    - Use sampling for high-volume log events
+    - Consider the performance impact of logging in critical paths
+  </Accordion>
+  
+  <Accordion title="Inefficient Serialization/Deserialization" icon="exchange">
+    ```java
+    // Anti-pattern: Inefficient serialization/deserialization
+    public class DataProcessor {
+        public void processData(List<DataRecord> records) {
+            // Serialize each record individually
+            for (DataRecord record : records) {
+                // Create a new ObjectMapper for each record
+                ObjectMapper mapper = new ObjectMapper();
+                try {
+                    // Convert to JSON string
+                    String json = mapper.writeValueAsString(record);
+                    
+                    // Immediately deserialize back
+                    DataRecord copy = mapper.readValue(json, DataRecord.class);
+                    
+                    // Process the copy
+                    processRecord(copy);
+                } catch (Exception e) {
+                    // Handle exception
+                }
+            }
+        }
+        
+        private void processRecord(DataRecord record) {
+            // Process the record
+        }
+    }
+    
+    // Better approach: Efficient serialization/deserialization
+    public class EfficientDataProcessor {
+        // Reuse ObjectMapper instance
+        private final ObjectMapper mapper = new ObjectMapper();
+        
+        public void processData(List<DataRecord> records) {
+            try {
+                // Batch serialize if needed
+                if (needsJsonRepresentation(records)) {
+                    String json = mapper.writeValueAsString(records);
+                    // Use the JSON representation
+                    storeOrTransmitJson(json);
+                }
+                
+                // Process records directly without unnecessary serialization/deserialization
+                for (DataRecord record : records) {
+                    processRecord(record);
+                }
+            } catch (Exception e) {
+                // Handle exception
+            }
+        }
+        
+        private boolean needsJsonRepresentation(List<DataRecord> records) {
+            // Determine if serialization is actually needed
+            return false; // Example return value
+        }
+        
+        private void storeOrTransmitJson(String json) {
+            // Store or transmit the JSON data
+        }
+        
+        private void processRecord(DataRecord record) {
+            // Process the record directly
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient serialization/deserialization
+    function processData(records) {
+      // Serialize each record individually
+      for (const record of records) {
+        try {
+          // Convert to JSON string
+          const json = JSON.stringify(record);
+          
+          // Immediately deserialize back
+          const copy = JSON.parse(json);
+          
+          // Process the copy
+          processRecord(copy);
+        } catch (error) {
+          console.error('Error processing record:', error);
+        }
+      }
+    }
+    
+    // Better approach: Efficient serialization/deserialization
+    function processDataEfficiently(records) {
+      try {
+        // Batch serialize if needed
+        if (needsJsonRepresentation(records)) {
+          const json = JSON.stringify(records);
+          // Use the JSON representation
+          storeOrTransmitJson(json);
+        }
+        
+        // Process records directly without unnecessary serialization/deserialization
+        for (const record of records) {
+          processRecord(record);
+        }
+      } catch (error) {
+        console.error('Error processing records:', error);
+      }
+    }
+    
+    function needsJsonRepresentation(records) {
+      // Determine if serialization is actually needed
+      return false; // Example return value
+    }
+    
+    function storeOrTransmitJson(json) {
+      // Store or transmit the JSON data
+    }
+    
+    function processRecord(record) {
+      // Process the record directly
+    }
+    ```
+    
+    Inefficient serialization and deserialization, such as repeatedly creating serializer instances, performing unnecessary conversions, or using inefficient formats, can lead to significant performance overhead, especially when dealing with large data sets.
+    
+    To optimize serialization/deserialization:
+    - Reuse serializer instances instead of creating new ones
+    - Avoid unnecessary serialization/deserialization cycles
+    - Consider using more efficient formats (Protocol Buffers, MessagePack, etc.)
+    - Use streaming serialization/deserialization for large objects
+    - Implement custom serialization for performance-critical classes
+    - Consider partial serialization when only a subset of fields is needed
+    - Use appropriate data binding options (e.g., Jackson annotations)
+    - Benchmark different serialization libraries and formats
+    - Consider binary formats for internal communication
+    - Cache serialized representations of frequently used objects
+  </Accordion>
+  
+  <Accordion title="Inefficient Buffering Strategies" icon="memory">
+    ```java
+    // Anti-pattern: Inefficient buffering
+    public void copyFileInefficiently(String sourcePath, String destPath) throws IOException {
+        try (FileInputStream fis = new FileInputStream(sourcePath);
+             FileOutputStream fos = new FileOutputStream(destPath)) {
+            
+            // Using a very small buffer
+            byte[] buffer = new byte[10];
+            int bytesRead;
+            
+            // Read and write small chunks at a time
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                fos.write(buffer, 0, bytesRead);
+                // Flush after every write
+                fos.flush();
+            }
+        }
+    }
+    
+    // Better approach: Efficient buffering
+    public void copyFileEfficiently(String sourcePath, String destPath) throws IOException {
+        // Use NIO channels with a properly sized buffer
+        try (FileChannel sourceChannel = FileChannel.open(Paths.get(sourcePath), StandardOpenOption.READ);
+             FileChannel destChannel = FileChannel.open(Paths.get(destPath), StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+            
+            // Use a larger buffer size appropriate for the file system
+            ByteBuffer buffer = ByteBuffer.allocateDirect(64 * 1024); // 64KB buffer
+            
+            // Read and write larger chunks at a time
+            while (sourceChannel.read(buffer) != -1) {
+                buffer.flip();
+                destChannel.write(buffer);
+                buffer.clear();
+            }
+            
+            // Only force to disk at the end if needed
+            destChannel.force(true);
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient buffering
+    function copyFileInefficiently(sourcePath, destPath) {
+      const sourceStream = fs.createReadStream(sourcePath, { highWaterMark: 10 }); // Very small buffer
+      const destStream = fs.createWriteStream(destPath);
+      
+      sourceStream.on('data', (chunk) => {
+        // Write each small chunk as it comes
+        destStream.write(chunk);
+      });
+      
+      sourceStream.on('end', () => {
+        destStream.end();
+      });
+    }
+    
+    // Better approach: Efficient buffering
+    function copyFileEfficiently(sourcePath, destPath) {
+      // Use pipe with appropriate buffer size
+      const sourceStream = fs.createReadStream(sourcePath, { highWaterMark: 64 * 1024 }); // 64KB buffer
+      const destStream = fs.createWriteStream(destPath);
+      
+      // Let pipe handle the buffering and backpressure
+      sourceStream.pipe(destStream);
+      
+      return new Promise((resolve, reject) => {
+        destStream.on('finish', resolve);
+        destStream.on('error', reject);
+        sourceStream.on('error', reject);
+      });
+    }
+    ```
+    
+    Inefficient buffering strategies, such as using buffers that are too small or too large, unnecessary flushing, or not considering the characteristics of the underlying storage system, can lead to poor I/O performance.
+    
+    To optimize buffering strategies:
+    - Use appropriately sized buffers based on the use case and system characteristics
+    - Consider direct buffers for large I/O operations
+    - Avoid unnecessary buffer copies
+    - Minimize flushing in performance-critical code
+    - Use buffered streams/channels for better performance
+    - Consider memory-mapped files for large files with random access patterns
+    - Be aware of the buffer sizes in libraries and frameworks you use
+    - Implement proper buffer pooling for frequently used buffers
+    - Consider the trade-offs between buffer size and memory usage
+    - Use streaming APIs that handle buffering automatically when appropriate
+  </Accordion>
+  
+  <Accordion title="Synchronous I/O in Event Loops" icon="circle-nodes">
+    ```java
+    // Anti-pattern: Synchronous I/O in event loop (Netty example)
+    public class BlockingHandler extends ChannelInboundHandlerAdapter {
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            // Blocking I/O operation in event loop thread
+            try {
+                // Read a file synchronously
+                byte[] fileContent = Files.readAllBytes(Paths.get("large-file.dat"));
+                
+                // Process the file content
+                processData(fileContent);
+                
+                // Send response
+                ctx.writeAndFlush(Unpooled.copiedBuffer("Processed", CharsetUtil.UTF_8));
+            } catch (IOException e) {
+                ctx.writeAndFlush(Unpooled.copiedBuffer("Error", CharsetUtil.UTF_8));
+            }
+        }
+        
+        private void processData(byte[] data) {
+            // Process the data
+        }
+    }
+    
+    // Better approach: Non-blocking I/O in event loop
+    public class NonBlockingHandler extends ChannelInboundHandlerAdapter {
+        private final EventExecutorGroup executorGroup = new DefaultEventExecutorGroup(16);
+        
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            // Offload blocking I/O to a separate thread pool
+            executorGroup.submit(() -> {
+                try {
+                    // Read a file (still blocking, but not in event loop thread)
+                    byte[] fileContent = Files.readAllBytes(Paths.get("large-file.dat"));
+                    
+                    // Process the file content
+                    processData(fileContent);
+                    
+                    // Send response back on the event loop thread
+                    ctx.writeAndFlush(Unpooled.copiedBuffer("Processed", CharsetUtil.UTF_8));
+                } catch (IOException e) {
+                    ctx.writeAndFlush(Unpooled.copiedBuffer("Error", CharsetUtil.UTF_8));
+                }
+            });
+        }
+        
+        private void processData(byte[] data) {
+            // Process the data
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Synchronous I/O in Node.js event loop
+    const http = require('http');
+    const fs = require('fs');
+    
+    const server = http.createServer((req, res) => {
+      if (req.url === '/data') {
+        // Blocking I/O operation in event loop thread
+        try {
+          // Read a file synchronously
+          const fileContent = fs.readFileSync('large-file.dat');
+          
+          // Process the file content
+          const result = processData(fileContent);
+          
+          // Send response
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end(`Processed: ${result}`);
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end('Error processing request');
+        }
+      }
+    });
+    
+    // Better approach: Non-blocking I/O in Node.js
+    const http = require('http');
+    const fs = require('fs').promises;
+    
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/data') {
+        try {
+          // Read a file asynchronously
+          const fileContent = await fs.readFile('large-file.dat');
+          
+          // Process the file content
+          const result = processData(fileContent);
+          
+          // Send response
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end(`Processed: ${result}`);
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end('Error processing request');
+        }
+      }
+    });
+    
+    function processData(data) {
+      // Process the data
+      return 'result';
+    }
+    ```
+    
+    Performing synchronous I/O operations in event-loop-based systems (Node.js, Netty, etc.) can block the event loop, preventing it from processing other events and leading to reduced throughput and responsiveness.
+    
+    To avoid blocking the event loop:
+    - Use asynchronous I/O APIs (Promises, async/await, CompletableFuture)
+    - Offload blocking operations to separate thread pools
+    - Break up long-running CPU-bound tasks
+    - Use non-blocking I/O libraries and frameworks
+    - Implement proper backpressure handling
+    - Monitor event loop delays and blocked threads
+    - Consider using worker threads or child processes for CPU-intensive tasks
+    - Implement timeouts for all I/O operations
+    - Use streaming APIs for large data processing
+    - Consider reactive programming models (Reactive Streams, RxJS)
+  </Accordion>
+  
+  <Accordion title="I/O Performance Best Practices Checklist" icon="clipboard-check">
+    ```text
+    I/O Performance Best Practices Checklist:
+    
+    1. Asynchronous I/O
+       - Use non-blocking I/O APIs when available
+       - Offload blocking I/O to dedicated thread pools
+       - Implement proper error handling and timeouts
+       - Use appropriate concurrency models (callbacks, promises, async/await)
+       - Consider reactive programming for complex I/O flows
+    
+    2. Efficient File Operations
+       - Use buffered I/O with appropriate buffer sizes
+       - Stream large files instead of loading them entirely into memory
+       - Use memory-mapped files for large files with random access patterns
+       - Batch small file operations when possible
+       - Consider using specialized file formats for specific use cases
+    
+    3. Database Access Optimization
+       - Use connection pooling for database connections
+       - Implement proper indexing for frequently queried columns
+       - Avoid N+1 query problems with joins or batch fetching
+       - Use query caching for frequently accessed data
+       - Implement pagination for large result sets
+    
+    4. Network Communication
+       - Batch multiple small requests into larger ones
+       - Implement connection pooling and reuse
+       - Use compression for request and response payloads
+       - Implement retry mechanisms with exponential backoff
+       - Consider using HTTP/2 or HTTP/3 for multiplexing
+    
+    5. Resource Management
+       - Always close resources properly (files, connections, etc.)
+       - Use try-with-resources or equivalent patterns
+       - Implement proper error handling for resource cleanup
+       - Monitor resource usage and implement limits
+       - Use resource pooling for expensive resources
+    ```
+    
+    Optimizing I/O performance is critical for building responsive and scalable applications. By following best practices for different types of I/O operations, you can significantly improve throughput, reduce latency, and enhance overall system performance.
+    
+    Key principles for I/O optimization:
+    - Minimize blocking operations in responsive applications
+    - Use appropriate buffering strategies for different I/O types
+    - Batch small operations when possible
+    - Implement proper resource management
+    - Use asynchronous and non-blocking APIs when available
+    - Choose the right tools and libraries for specific I/O patterns
+    - Monitor and profile I/O performance regularly
+    - Implement proper error handling and recovery mechanisms
+    - Consider the trade-offs between throughput, latency, and resource usage
+    - Stay updated on modern I/O optimization techniques and APIs
+  </Accordion>
+</AccordionGroup>

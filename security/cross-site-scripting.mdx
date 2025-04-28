@@ -1,0 +1,540 @@
+---
+title: 'Cross-Site Scripting Vulnerabilities'
+description: 'Cross-Site Scripting (XSS) vulnerabilities occur when applications include untrusted data in web pages without proper validation or escaping, allowing attackers to execute malicious scripts in users browsers.'
+---
+
+<AccordionGroup>
+  <Accordion title="Cross-Site Scripting (XSS) Overview" icon="code">
+    Cross-Site Scripting (XSS) vulnerabilities occur when applications include untrusted data in web pages without proper validation or escaping. These vulnerabilities allow attackers to inject and execute malicious scripts in victims' browsers, potentially leading to session hijacking, credential theft, or other client-side attacks.
+    
+    There are three main types of XSS attacks:
+    - **Reflected XSS**: Malicious script is reflected off the web server, such as in search results or error messages.
+    - **Stored XSS**: Malicious script is stored on the target server, such as in a database, message forum, or comment field.
+    - **DOM-based XSS**: Vulnerability exists in client-side code rather than server-side code.
+    
+    Preventing XSS requires proper input validation, output encoding, and the use of appropriate security headers and frameworks.
+  </Accordion>
+  
+  <Accordion title="Reflected XSS" icon="arrow-right-arrow-left">
+    ```javascript
+    // Anti-pattern: Vulnerable to reflected XSS
+    app.get('/search', (req, res) => {
+      const query = req.query.q;
+      
+      // Directly inserting user input into HTML response
+      res.send(`
+        <h1>Search Results for: ${query}</h1>
+        <div>No results found for your search.</div>
+      `);
+    });
+    
+    // Better approach: Preventing reflected XSS
+    const escapeHtml = require('escape-html');
+    
+    app.get('/search', (req, res) => {
+      const query = req.query.q;
+      
+      // Escape user input before inserting into HTML
+      const safeQuery = escapeHtml(query);
+      
+      res.send(`
+        <h1>Search Results for: ${safeQuery}</h1>
+        <div>No results found for your search.</div>
+      `);
+    });
+    ```
+    
+    Reflected XSS vulnerabilities allow attackers to craft malicious URLs that, when clicked by victims, execute arbitrary JavaScript in their browsers.
+    
+    To prevent reflected XSS:
+    - Always escape or encode user input before including it in HTML responses
+    - Use template systems with automatic escaping
+    - Implement Content Security Policy (CSP) headers
+    - Validate input against a whitelist of allowed values when possible
+    - Use frameworks that automatically handle XSS protection
+    - Consider implementing the X-XSS-Protection header
+  </Accordion>
+  
+  <Accordion title="Stored XSS" icon="database">
+    ```javascript
+    // Anti-pattern: Vulnerable to stored XSS
+    app.post('/comments', (req, res) => {
+      const { username, comment } = req.body;
+      
+      // Storing unvalidated user input
+      db.comments.insert({ username, comment });
+      res.redirect('/comments');
+    });
+    
+    app.get('/comments', (req, res) => {
+      const comments = db.comments.getAll();
+      
+      let html = '<h1>Comments</h1>';
+      
+      // Rendering stored user input without escaping
+      comments.forEach(comment => {
+        html += `
+          <div class="comment">
+            <strong>${comment.username}</strong>: ${comment.comment}
+          </div>
+        `;
+      });
+      
+      res.send(html);
+    });
+    
+    // Better approach: Preventing stored XSS
+    const escapeHtml = require('escape-html');
+    
+    app.post('/comments', (req, res) => {
+      const { username, comment } = req.body;
+      
+      // Sanitize input before storing
+      const sanitizedComment = sanitizeHtml(comment, {
+        allowedTags: ['b', 'i', 'em', 'strong'],
+        allowedAttributes: {}
+      });
+      
+      db.comments.insert({ 
+        username: escapeHtml(username), 
+        comment: sanitizedComment 
+      });
+      
+      res.redirect('/comments');
+    });
+    
+    app.get('/comments', (req, res) => {
+      const comments = db.comments.getAll();
+      
+      let html = '<h1>Comments</h1>';
+      
+      // Even though data is sanitized before storage, still escape when rendering
+      comments.forEach(comment => {
+        html += `
+          <div class="comment">
+            <strong>${comment.username}</strong>: ${comment.comment}
+          </div>
+        `;
+      });
+      
+      res.send(html);
+    });
+    ```
+    
+    Stored XSS vulnerabilities allow attackers to inject malicious scripts that are permanently stored on the target server and executed when other users access the affected page.
+    
+    To prevent stored XSS:
+    - Sanitize user input before storing in the database
+    - Escape or encode user-generated content when rendering
+    - Use HTML sanitization libraries to remove dangerous tags and attributes
+    - Implement Content Security Policy (CSP) headers
+    - Consider using a markup language like Markdown instead of allowing HTML
+    - Validate input against a whitelist of allowed values when possible
+  </Accordion>
+  
+  <Accordion title="DOM-based XSS" icon="code-branch">
+    ```javascript
+    // Anti-pattern: Vulnerable to DOM-based XSS
+    // Client-side JavaScript
+    function showWelcomeMessage() {
+      // Extracting data from URL fragment
+      const username = location.hash.substring(1);
+      
+      // Directly inserting into DOM without sanitization
+      document.getElementById('welcome').innerHTML = 
+        'Welcome, ' + username + '!';
+    }
+    
+    // Better approach: Preventing DOM-based XSS
+    // Client-side JavaScript
+    function showWelcomeMessage() {
+      // Extracting data from URL fragment
+      const username = location.hash.substring(1);
+      
+      // Create text node instead of using innerHTML
+      const welcomeElement = document.getElementById('welcome');
+      welcomeElement.textContent = 'Welcome, ' + username + '!';
+      
+      // Alternatively, if HTML is needed, use a sanitization library
+      // const sanitizedUsername = DOMPurify.sanitize(username);
+      // document.getElementById('welcome').innerHTML = 
+      //   'Welcome, ' + sanitizedUsername + '!';
+    }
+    ```
+    
+    DOM-based XSS vulnerabilities occur when client-side JavaScript dynamically updates the page using untrusted data, allowing attackers to inject malicious scripts.
+    
+    To prevent DOM-based XSS:
+    - Use safe DOM methods like textContent instead of innerHTML
+    - Sanitize data before inserting it into the DOM
+    - Use client-side sanitization libraries like DOMPurify
+    - Implement Content Security Policy (CSP) headers
+    - Avoid using dangerous JavaScript functions like eval() or document.write()
+    - Be cautious when using jQuery's html() method or similar functions
+  </Accordion>
+  
+  <Accordion title="XSS in JavaScript Frameworks" icon="js">
+    ```javascript
+    // Anti-pattern: XSS in React (directly using dangerouslySetInnerHTML)
+    function UserProfile({ userData }) {
+      return (
+        <div>
+          <h1>User Profile</h1>
+          <div dangerouslySetInnerHTML={{ __html: userData.bio }} />
+        </div>
+      );
+    }
+    
+    // Better approach: Safe handling in React
+    import DOMPurify from 'dompurify';
+    
+    function UserProfile({ userData }) {
+      // If HTML is absolutely necessary, sanitize it first
+      const sanitizedBio = userData.bio ? 
+        DOMPurify.sanitize(userData.bio) : '';
+      
+      return (
+        <div>
+          <h1>User Profile</h1>
+          {/* Prefer using plain text when possible */}
+          <p>{userData.name}</p>
+          <p>{userData.email}</p>
+          
+          {/* Only use dangerouslySetInnerHTML when absolutely necessary */}
+          {userData.bio && (
+            <div dangerouslySetInnerHTML={{ __html: sanitizedBio }} />
+          )}
+        </div>
+      );
+    }
+    ```
+    
+    Modern JavaScript frameworks provide some protection against XSS, but they can still be vulnerable if used improperly.
+    
+    To prevent XSS in JavaScript frameworks:
+    - Understand the security model of your framework
+    - Avoid bypassing built-in protections (like React's dangerouslySetInnerHTML)
+    - Use framework-specific security best practices
+    - Still sanitize user input even when using frameworks
+    - Implement Content Security Policy (CSP) headers
+    - Keep frameworks and libraries updated
+    - Use security linters and static analysis tools
+  </Accordion>
+  
+  <Accordion title="XSS in HTML Attributes" icon="tag">
+    ```javascript
+    // Anti-pattern: XSS in HTML attributes
+    app.get('/profile', (req, res) => {
+      const username = req.query.user;
+      
+      // Directly inserting user input into HTML attributes
+      res.send(`
+        <div>
+          <img src="/images/avatars/${username}.jpg" 
+               alt="Profile picture of ${username}" 
+               title="${username}'s profile" 
+               onerror="this.src='/images/default.jpg'">
+        </div>
+      `);
+    });
+    
+    // Better approach: Preventing XSS in HTML attributes
+    const escapeHtml = require('escape-html');
+    
+    app.get('/profile', (req, res) => {
+      const username = req.query.user;
+      
+      // Escape user input for HTML attributes
+      const safeUsername = escapeHtml(username);
+      
+      // Use proper attribute encoding and avoid event handlers in HTML
+      res.send(`
+        <div>
+          <img src="/images/avatars/${safeUsername}.jpg" 
+               alt="Profile picture of ${safeUsername}" 
+               title="${safeUsername}'s profile">
+        </div>
+      `);
+      
+      // Add client-side fallback with JavaScript instead
+      res.write(`
+        <script>
+          document.addEventListener('DOMContentLoaded', function() {
+            const img = document.querySelector('img');
+            img.addEventListener('error', function() {
+              this.src = '/images/default.jpg';
+            });
+          });
+        </script>
+      `);
+    });
+    ```
+    
+    HTML attributes can be vulnerable to XSS if user input is not properly escaped, especially in event handlers and URLs.
+    
+    To prevent XSS in HTML attributes:
+    - Escape user input before inserting it into HTML attributes
+    - Be especially careful with attributes that can execute JavaScript (onclick, onerror, etc.)
+    - Use proper URL encoding for attributes containing URLs
+    - Avoid inline event handlers and use unobtrusive JavaScript instead
+    - Consider using template systems with automatic attribute escaping
+    - Implement Content Security Policy (CSP) headers
+  </Accordion>
+  
+  <Accordion title="XSS in URLs" icon="link">
+    ```javascript
+    // Anti-pattern: XSS in URLs
+    app.get('/redirect', (req, res) => {
+      const url = req.query.url;
+      
+      // Directly using user input in redirect
+      res.redirect(url);
+    });
+    
+    // In HTML template
+    `<a href="${userProvidedUrl}">Click here</a>`
+    
+    // Better approach: Preventing XSS in URLs
+    app.get('/redirect', (req, res) => {
+      const url = req.query.url;
+      
+      // Validate URL against whitelist
+      const allowedDomains = ['example.com', 'api.example.com', 'cdn.example.com'];
+      
+      try {
+        const parsedUrl = new URL(url);
+        
+        if (!allowedDomains.includes(parsedUrl.hostname)) {
+          return res.status(400).send('Invalid redirect URL');
+        }
+        
+        // Additional checks (protocol, etc.)
+        if (parsedUrl.protocol !== 'https:') {
+          return res.status(400).send('Only HTTPS URLs are allowed');
+        }
+        
+        res.redirect(url);
+      } catch (error) {
+        // URL parsing failed
+        res.status(400).send('Invalid URL format');
+      }
+    });
+    
+    // In HTML template
+    const escapeAttr = require('escape-attr');
+    `<a href="${escapeAttr(validatedUrl)}">Click here</a>`
+    ```
+    
+    URLs can be vulnerable to XSS through javascript: protocol links or malformed URLs that execute JavaScript when clicked.
+    
+    To prevent XSS in URLs:
+    - Validate URLs against a whitelist of allowed domains
+    - Ensure URLs use safe protocols (https:, http:) and not dangerous ones (javascript:, data:)
+    - Use proper URL encoding
+    - Consider implementing URL sanitization libraries
+    - For redirects, use a server-side whitelist approach
+    - Implement proper Content Security Policy (CSP) headers
+    - Use rel="noopener noreferrer" for external links
+  </Accordion>
+  
+  <Accordion title="Content Security Policy (CSP)" icon="shield-halved">
+    ```javascript
+    // Anti-pattern: No Content Security Policy
+    app.get('/', (req, res) => {
+      // No CSP headers
+      res.send('<h1>Welcome to our site</h1>');
+    });
+    
+    // Better approach: Implementing Content Security Policy
+    const helmet = require('helmet');
+    
+    // Using helmet to set CSP headers
+    app.use(helmet.contentSecurityPolicy({
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'cdn.example.com'],
+        styleSrc: ["'self'", 'cdn.example.com', "'unsafe-inline'"],
+        imgSrc: ["'self'", 'img.example.com', 'data:'],
+        connectSrc: ["'self'", 'api.example.com'],
+        fontSrc: ["'self'", 'fonts.example.com'],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+        reportUri: '/csp-violation-report'
+      }
+    }));
+    
+    // Endpoint to collect CSP violation reports
+    app.post('/csp-violation-report', (req, res) => {
+      console.log('CSP Violation:', req.body);
+      res.status(204).end();
+    });
+    ```
+    
+    Content Security Policy (CSP) is a browser security feature that helps mitigate XSS and other code injection attacks by controlling which resources can be loaded and executed.
+    
+    To implement an effective Content Security Policy:
+    - Define appropriate directives for different resource types
+    - Start with a strict policy and relax as needed
+    - Use nonce or hash-based approaches for inline scripts when necessary
+    - Implement report-uri directive to monitor violations
+    - Consider using report-only mode during initial implementation
+    - Regularly review and update CSP based on application needs
+    - Test CSP thoroughly to avoid breaking legitimate functionality
+  </Accordion>
+  
+  <Accordion title="XSS in JSON Responses" icon="brackets-curly">
+    ```javascript
+    // Anti-pattern: XSS in JSON responses
+    app.get('/api/user', (req, res) => {
+      const userData = getUserData(req.user.id);
+      
+      // Directly embedding JSON in HTML
+      res.send(`
+        <script>
+          const user = ${JSON.stringify(userData)};
+          displayUserProfile(user);
+        </script>
+      `);
+    });
+    
+    // Better approach: Preventing XSS in JSON responses
+    app.get('/api/user', (req, res) => {
+      const userData = getUserData(req.user.id);
+      
+      // Set proper Content-Type for JSON responses
+      res.setHeader('Content-Type', 'application/json');
+      
+      // Send JSON response directly
+      res.send(JSON.stringify(userData));
+    });
+    
+    // In HTML file, load data via AJAX instead of embedding
+    `
+    <script>
+      fetch('/api/user')
+        .then(response => response.json())
+        .then(user => displayUserProfile(user))
+        .catch(error => console.error('Error loading user data:', error));
+    </script>
+    `
+    ```
+    
+    JSON responses can be vulnerable to XSS if they are improperly embedded in HTML or if the browser interprets them as HTML instead of JSON.
+    
+    To prevent XSS in JSON responses:
+    - Set proper Content-Type headers for JSON responses
+    - Avoid embedding JSON directly in HTML
+    - Use JSON.parse() for client-side parsing instead of eval()
+    - Consider using JSON.stringify() with a replacer function to sanitize values
+    - Implement proper Content Security Policy (CSP) headers
+    - Use AJAX or fetch to load JSON data asynchronously
+    - Be cautious with user-controlled values in JSON
+  </Accordion>
+  
+  <Accordion title="XSS in Template Engines" icon="file-code">
+    ```javascript
+    // Anti-pattern: XSS in template engines
+    // Using EJS template engine unsafely
+    app.get('/profile', (req, res) => {
+      const username = req.query.user;
+      
+      // Using unescaped output in EJS
+      res.render('profile', {
+        username: username,
+        bio: getUserBio(username)
+      });
+    });
+    
+    // In profile.ejs template
+    `
+    <h1>Profile for <%- username %></h1>
+    <div class="bio"><%- bio %></div>
+    `
+    
+    // Better approach: Safe use of template engines
+    app.get('/profile', (req, res) => {
+      const username = req.query.user;
+      
+      // Pass data to template, let template engine handle escaping
+      res.render('profile', {
+        username: username,
+        bio: getUserBio(username)
+      });
+    });
+    
+    // In profile.ejs template (using escaped output)
+    `
+    <h1>Profile for <%= username %></h1>
+    <div class="bio"><%= bio %></div>
+    `
+    ```
+    
+    Template engines can be vulnerable to XSS if they don't automatically escape output or if developers explicitly bypass escaping mechanisms.
+    
+    To prevent XSS in template engines:
+    - Use template engines that escape output by default
+    - Understand the escaping syntax of your template engine
+    - Avoid unescaped output unless absolutely necessary
+    - If unescaped output is needed, sanitize the data first
+    - Implement proper Content Security Policy (CSP) headers
+    - Keep template engines updated to benefit from security fixes
+    - Consider using context-specific escaping for different parts of HTML
+  </Accordion>
+  
+  <Accordion title="XSS Prevention Checklist" icon="clipboard-check">
+    ```text
+    XSS Prevention Checklist:
+    
+    1. Input Validation and Sanitization
+       - Validate input against whitelists when possible
+       - Sanitize HTML input using libraries like DOMPurify
+       - Reject invalid or suspicious input
+    
+    2. Output Encoding
+       - Use context-appropriate encoding (HTML, JavaScript, CSS, URL)
+       - Use template engines with automatic escaping
+       - Encode user-controlled data before inserting into HTML
+    
+    3. Content Security Policy (CSP)
+       - Implement a strict CSP
+       - Use nonces or hashes for inline scripts if needed
+       - Set up CSP reporting
+    
+    4. Security Headers
+       - X-XSS-Protection: 1; mode=block
+       - X-Content-Type-Options: nosniff
+       - Referrer-Policy: strict-origin-when-cross-origin
+    
+    5. Cookie Security
+       - Use HttpOnly flag to prevent JavaScript access
+       - Use Secure flag to ensure cookies are sent over HTTPS
+       - Use SameSite attribute to prevent CSRF
+    
+    6. Framework-specific Protections
+       - Follow security best practices for your framework
+       - Avoid bypassing built-in XSS protections
+    
+    7. Regular Security Testing
+       - Perform security code reviews
+       - Use automated scanners and linters
+       - Conduct penetration testing
+    
+    8. Keep Dependencies Updated
+       - Regularly update frameworks and libraries
+       - Monitor security advisories
+    ```
+    
+    A comprehensive approach to XSS prevention involves multiple layers of defense, including input validation, output encoding, and security headers.
+    
+    Key XSS prevention strategies:
+    - Treat all user input as untrusted
+    - Apply context-specific encoding when outputting data
+    - Implement Content Security Policy as an additional layer of defense
+    - Use modern frameworks with built-in XSS protections
+    - Regularly test for XSS vulnerabilities
+    - Keep all dependencies updated
+    - Implement proper security headers
+    - Follow the principle of defense in depth
+  </Accordion>
+</AccordionGroup>

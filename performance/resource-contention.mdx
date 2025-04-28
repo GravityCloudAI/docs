@@ -1,0 +1,1063 @@
+---
+title: 'Resource Contention'
+description: 'Anti-patterns related to shared resource access that can lead to performance bottlenecks and application instability.'
+---
+
+<AccordionGroup>
+  <Accordion title="Resource Contention Overview" icon="server">
+    Resource contention occurs when multiple threads, processes, or systems compete for access to shared resources such as CPU, memory, database connections, or file handles. This contention can lead to performance degradation, deadlocks, and application instability.
+    
+    Common resource contention issues include:
+    - Lock contention in multi-threaded applications
+    - Database connection pool exhaustion
+    - Thread starvation
+    - CPU contention
+    - Memory contention
+    
+    This guide covers common anti-patterns related to resource contention and provides best practices for optimizing resource usage across different application types.
+  </Accordion>
+  
+  <Accordion title="Excessive Locking" icon="lock">
+    ```java
+    // Anti-pattern: Excessive locking with coarse-grained locks
+    public class UserService {
+        private final Object lock = new Object();
+        
+        public User getUser(String userId) {
+            synchronized (lock) {
+                // This locks the entire service for all operations
+                // even though reading user data doesn't modify shared state
+                return userRepository.findById(userId);
+            }
+        }
+        
+        public void updateUser(User user) {
+            synchronized (lock) {
+                userRepository.save(user);
+            }
+        }
+        
+        public List<User> getAllUsers() {
+            synchronized (lock) {
+                return userRepository.findAll();
+            }
+        }
+    }
+    
+    // Better approach: Fine-grained locking
+    public class ImprovedUserService {
+        private final Map<String, Object> userLocks = new ConcurrentHashMap<>();
+        
+        public User getUser(String userId) {
+            // No lock needed for read operations
+            return userRepository.findById(userId);
+        }
+        
+        public void updateUser(User user) {
+            // Get or create a lock specific to this user
+            Object userLock = userLocks.computeIfAbsent(user.getId(), k -> new Object());
+            
+            synchronized (userLock) {
+                // Only lock operations for this specific user
+                userRepository.save(user);
+            }
+        }
+        
+        public List<User> getAllUsers() {
+            // No lock needed for read operations
+            return userRepository.findAll();
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Excessive locking in Node.js
+    class ResourceManager {
+      constructor() {
+        this.resources = {};
+        this.lock = new AsyncLock();
+      }
+      
+      async getResource(id) {
+        // Unnecessarily acquiring a lock for read operations
+        return await this.lock.acquire('resourceLock', async () => {
+          return this.resources[id];
+        });
+      }
+      
+      async updateResource(id, data) {
+        return await this.lock.acquire('resourceLock', async () => {
+          this.resources[id] = data;
+          return data;
+        });
+      }
+    }
+    
+    // Better approach: Fine-grained locking
+    class ImprovedResourceManager {
+      constructor() {
+        this.resources = {};
+        this.lock = new AsyncLock();
+      }
+      
+      async getResource(id) {
+        // No lock needed for read operations
+        return this.resources[id];
+      }
+      
+      async updateResource(id, data) {
+        // Use resource-specific lock key
+        return await this.lock.acquire(`resource:${id}`, async () => {
+          this.resources[id] = data;
+          return data;
+        });
+      }
+    }
+    ```
+    
+    Excessive locking, particularly using coarse-grained locks for all operations, leads to unnecessary contention, reduced concurrency, and poor application performance.
+    
+    To optimize locking strategies:
+    - Use fine-grained locks that target specific resources
+    - Avoid locking for read-only operations when possible
+    - Consider using read-write locks to allow concurrent reads
+    - Minimize the duration of held locks
+    - Use lock-free data structures when appropriate
+    - Consider using optimistic locking for low-contention scenarios
+    - Implement proper deadlock detection and prevention
+    - Use concurrent collections designed for high concurrency
+    - Monitor lock contention in production
+    - Consider using non-blocking algorithms for critical sections
+  </Accordion>
+  
+  <Accordion title="Connection Pool Exhaustion" icon="database">
+    ```java
+    // Anti-pattern: Not releasing database connections
+    public void processDataInefficiently() {
+        Connection conn = null;
+        try {
+            conn = dataSource.getConnection();
+            // Process data...
+            
+            if (someCondition) {
+                // Connection not released in this branch due to early return
+                return;
+            }
+            
+            // More processing...
+            
+        } catch (SQLException e) {
+            // Connection not released if exception occurs
+            throw new RuntimeException("Database error", e);
+        }
+        // No finally block to ensure connection is closed
+    }
+    
+    // Better approach: Proper connection handling
+    public void processDataEfficiently() {
+        // Using try-with-resources to ensure connection is always closed
+        try (Connection conn = dataSource.getConnection()) {
+            // Process data...
+            
+            if (someCondition) {
+                // Connection will still be closed when exiting this block
+                return;
+            }
+            
+            // More processing...
+            
+        } catch (SQLException e) {
+            // Connection will still be closed even if exception occurs
+            throw new RuntimeException("Database error", e);
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Not releasing connections in Node.js
+    async function queryDatabaseInefficiently() {
+      const pool = getConnectionPool();
+      const connection = await pool.getConnection();
+      
+      try {
+        const result = await connection.query('SELECT * FROM users');
+        
+        if (someCondition) {
+          // Connection not released in this branch
+          return result;
+        }
+        
+        // Process result...
+        return processedResult;
+      } catch (error) {
+        // Connection not released if error occurs
+        throw error;
+      }
+      // No finally block to release connection
+    }
+    
+    // Better approach: Proper connection handling
+    async function queryDatabaseEfficiently() {
+      const pool = getConnectionPool();
+      const connection = await pool.getConnection();
+      
+      try {
+        const result = await connection.query('SELECT * FROM users');
+        
+        if (someCondition) {
+          // Still returns result but ensures connection is released
+          return result;
+        }
+        
+        // Process result...
+        return processedResult;
+      } catch (error) {
+        // Re-throw the error after handling cleanup
+        throw error;
+      } finally {
+        // Always release the connection back to the pool
+        connection.release();
+      }
+    }
+    ```
+    
+    Connection pool exhaustion occurs when an application fails to properly release database connections back to the pool, leading to resource starvation and eventual application failure.
+    
+    To prevent connection pool exhaustion:
+    - Always release connections in a finally block or use language features like try-with-resources
+    - Configure appropriate connection pool sizes based on workload
+    - Implement connection validation to detect stale connections
+    - Set appropriate connection timeouts
+    - Monitor connection pool usage in production
+    - Implement circuit breakers for database operations
+    - Consider using connection leak detection tools
+    - Avoid holding database connections across long-running operations
+    - Implement proper error handling for database operations
+    - Use connection pooling libraries with robust features
+  </Accordion>
+  
+  <Accordion title="Thread Pool Saturation" icon="microchip">
+    ```java
+    // Anti-pattern: Submitting unbounded work to a thread pool
+    @RestController
+    public class UserController {
+        private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+        private final UserService userService;
+        
+        @GetMapping("/users/{userId}/recommendations")
+        public CompletableFuture<List<Product>> getRecommendations(@PathVariable String userId) {
+            return CompletableFuture.supplyAsync(() -> {
+                // Long-running operation without timeout or backpressure
+                return userService.generateRecommendations(userId);
+            }, executorService);
+        }
+        
+        // No shutdown method for the executor service
+    }
+    
+    // Better approach: Controlled thread pool with backpressure
+    @RestController
+    public class ImprovedUserController {
+        private final ThreadPoolExecutor executorService;
+        private final UserService userService;
+        
+        public ImprovedUserController(UserService userService) {
+            this.userService = userService;
+            
+            // Create bounded queue and thread pool
+            BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>(100);
+            this.executorService = new ThreadPoolExecutor(
+                5, // Core pool size
+                20, // Max pool size
+                60L, // Keep alive time
+                TimeUnit.SECONDS,
+                queue,
+                new ThreadPoolExecutor.CallerRunsPolicy() // Backpressure policy
+            );
+        }
+        
+        @GetMapping("/users/{userId}/recommendations")
+        public CompletableFuture<List<Product>> getRecommendations(@PathVariable String userId) {
+            // Check if thread pool is saturated
+            if (executorService.getQueue().size() >= 90) {
+                throw new ServiceUnavailableException("Server is busy, please try again later");
+            }
+            
+            return CompletableFuture.supplyAsync(() -> {
+                // Add timeout to prevent long-running tasks
+                try {
+                    return userService.generateRecommendations(userId, 5, TimeUnit.SECONDS);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException("Operation timed out", e);
+                }
+            }, executorService);
+        }
+        
+        @PreDestroy
+        public void shutdown() {
+            executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Unbounded parallel operations in Node.js
+    async function processAllItems(items) {
+      // Process all items in parallel without limits
+      return Promise.all(items.map(item => processItem(item)));
+    }
+    
+    // Better approach: Controlled concurrency
+    const pLimit = require('p-limit');
+    
+    async function processAllItemsEfficiently(items) {
+      // Limit concurrency to 5 parallel operations
+      const limit = pLimit(5);
+      
+      // Map items to limited promises
+      const promises = items.map(item => {
+        return limit(() => processItem(item));
+      });
+      
+      return Promise.all(promises);
+    }
+    ```
+    
+    Thread pool saturation occurs when an application submits more tasks than the thread pool can handle, leading to task queuing, increased latency, and potential resource exhaustion.
+    
+    To prevent thread pool saturation:
+    - Configure appropriate thread pool sizes based on workload and available resources
+    - Implement backpressure mechanisms to handle overload situations
+    - Use bounded work queues to prevent memory exhaustion
+    - Implement timeouts for long-running tasks
+    - Monitor thread pool metrics in production
+    - Consider using different thread pools for different types of work
+    - Implement circuit breakers for external dependencies
+    - Use appropriate rejection policies for when the queue is full
+    - Consider using non-blocking I/O to reduce thread usage
+    - Implement graceful degradation under high load
+  </Accordion>
+  
+  <Accordion title="Database Lock Contention" icon="database-lock">
+    ```sql
+    -- Anti-pattern: Long-running transactions with locks
+    BEGIN TRANSACTION;
+    
+    -- Select data for update (acquires locks)
+    SELECT * FROM orders WHERE status = 'PENDING' FOR UPDATE;
+    
+    -- Perform some long-running operation outside the database
+    -- This keeps locks held for the duration
+    -- [Long-running external process or calculation]
+    
+    -- Update data
+    UPDATE orders SET status = 'PROCESSING' WHERE status = 'PENDING';
+    
+    COMMIT;
+    
+    -- Better approach: Minimize lock duration
+    BEGIN TRANSACTION;
+    
+    -- Use more selective locking
+    SELECT id FROM orders WHERE status = 'PENDING' AND last_updated < NOW() - INTERVAL '1 hour' LIMIT 100 FOR UPDATE SKIP LOCKED;
+    
+    -- Update immediately to minimize lock duration
+    UPDATE orders SET status = 'PROCESSING', locked_by = 'worker-1' 
+    WHERE id IN (/* ids from previous select */);
+    
+    COMMIT;
+    
+    -- Perform long-running operation after releasing locks
+    -- [Long-running external process or calculation]
+    ```
+    
+    ```java
+    // Anti-pattern: Inefficient locking in JPA/Hibernate
+    @Transactional
+    public void processOrdersInefficiently() {
+        // This query locks all pending orders
+        List<Order> pendingOrders = entityManager
+            .createQuery("SELECT o FROM Order o WHERE o.status = 'PENDING'", Order.class)
+            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+            .getResultList();
+        
+        for (Order order : pendingOrders) {
+            // Long-running process while holding locks
+            processOrder(order); // This could take a long time
+            
+            order.setStatus("PROCESSED");
+            entityManager.merge(order);
+        }
+    }
+    
+    // Better approach: Batch processing with limited locks
+    @Transactional
+    public void processOrdersEfficiently() {
+        // Process in smaller batches with more selective locking
+        List<Long> orderIds = entityManager
+            .createQuery("SELECT o.id FROM Order o WHERE o.status = 'PENDING' AND o.lockedBy IS NULL ORDER BY o.createdAt", Long.class)
+            .setMaxResults(100)
+            .getResultList();
+        
+        if (orderIds.isEmpty()) {
+            return;
+        }
+        
+        // Mark orders as locked in a single update
+        entityManager
+            .createQuery("UPDATE Order o SET o.lockedBy = :workerId, o.lockTime = :now WHERE o.id IN :orderIds")
+            .setParameter("workerId", getWorkerId())
+            .setParameter("now", Instant.now())
+            .setParameter("orderIds", orderIds)
+            .executeUpdate();
+        
+        entityManager.flush();
+        entityManager.clear();
+    }
+    
+    // In a separate transaction, process the locked orders
+    @Transactional
+    public void processLockedOrders() {
+        List<Order> lockedOrders = entityManager
+            .createQuery("SELECT o FROM Order o WHERE o.lockedBy = :workerId", Order.class)
+            .setParameter("workerId", getWorkerId())
+            .getResultList();
+        
+        for (Order order : lockedOrders) {
+            try {
+                // Process each order
+                processOrder(order);
+                
+                order.setStatus("PROCESSED");
+                order.setLockedBy(null);
+                entityManager.merge(order);
+            } catch (Exception e) {
+                // Handle error and release lock
+                order.setLockedBy(null);
+                order.setLastError(e.getMessage());
+                entityManager.merge(order);
+            }
+        }
+    }
+    ```
+    
+    Database lock contention occurs when multiple transactions compete for the same database locks, leading to reduced concurrency, increased latency, and potential deadlocks.
+    
+    To minimize database lock contention:
+    - Keep transactions as short as possible
+    - Use appropriate isolation levels for your use case
+    - Implement row-level locking instead of table-level locking
+    - Consider using optimistic locking for low-contention scenarios
+    - Process data in smaller batches
+    - Use selective locking (e.g., SKIP LOCKED in PostgreSQL)
+    - Avoid holding locks during long-running operations
+    - Consider using application-level locking for some scenarios
+    - Monitor lock contention in production
+    - Implement deadlock detection and prevention strategies
+  </Accordion>
+  
+  <Accordion title="Resource Leaks" icon="faucet-drip">
+    ```java
+    // Anti-pattern: Resource leak in file handling
+    public void processFileInefficiently(String filePath) {
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(filePath);
+            // Process file...
+            
+            if (someCondition) {
+                // Early return without closing the resource
+                return;
+            }
+            
+            // More processing...
+            
+            // Close resource only in the happy path
+            fis.close();
+        } catch (IOException e) {
+            // Resource not closed if exception occurs
+            throw new RuntimeException("Error processing file", e);
+        }
+    }
+    
+    // Better approach: Proper resource management
+    public void processFileEfficiently(String filePath) {
+        // Using try-with-resources to ensure resource is always closed
+        try (FileInputStream fis = new FileInputStream(filePath)) {
+            // Process file...
+            
+            if (someCondition) {
+                // Resource will still be closed when exiting this block
+                return;
+            }
+            
+            // More processing...
+        } catch (IOException e) {
+            // Resource will still be closed even if exception occurs
+            throw new RuntimeException("Error processing file", e);
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Resource leak in Node.js file handling
+    function processFileInefficiently(filePath) {
+      const fd = fs.openSync(filePath, 'r');
+      
+      try {
+        // Process file...
+        const buffer = Buffer.alloc(1024);
+        fs.readSync(fd, buffer, 0, buffer.length, 0);
+        
+        if (someCondition) {
+          // Early return without closing the file descriptor
+          return processBuffer(buffer);
+        }
+        
+        // More processing...
+        return processMoreBuffer(buffer);
+      } catch (error) {
+        // File descriptor not closed if error occurs
+        throw error;
+      } finally {
+        // Missing fs.closeSync(fd) in finally block
+      }
+    }
+    
+    // Better approach: Proper resource cleanup
+    function processFileEfficiently(filePath) {
+      const fd = fs.openSync(filePath, 'r');
+      
+      try {
+        // Process file...
+        const buffer = Buffer.alloc(1024);
+        fs.readSync(fd, buffer, 0, buffer.length, 0);
+        
+        if (someCondition) {
+          return processBuffer(buffer);
+        }
+        
+        // More processing...
+        return processMoreBuffer(buffer);
+      } catch (error) {
+        throw error;
+      } finally {
+        // Always close the file descriptor
+        fs.closeSync(fd);
+      }
+    }
+    ```
+    
+    Resource leaks occur when an application fails to properly release resources such as file handles, database connections, or network sockets, leading to resource exhaustion and eventual application failure.
+    
+    To prevent resource leaks:
+    - Use language features like try-with-resources in Java or context managers in Python
+    - Always release resources in a finally block
+    - Implement proper error handling to ensure resources are released
+    - Consider using resource management libraries
+    - Implement resource tracking and leak detection
+    - Use static analysis tools to detect potential resource leaks
+    - Implement timeouts for resource acquisition
+    - Consider using resource pooling for expensive resources
+    - Regularly test application behavior under resource pressure
+    - Monitor resource usage in production
+  </Accordion>
+  <Accordion title="Memory Contention" icon="memory">
+    ```java
+    // Anti-pattern: Inefficient memory usage in a cache
+    public class UnboundedCache {
+        private static final Map<String, byte[]> CACHE = new HashMap<>();
+        
+        public static void addToCache(String key, byte[] data) {
+            // No size limits or eviction policy
+            CACHE.put(key, data);
+        }
+        
+        public static byte[] getFromCache(String key) {
+            return CACHE.get(key);
+        }
+    }
+    
+    // Better approach: Memory-aware caching
+    public class BoundedCache {
+        private static final int MAX_ENTRIES = 1000;
+        private static final int MAX_MEMORY_MB = 100;
+        private static final long MAX_BYTES = MAX_MEMORY_MB * 1024 * 1024;
+        
+        private static final Map<String, byte[]> CACHE = new LinkedHashMap<String, byte[]>(MAX_ENTRIES, 0.75f, true) {
+            private long currentBytes = 0;
+            
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
+                return size() > MAX_ENTRIES || currentBytes > MAX_BYTES;
+            }
+            
+            @Override
+            public byte[] put(String key, byte[] value) {
+                byte[] oldValue = super.put(key, value);
+                
+                if (oldValue != null) {
+                    currentBytes -= oldValue.length;
+                }
+                
+                currentBytes += value.length;
+                return oldValue;
+            }
+            
+            @Override
+            public byte[] remove(Object key) {
+                byte[] value = super.remove(key);
+                
+                if (value != null) {
+                    currentBytes -= value.length;
+                }
+                
+                return value;
+            }
+        };
+        
+        public static void addToCache(String key, byte[] data) {
+            CACHE.put(key, data);
+        }
+        
+        public static byte[] getFromCache(String key) {
+            return CACHE.get(key);
+        }
+        
+        public static void clearCache() {
+            CACHE.clear();
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Memory-intensive operations without consideration for other processes
+    function processLargeDataset(data) {
+      // Creating multiple copies of large data in memory
+      const copy1 = [...data];
+      const copy2 = [...data];
+      const results = [];
+      
+      // Processing that creates many intermediate objects
+      for (let i = 0; i < copy1.length; i++) {
+        const processed = heavyProcessing(copy1[i]);
+        const enhanced = enhanceResults(processed, copy2);
+        results.push(enhanced);
+      }
+      
+      return results;
+    }
+    
+    // Better approach: Memory-efficient processing
+    function processLargeDatasetEfficiently(data) {
+      const results = [];
+      
+      // Process in smaller chunks to reduce memory pressure
+      const chunkSize = 1000;
+      
+      for (let i = 0; i < data.length; i += chunkSize) {
+        const chunk = data.slice(i, i + chunkSize);
+        
+        // Process each item without creating unnecessary copies
+        for (const item of chunk) {
+          const processed = heavyProcessing(item);
+          results.push(processed);
+        }
+        
+        // Suggest garbage collection after processing each chunk
+        if (global.gc) {
+          global.gc();
+        }
+      }
+      
+      return results;
+    }
+    ```
+    
+    Memory contention occurs when multiple processes or threads compete for limited memory resources, leading to increased garbage collection, swapping, and potential out-of-memory errors.
+    
+    To minimize memory contention:
+    - Implement proper memory limits for caches and buffers
+    - Process large datasets in smaller chunks
+    - Avoid creating unnecessary copies of large data structures
+    - Use memory-efficient data structures
+    - Implement proper cleanup of temporary objects
+    - Consider using off-heap memory for large datasets
+    - Monitor memory usage and implement circuit breakers
+    - Use weak references for caches when appropriate
+    - Tune garbage collection settings for your workload
+    - Consider using memory-mapped files for very large datasets
+  </Accordion>
+  
+  <Accordion title="CPU Contention" icon="microchip">
+    ```java
+    // Anti-pattern: CPU-intensive operations on the main thread
+    @RestController
+    public class ReportController {
+        @GetMapping("/generate-report")
+        public ResponseEntity<byte[]> generateReport() {
+            // CPU-intensive operation on the request thread
+            byte[] reportData = generateCpuIntensiveReport();
+            return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(reportData);
+        }
+        
+        private byte[] generateCpuIntensiveReport() {
+            // Simulate CPU-intensive work
+            // This blocks the request thread and consumes CPU resources
+            // that could be used to handle other requests
+            // ...
+            return reportData;
+        }
+    }
+    
+    // Better approach: Offloading CPU-intensive work
+    @RestController
+    public class ImprovedReportController {
+        private final ExecutorService cpuBoundExecutor;
+        
+        public ImprovedReportController() {
+            // Create a dedicated thread pool for CPU-bound tasks
+            // with a size based on available processors
+            int processors = Runtime.getRuntime().availableProcessors();
+            this.cpuBoundExecutor = Executors.newFixedThreadPool(processors);
+        }
+        
+        @GetMapping("/generate-report")
+        public CompletableFuture<ResponseEntity<byte[]>> generateReport() {
+            // Offload CPU-intensive work to a dedicated thread pool
+            return CompletableFuture.supplyAsync(() -> {
+                byte[] reportData = generateCpuIntensiveReport();
+                return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(reportData);
+            }, cpuBoundExecutor);
+        }
+        
+        private byte[] generateCpuIntensiveReport() {
+            // CPU-intensive work now runs in a dedicated thread pool
+            // ...
+            return reportData;
+        }
+        
+        @PreDestroy
+        public void shutdown() {
+            cpuBoundExecutor.shutdown();
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: CPU-intensive operations in Node.js
+    function calculateFibonacci(n) {
+      if (n <= 1) return n;
+      return calculateFibonacci(n - 1) + calculateFibonacci(n - 2);
+    }
+    
+    app.get('/fibonacci/:n', (req, res) => {
+      const n = parseInt(req.params.n);
+      
+      // CPU-intensive calculation blocks the event loop
+      const result = calculateFibonacci(n);
+      
+      res.json({ result });
+    });
+    
+    // Better approach: Using worker threads
+    const { Worker } = require('worker_threads');
+    
+    app.get('/fibonacci/:n', (req, res) => {
+      const n = parseInt(req.params.n);
+      
+      // Offload CPU-intensive work to a worker thread
+      const worker = new Worker(`
+        const { parentPort, workerData } = require('worker_threads');
+        
+        function calculateFibonacci(n) {
+          if (n <= 1) return n;
+          return calculateFibonacci(n - 1) + calculateFibonacci(n - 2);
+        }
+        
+        const result = calculateFibonacci(workerData.n);
+        parentPort.postMessage({ result });
+      `, { eval: true, workerData: { n } });
+      
+      worker.on('message', (data) => {
+        res.json(data);
+      });
+      
+      worker.on('error', (err) => {
+        res.status(500).json({ error: err.message });
+      });
+    });
+    ```
+    
+    CPU contention occurs when multiple processes or threads compete for limited CPU resources, leading to increased latency, reduced throughput, and poor application responsiveness.
+    
+    To minimize CPU contention:
+    - Offload CPU-intensive operations to dedicated thread pools
+    - Size thread pools based on available processors
+    - Use worker threads or processes for CPU-bound tasks
+    - Implement proper task prioritization
+    - Consider using asynchronous processing for non-critical tasks
+    - Optimize algorithms to reduce CPU usage
+    - Implement proper timeouts for CPU-intensive operations
+    - Monitor CPU usage and implement circuit breakers
+    - Consider using dedicated compute resources for CPU-intensive workloads
+    - Implement backpressure mechanisms to prevent overload
+  </Accordion>
+  
+  <Accordion title="Deadlocks" icon="lock">
+    ```java
+    // Anti-pattern: Potential deadlock due to inconsistent lock ordering
+    public class AccountService {
+        public void transfer(Account fromAccount, Account toAccount, BigDecimal amount) {
+            synchronized (fromAccount) {
+                synchronized (toAccount) {
+                    // If another thread tries to transfer in the opposite direction,
+                    // it might acquire toAccount first, then wait for fromAccount,
+                    // while this thread holds fromAccount and waits for toAccount
+                    fromAccount.debit(amount);
+                    toAccount.credit(amount);
+                }
+            }
+        }
+    }
+    
+    // Better approach: Consistent lock ordering
+    public class ImprovedAccountService {
+        public void transfer(Account fromAccount, Account toAccount, BigDecimal amount) {
+            // Ensure consistent lock ordering by account ID
+            Account firstLock = fromAccount.getId() < toAccount.getId() ? fromAccount : toAccount;
+            Account secondLock = fromAccount.getId() < toAccount.getId() ? toAccount : fromAccount;
+            
+            synchronized (firstLock) {
+                synchronized (secondLock) {
+                    // Now all threads will acquire locks in the same order,
+                    // preventing deadlocks
+                    fromAccount.debit(amount);
+                    toAccount.credit(amount);
+                }
+            }
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Potential deadlock in Node.js with async locks
+    const AsyncLock = require('async-lock');
+    const lock = new AsyncLock();
+    
+    async function transferFunds(fromAccount, toAccount, amount) {
+      // Acquire locks in order of operation, which can lead to deadlocks
+      await lock.acquire(fromAccount, async () => {
+        // Debit operation
+        
+        await lock.acquire(toAccount, async () => {
+          // Credit operation
+        });
+      });
+    }
+    
+    // Better approach: Consistent lock ordering
+    async function transferFundsImproved(fromAccount, toAccount, amount) {
+      // Ensure consistent lock ordering
+      const [firstLock, secondLock] = [fromAccount, toAccount].sort();
+      
+      await lock.acquire(firstLock, async () => {
+        await lock.acquire(secondLock, async () => {
+          // Perform transfer operations
+          if (fromAccount === firstLock) {
+            // Debit from firstLock, credit to secondLock
+          } else {
+            // Debit from secondLock, credit to firstLock
+          }
+        });
+      });
+    }
+    ```
+    
+    Deadlocks occur when two or more threads are blocked forever, waiting for each other to release locks, leading to application hangs and unresponsiveness.
+    
+    To prevent deadlocks:
+    - Implement consistent lock ordering
+    - Use lock hierarchies to enforce ordering
+    - Avoid nested locks when possible
+    - Implement lock timeouts
+    - Consider using tryLock with timeout instead of blocking indefinitely
+    - Use higher-level concurrency constructs when appropriate
+    - Implement deadlock detection mechanisms
+    - Consider using lock-free algorithms for critical sections
+    - Minimize the duration of held locks
+    - Implement proper error handling for lock acquisition failures
+  </Accordion>
+  
+  <Accordion title="I/O Contention" icon="hard-drive">
+    ```java
+    // Anti-pattern: Inefficient file I/O
+    public void processLargeFile(String filePath) throws IOException {
+        // Open file for each read operation
+        for (int i = 0; i < 1000; i++) {
+            try (FileInputStream fis = new FileInputStream(filePath)) {
+                // Seek to position
+                fis.skip(i * 1024);
+                
+                // Read small chunk
+                byte[] buffer = new byte[1024];
+                fis.read(buffer);
+                
+                // Process buffer
+                processBuffer(buffer);
+            }
+        }
+    }
+    
+    // Better approach: Efficient file I/O
+    public void processLargeFileEfficiently(String filePath) throws IOException {
+        // Open file once
+        try (FileInputStream fis = new FileInputStream(filePath);
+             BufferedInputStream bis = new BufferedInputStream(fis, 8192)) {
+            
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            
+            // Read in larger chunks
+            while ((bytesRead = bis.read(buffer)) != -1) {
+                // Process buffer in memory
+                processBufferRange(buffer, 0, bytesRead);
+            }
+        }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Inefficient file I/O in Node.js
+    async function processLargeFile(filePath) {
+      const fileStats = await fs.promises.stat(filePath);
+      const fileSize = fileStats.size;
+      
+      // Process file in many small chunks
+      for (let position = 0; position < fileSize; position += 1024) {
+        // Open file handle for each chunk
+        const fileHandle = await fs.promises.open(filePath, 'r');
+        const buffer = Buffer.alloc(1024);
+        
+        await fileHandle.read(buffer, 0, 1024, position);
+        await fileHandle.close();
+        
+        // Process buffer
+        await processBuffer(buffer);
+      }
+    }
+    
+    // Better approach: Efficient file I/O
+    async function processLargeFileEfficiently(filePath) {
+      // Open file once
+      const fileHandle = await fs.promises.open(filePath, 'r');
+      
+      try {
+        // Create read stream for efficient reading
+        const stream = fileHandle.createReadStream({
+          highWaterMark: 64 * 1024 // 64KB chunks
+        });
+        
+        // Process stream with backpressure handling
+        for await (const chunk of stream) {
+          await processBuffer(chunk);
+        }
+      } finally {
+        // Always close the file handle
+        await fileHandle.close();
+      }
+    }
+    ```
+    
+    I/O contention occurs when multiple processes or threads compete for limited I/O resources such as disk or network bandwidth, leading to increased latency and reduced throughput.
+    
+    To minimize I/O contention:
+    - Use buffered I/O to reduce the number of system calls
+    - Process data in appropriately sized chunks
+    - Implement asynchronous I/O operations
+    - Use connection pooling for network resources
+    - Consider using memory-mapped files for large files
+    - Implement proper I/O scheduling and prioritization
+    - Use streaming APIs for large data transfers
+    - Consider using dedicated I/O threads or thread pools
+    - Implement backpressure mechanisms for I/O operations
+    - Monitor I/O usage and implement circuit breakers
+  </Accordion>
+  
+  <Accordion title="Resource Contention Checklist" icon="clipboard-check">
+    ```text
+    Resource Contention Prevention Checklist:
+    
+    1. Locking Strategy
+       - Use fine-grained locks for specific resources
+       - Implement consistent lock ordering to prevent deadlocks
+       - Minimize lock duration
+       - Consider read-write locks for read-heavy workloads
+       - Use lock-free data structures when appropriate
+       - Implement proper deadlock detection and prevention
+       - Monitor lock contention in production
+    
+    2. Thread Pool Management
+       - Size thread pools based on available resources
+       - Use separate thread pools for different types of work
+       - Implement proper rejection policies
+       - Monitor thread pool metrics
+       - Implement backpressure mechanisms
+       - Use bounded work queues
+       - Implement timeouts for long-running tasks
+    
+    3. Database Connection Management
+       - Use connection pooling
+       - Configure appropriate pool sizes
+       - Implement proper connection release
+       - Use connection validation
+       - Monitor connection pool usage
+       - Implement circuit breakers for database operations
+       - Use appropriate transaction isolation levels
+    
+    4. Memory Management
+       - Implement memory limits for caches
+       - Process large datasets in chunks
+       - Use memory-efficient data structures
+       - Implement proper cleanup of temporary objects
+       - Monitor memory usage
+       - Consider using off-heap memory for large datasets
+       - Tune garbage collection settings
+    
+    5. I/O Resource Management
+       - Use buffered I/O
+       - Implement asynchronous I/O operations
+       - Use connection pooling for network resources
+       - Consider using memory-mapped files
+       - Implement proper resource cleanup
+       - Use streaming APIs for large data transfers
+       - Monitor I/O usage
+    ```
+    
+    Preventing resource contention requires a systematic approach that addresses multiple aspects of resource usage, from locking strategies to thread pool management and I/O operations.
+    
+    Key prevention strategies:
+    - Implement proper locking and synchronization
+    - Configure appropriate resource pool sizes
+    - Ensure proper resource cleanup
+    - Monitor resource usage in production
+    - Implement circuit breakers and backpressure mechanisms
+    - Use asynchronous operations when appropriate
+    - Optimize algorithms to reduce resource usage
+    - Implement proper error handling for resource acquisition failures
+    - Consider resource requirements during system design
+    - Test application behavior under resource pressure
+  </Accordion>
+</AccordionGroup>
