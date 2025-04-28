@@ -1,0 +1,610 @@
+---
+title: 'Delphi'
+description: 'Delphi is an object-oriented, visual programming language derived from Pascal. It is used to build desktop, mobile, web, and console applications, and is known for its rapid application development capabilities.'
+---
+
+<AccordionGroup>
+  <Accordion title="Delphi Anti-Patterns Overview" icon="delphi">
+    Delphi, despite being a powerful language for rapid application development, has several common anti-patterns that can lead to maintainability problems, performance issues, and bugs. Here are the most important anti-patterns to avoid when writing Delphi code.
+  </Accordion>
+  
+  <Accordion title="Using String Concatenation in Loops" icon="warning">
+    ```delphi
+    // Anti-pattern: String concatenation in loops
+    procedure BuildReport;
+var
+  Report: string;
+  i: Integer;
+begin
+  Report := '';
+  for i := 1 to 1000 do
+  begin
+    Report := Report + 'Line ' + IntToStr(i) + #13#10;
+  end;
+  Memo1.Text := Report;
+end;
+
+// Better approach: Use TStringBuilder or TStringList
+procedure BuildReport;
+var
+  Builder: TStringBuilder;
+  i: Integer;
+begin
+  Builder := TStringBuilder.Create;
+  try
+    for i := 1 to 1000 do
+    begin
+      Builder.Append('Line ').Append(i).AppendLine;
+    end;
+    Memo1.Text := Builder.ToString;
+  finally
+    Builder.Free;
+  end;
+end;
+
+// Alternative with TStringList
+procedure BuildReport;
+var
+  Lines: TStringList;
+  i: Integer;
+begin
+  Lines := TStringList.Create;
+  try
+    for i := 1 to 1000 do
+    begin
+      Lines.Add('Line ' + IntToStr(i));
+    end;
+    Memo1.Lines.Assign(Lines);
+  finally
+    Lines.Free;
+  end;
+end;
+    ```
+    Avoid using string concatenation in loops. In Delphi, strings are immutable, so each concatenation creates a new string object, which is inefficient. Use `TStringBuilder` (in newer Delphi versions) or `TStringList` instead for better performance.
+  </Accordion>
+  
+  <Accordion title="Not Using Try-Finally for Resource Management" icon="warning">
+    ```delphi
+    // Anti-pattern: Not using try-finally
+    procedure ProcessFile(const FileName: string);
+var
+  FileStream: TFileStream;
+begin
+  FileStream := TFileStream.Create(FileName, fmOpenRead);
+  // If an exception occurs here, FileStream will leak
+  ProcessData(FileStream);
+  FileStream.Free;
+end;
+
+// Better approach: Use try-finally
+procedure ProcessFile(const FileName: string);
+var
+  FileStream: TFileStream;
+begin
+  FileStream := TFileStream.Create(FileName, fmOpenRead);
+  try
+    ProcessData(FileStream);
+  finally
+    FileStream.Free;
+  end;
+end;
+
+// Even better in modern Delphi: Use interfaces
+procedure ProcessFile(const FileName: string);
+var
+  FileStream: IFileStream; // Interface type
+begin
+  FileStream := TFileStream.Create(FileName, fmOpenRead) as IFileStream;
+  // No need for try-finally; interface reference will be released automatically
+  ProcessData(FileStream);
+end;
+    ```
+    Always use try-finally blocks when working with resources that need explicit cleanup, such as file handles, database connections, or objects created with `Create`. This ensures resources are properly released even if an exception occurs.
+  </Accordion>
+  
+  <Accordion title="Using Global Variables" icon="warning">
+    ```delphi
+    // Anti-pattern: Using global variables
+var
+  GlobalCustomer: TCustomer; // Global variable
+  GlobalSettings: TSettings; // Global variable
+
+procedure ProcessCustomer;
+begin
+  GlobalCustomer.Process(GlobalSettings);
+end;
+
+// Better approach: Pass dependencies explicitly
+procedure ProcessCustomer(Customer: TCustomer; const Settings: TSettings);
+begin
+  Customer.Process(Settings);
+end;
+
+// Or use a singleton pattern when appropriate
+function GetSettings: TSettings;
+begin
+  if not Assigned(FSettings) then
+    FSettings := TSettings.Create;
+  Result := FSettings;
+end;
+    ```
+    Avoid using global variables. They create hidden dependencies, make testing difficult, and can lead to unexpected behavior, especially in multithreaded applications. Instead, pass dependencies explicitly through parameters or use design patterns like Singleton when appropriate.
+  </Accordion>
+  
+  <Accordion title="Not Using Properties" icon="warning">
+    ```delphi
+    // Anti-pattern: Direct field access
+type
+  TCustomer = class
+  public
+    Name: string;      // Public field
+    Address: string;   // Public field
+    Age: Integer;      // Public field
+  end;
+
+// Usage
+procedure ProcessCustomer(Customer: TCustomer);
+begin
+  Customer.Age := -10; // Can set invalid age
+end;
+
+// Better approach: Use properties with validation
+type
+  TCustomer = class
+  private
+    FName: string;
+    FAddress: string;
+    FAge: Integer;
+  public
+    property Name: string read FName write FName;
+    property Address: string read FAddress write FAddress;
+    property Age: Integer read FAge write SetAge;
+  end;
+
+procedure TCustomer.SetAge(const Value: Integer);
+begin
+  if Value < 0 then
+    raise Exception.Create('Age cannot be negative');
+  FAge := Value;
+end;
+    ```
+    Use properties instead of public fields. Properties allow you to encapsulate implementation details, add validation logic, and change the internal representation without affecting client code.
+  </Accordion>
+  
+  <Accordion title="Not Using Interfaces for Decoupling" icon="warning">
+    ```delphi
+    // Anti-pattern: Tight coupling to concrete classes
+type
+  TCustomerProcessor = class
+  private
+    FDatabase: TDatabase;
+    FLogger: TLogger;
+  public
+    constructor Create(Database: TDatabase; Logger: TLogger);
+    procedure ProcessCustomer(Customer: TCustomer);
+  end;
+
+// Better approach: Use interfaces for decoupling
+type
+  IDatabase = interface
+    ['{GUID}'] // Add a proper GUID here
+    function GetCustomer(ID: Integer): TCustomer;
+    procedure SaveCustomer(Customer: TCustomer);
+  end;
+
+  ILogger = interface
+    ['{GUID}'] // Add a proper GUID here
+    procedure Log(const Message: string);
+  end;
+
+  TCustomerProcessor = class
+  private
+    FDatabase: IDatabase;
+    FLogger: ILogger;
+  public
+    constructor Create(Database: IDatabase; Logger: ILogger);
+    procedure ProcessCustomer(Customer: TCustomer);
+  end;
+    ```
+    Use interfaces to decouple components. This makes your code more flexible, testable, and maintainable. Interfaces allow you to swap implementations without changing client code, which is especially useful for testing and dependency injection.
+  </Accordion>
+  
+  <Accordion title="Excessive Form Coupling" icon="warning">
+    ```delphi
+    // Anti-pattern: Forms directly accessing each other's components
+procedure TMainForm.ShowCustomerDetails(CustomerID: Integer);
+var
+  CustomerForm: TCustomerForm;
+begin
+  CustomerForm := TCustomerForm.Create(Self);
+  try
+    // Direct access to another form's components
+    CustomerForm.CustomerIDEdit.Text := IntToStr(CustomerID);
+    CustomerForm.LoadButton.Click;
+    CustomerForm.ShowModal;
+  finally
+    CustomerForm.Free;
+  end;
+end;
+
+// Better approach: Use proper encapsulation and methods
+type
+  TCustomerForm = class(TForm)
+    // Components...
+  public
+    procedure LoadCustomer(CustomerID: Integer);
+  end;
+
+procedure TMainForm.ShowCustomerDetails(CustomerID: Integer);
+var
+  CustomerForm: TCustomerForm;
+begin
+  CustomerForm := TCustomerForm.Create(Self);
+  try
+    CustomerForm.LoadCustomer(CustomerID);
+    CustomerForm.ShowModal;
+  finally
+    CustomerForm.Free;
+  end;
+end;
+    ```
+    Avoid excessive coupling between forms. Don't directly access components on other forms; instead, provide public methods or properties that encapsulate the functionality you need. This makes your forms more maintainable and reusable.
+  </Accordion>
+  
+  <Accordion title="Not Using Exceptions Properly" icon="warning">
+    ```delphi
+    // Anti-pattern: Poor exception handling
+function TryGetCustomer(ID: Integer; out Customer: TCustomer): Boolean;
+begin
+  Result := False;
+  try
+    Customer := GetCustomer(ID);
+    Result := True;
+  except
+    // Swallow all exceptions
+  end;
+end;
+
+// Better approach: Proper exception handling
+function TryGetCustomer(ID: Integer; out Customer: TCustomer): Boolean;
+begin
+  Result := False;
+  try
+    Customer := GetCustomer(ID);
+    Result := True;
+  except
+    on E: ECustomerNotFound do
+      // Handle specific exception
+      LogError('Customer not found: ' + E.Message);
+    on E: EDatabaseError do
+      // Handle database errors
+      LogError('Database error: ' + E.Message);
+    else
+      // Re-raise unexpected exceptions
+      raise;
+  end;
+end;
+    ```
+    Use exceptions properly. Don't swallow exceptions without handling them, and catch only the exceptions you can actually handle. Create custom exception classes for specific error conditions, and include meaningful error messages.
+  </Accordion>
+  
+  <Accordion title="Not Using Generics" icon="warning">
+    ```delphi
+    // Anti-pattern: Type-specific collections
+type
+  TCustomerList = class
+  private
+    FItems: TList;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Add(Customer: TCustomer);
+    function GetItem(Index: Integer): TCustomer;
+    property Items[Index: Integer]: TCustomer read GetItem; default;
+  end;
+
+// Similar code for TProductList, TOrderList, etc.
+
+// Better approach: Use generics
+type
+  TGenericList<T> = class
+  private
+    FItems: TList<T>;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Add(const Item: T);
+    function GetItem(Index: Integer): T;
+    property Items[Index: Integer]: T read GetItem; default;
+  end;
+
+// Usage
+var
+  Customers: TGenericList<TCustomer>;
+  Products: TGenericList<TProduct>;
+begin
+  Customers := TGenericList<TCustomer>.Create;
+  Products := TGenericList<TProduct>.Create;
+  // Use the lists...
+end;
+    ```
+    Use generics for type-safe collections and algorithms. Generics reduce code duplication and provide compile-time type checking, making your code more robust and maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Anonymous Methods" icon="warning">
+    ```delphi
+    // Anti-pattern: Callback interfaces for simple operations
+type
+  ICompareCallback = interface
+    function Compare(A, B: Integer): Integer;
+  end;
+
+  TMyComparer = class(TInterfacedObject, ICompareCallback)
+  public
+    function Compare(A, B: Integer): Integer;
+  end;
+
+function TMyComparer.Compare(A, B: Integer): Integer;
+begin
+  Result := A - B; // Ascending order
+end;
+
+// Usage
+procedure SortData(Data: TList<Integer>; Comparer: ICompareCallback);
+var
+  i, j: Integer;
+begin
+  // Sort implementation using Comparer.Compare
+end;
+
+// Better approach: Use anonymous methods
+procedure SortData(Data: TList<Integer>; CompareFunc: TFunc<Integer, Integer, Integer>);
+var
+  i, j: Integer;
+begin
+  // Sort implementation using CompareFunc
+end;
+
+// Usage
+var
+  Data: TList<Integer>;
+begin
+  Data := TList<Integer>.Create;
+  // Fill data...
+  
+  // Sort ascending
+  SortData(Data, function(A, B: Integer): Integer
+  begin
+    Result := A - B;
+  end);
+  
+  // Sort descending
+  SortData(Data, function(A, B: Integer): Integer
+  begin
+    Result := B - A;
+  end);
+end;
+    ```
+    Use anonymous methods (closures) for callbacks and event handlers. They make your code more concise and can capture variables from the surrounding scope, which is useful for implementing callbacks without creating separate classes.
+  </Accordion>
+  
+  <Accordion title="Not Using ARC/Automatic Memory Management" icon="warning">
+    ```delphi
+    // Anti-pattern: Manual memory management with potential leaks
+procedure ProcessData;
+var
+  Customer: TCustomer;
+  Order: TOrder;
+begin
+  Customer := TCustomer.Create;
+  Order := TOrder.Create;
+  
+  try
+    // Process data
+    if SomeCondition then
+      Exit; // Memory leak! Objects not freed
+    
+    // More processing
+  finally
+    Customer.Free;
+    Order.Free;
+  end;
+end;
+
+// Better approach: Use ARC (for mobile platforms)
+type
+  TCustomer = class(TObject)
+  end;
+
+  TOrder = class(TObject)
+  end;
+
+procedure ProcessData;
+var
+  Customer: TCustomer;
+  Order: TOrder;
+begin
+  Customer := TCustomer.Create;
+  Order := TOrder.Create;
+  
+  // Process data
+  if SomeCondition then
+    Exit; // No leak with ARC
+  
+  // More processing
+  // No need to free objects with ARC
+end;
+
+// Alternative for non-ARC: Use interfaces
+type
+  ICustomer = interface
+    ['{GUID}']
+    // Methods
+  end;
+
+  TCustomerImpl = class(TInterfacedObject, ICustomer)
+    // Implementation
+  end;
+
+procedure ProcessData;
+var
+  Customer: ICustomer;
+begin
+  Customer := TCustomerImpl.Create;
+  
+  // Process data
+  if SomeCondition then
+    Exit; // No leak with interfaces
+  
+  // More processing
+  // No need to free interface references
+end;
+    ```
+    Take advantage of Automatic Reference Counting (ARC) on mobile platforms or use interface references on non-ARC platforms to simplify memory management. This reduces the risk of memory leaks and makes your code more robust.
+  </Accordion>
+  
+  <Accordion title="Not Using RTTI and Attributes" icon="warning">
+    ```delphi
+    // Anti-pattern: Manual property serialization
+procedure SaveCustomerToXML(Customer: TCustomer; XML: IXMLNode);
+begin
+  XML.ChildValues['Name'] := Customer.Name;
+  XML.ChildValues['Address'] := Customer.Address;
+  XML.ChildValues['Age'] := Customer.Age;
+  // Add more properties manually
+end;
+
+// Better approach: Use RTTI and attributes
+type
+  [XmlRoot('Customer')]
+  TCustomer = class
+  private
+    FName: string;
+    FAddress: string;
+    FAge: Integer;
+    FInternalID: string; // Not serialized
+  public
+    [XmlElement('Name')]
+    property Name: string read FName write FName;
+    
+    [XmlElement('Address')]
+    property Address: string read FAddress write FAddress;
+    
+    [XmlElement('Age')]
+    property Age: Integer read FAge write FAge;
+    
+    [XmlIgnore]
+    property InternalID: string read FInternalID write FInternalID;
+  end;
+
+// Generic serialization using RTTI
+procedure SaveObjectToXML<T: class>(Obj: T; XML: IXMLNode);
+var
+  Context: TRttiContext;
+  ObjType: TRttiType;
+  Prop: TRttiProperty;
+  Attr: TCustomAttribute;
+begin
+  Context := TRttiContext.Create;
+  try
+    ObjType := Context.GetType(TypeInfo(T));
+    
+    for Prop in ObjType.GetProperties do
+    begin
+      // Skip properties with XmlIgnore attribute
+      if HasAttribute<XmlIgnoreAttribute>(Prop) then
+        Continue;
+      
+      // Get custom element name or use property name
+      ElementName := Prop.Name;
+      for Attr in Prop.GetAttributes do
+      begin
+        if Attr is XmlElementAttribute then
+          ElementName := XmlElementAttribute(Attr).ElementName;
+      end;
+      
+      // Set XML value
+      XML.ChildValues[ElementName] := Prop.GetValue(Obj).AsVariant;
+    end;
+  finally
+    Context.Free;
+  end;
+end;
+    ```
+    Use Run-Time Type Information (RTTI) and attributes for tasks like serialization, validation, and mapping. This makes your code more declarative and reduces boilerplate code.
+  </Accordion>
+  
+  <Accordion title="Not Using Unit Testing" icon="warning">
+    ```delphi
+    // Anti-pattern: No unit tests
+function CalculateTotal(const Items: TArray<TOrderItem>): Currency;
+var
+  Item: TOrderItem;
+begin
+  Result := 0;
+  for Item in Items do
+    Result := Result + Item.Price * Item.Quantity;
+end;
+
+// Better approach: Write unit tests
+unit CalculationTests;
+
+interface
+
+uses
+  DUnitX.TestFramework;
+
+type
+  [TestFixture]
+  TCalculationTests = class
+  public
+    [Test]
+    procedure TestCalculateTotal_EmptyArray_ReturnsZero;
+    
+    [Test]
+    procedure TestCalculateTotal_SingleItem_ReturnsCorrectTotal;
+    
+    [Test]
+    procedure TestCalculateTotal_MultipleItems_ReturnsCorrectTotal;
+  end;
+
+implementation
+
+uses
+  OrderCalculations, OrderTypes;
+
+procedure TCalculationTests.TestCalculateTotal_EmptyArray_ReturnsZero;
+var
+  Items: TArray<TOrderItem>;
+begin
+  SetLength(Items, 0);
+  Assert.AreEqual(0, CalculateTotal(Items));
+end;
+
+procedure TCalculationTests.TestCalculateTotal_SingleItem_ReturnsCorrectTotal;
+var
+  Items: TArray<TOrderItem>;
+begin
+  SetLength(Items, 1);
+  Items[0].Price := 10;
+  Items[0].Quantity := 2;
+  Assert.AreEqual(20, CalculateTotal(Items));
+end;
+
+procedure TCalculationTests.TestCalculateTotal_MultipleItems_ReturnsCorrectTotal;
+var
+  Items: TArray<TOrderItem>;
+begin
+  SetLength(Items, 2);
+  Items[0].Price := 10;
+  Items[0].Quantity := 2;
+  Items[1].Price := 15;
+  Items[1].Quantity := 3;
+  Assert.AreEqual(65, CalculateTotal(Items));
+end;
+
+end.
+    ```
+    Write unit tests for your code. Unit tests help catch bugs early, document expected behavior, and make it safer to refactor code. Use testing frameworks like DUnitX or DUnit to structure and run your tests.
+  </Accordion>
+</AccordionGroup>

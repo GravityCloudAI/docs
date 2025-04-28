@@ -1,0 +1,570 @@
+---
+title: 'C'
+description: 'C is a general-purpose, procedural programming language that provides low-level access to system memory. It is known for its efficiency, portability, and power, making it ideal for system programming.'
+---
+
+<AccordionGroup>
+  <Accordion title="C Anti-Patterns Overview" icon="c">
+    C, despite being a foundational language with decades of use, has several common anti-patterns that can lead to bugs, security vulnerabilities, and maintenance problems. Here are the most important anti-patterns to avoid when writing C code.
+  </Accordion>
+  
+  <Accordion title="Not Checking Return Values" icon="warning">
+    ```c
+    // Anti-pattern: Not checking return values
+    void process_file(const char* filename) {
+        FILE* file = fopen(filename, "r");
+        char buffer[256];
+        fgets(buffer, sizeof(buffer), file); // What if file is NULL?
+        // Process buffer...
+        fclose(file);
+    }
+    
+    // Better approach: Check return values
+    void process_file(const char* filename) {
+        FILE* file = fopen(filename, "r");
+        if (file == NULL) {
+            perror("Error opening file");
+            return;
+        }
+        
+        char buffer[256];
+        if (fgets(buffer, sizeof(buffer), file) == NULL) {
+            perror("Error reading file");
+            fclose(file);
+            return;
+        }
+        
+        // Process buffer...
+        fclose(file);
+    }
+    ```
+    Always check return values from functions that can fail, such as memory allocation, file operations, and network calls.
+  </Accordion>
+  
+  <Accordion title="Buffer Overflows" icon="warning">
+    ```c
+    // Anti-pattern: Potential buffer overflow
+    void copy_string(char* dest, const char* src) {
+        strcpy(dest, src); // No bounds checking
+    }
+    
+    // Better approach: Use bounded string functions
+    void copy_string(char* dest, size_t dest_size, const char* src) {
+        strncpy(dest, src, dest_size - 1);
+        dest[dest_size - 1] = '\0'; // Ensure null termination
+    }
+    
+    // Even better: Check return values
+    int copy_string(char* dest, size_t dest_size, const char* src) {
+        if (dest == NULL || src == NULL || dest_size == 0) {
+            return -1; // Error
+        }
+        
+        size_t src_len = strlen(src);
+        if (src_len >= dest_size) {
+            // Source string won't fit in destination
+            strncpy(dest, src, dest_size - 1);
+            dest[dest_size - 1] = '\0';
+            return -1; // Truncation occurred
+        }
+        
+        strcpy(dest, src);
+        return 0; // Success
+    }
+    ```
+    Use bounded string functions and explicit buffer size management to prevent buffer overflows, which can lead to security vulnerabilities.
+  </Accordion>
+  
+  <Accordion title="Memory Leaks" icon="warning">
+    ```c
+    // Anti-pattern: Memory leak
+    void process_data() {
+        char* buffer = (char*)malloc(1024);
+        if (buffer == NULL) {
+            return; // Early return without freeing
+        }
+        
+        // Process data...
+        
+        if (error_condition) {
+            return; // Another early return without freeing
+        }
+        
+        free(buffer);
+    }
+    
+    // Better approach: Ensure cleanup
+    void process_data() {
+        char* buffer = (char*)malloc(1024);
+        if (buffer == NULL) {
+            return;
+        }
+        
+        // Process data...
+        
+        if (error_condition) {
+            free(buffer); // Free before returning
+            return;
+        }
+        
+        free(buffer);
+    }
+    ```
+    Always free allocated memory, even in error paths, to prevent memory leaks.
+  </Accordion>
+  
+  <Accordion title="Using gets() Function" icon="warning">
+    ```c
+    // Anti-pattern: Using gets()
+    void read_input() {
+        char buffer[256];
+        gets(buffer); // Dangerous - no bounds checking
+        // Process buffer...
+    }
+    
+    // Better approach: Use fgets()
+    void read_input() {
+        char buffer[256];
+        if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
+            // Remove newline if present
+            size_t len = strlen(buffer);
+            if (len > 0 && buffer[len-1] == '\n') {
+                buffer[len-1] = '\0';
+            }
+            // Process buffer...
+        }
+    }
+    ```
+    Never use `gets()` as it has no bounds checking. Use `fgets()` or other bounded input functions instead.
+  </Accordion>
+  
+  <Accordion title="Integer Overflow" icon="warning">
+    ```c
+    // Anti-pattern: Integer overflow vulnerability
+    void* allocate_buffer(size_t n_elements, size_t element_size) {
+        size_t size = n_elements * element_size; // Potential overflow
+        return malloc(size);
+    }
+    
+    // Better approach: Check for overflow
+    void* allocate_buffer(size_t n_elements, size_t element_size) {
+        // Check for overflow
+        if (n_elements > 0 && SIZE_MAX / n_elements < element_size) {
+            errno = EOVERFLOW;
+            return NULL; // Overflow would occur
+        }
+        
+        size_t size = n_elements * element_size;
+        return malloc(size);
+    }
+    ```
+    Be aware of integer overflow, especially when calculating sizes for memory allocation.
+  </Accordion>
+  
+  <Accordion title="Using Uninitialized Variables" icon="warning">
+    ```c
+    // Anti-pattern: Uninitialized variable
+    int calculate_sum(int count) {
+        int sum; // Uninitialized
+        for (int i = 1; i <= count; i++) {
+            sum += i; // Using uninitialized value in first iteration
+        }
+        return sum;
+    }
+    
+    // Better approach: Initialize variables
+    int calculate_sum(int count) {
+        int sum = 0; // Initialized
+        for (int i = 1; i <= count; i++) {
+            sum += i;
+        }
+        return sum;
+    }
+    ```
+    Always initialize variables before using them to avoid undefined behavior.
+  </Accordion>
+  
+  <Accordion title="Not Using const for Read-Only Parameters" icon="warning">
+    ```c
+    // Anti-pattern: Missing const
+    int string_length(char* str) {
+        // Function doesn't modify str, but signature allows it
+        return strlen(str);
+    }
+    
+    // Better approach: Use const for read-only parameters
+    int string_length(const char* str) {
+        // Clearly communicates that str is not modified
+        return strlen(str);
+    }
+    ```
+    Use `const` for function parameters that should not be modified to communicate intent and enable compiler optimizations.
+  </Accordion>
+  
+  <Accordion title="Using Magic Numbers" icon="warning">
+    ```c
+    // Anti-pattern: Magic numbers
+    void process_data(int value) {
+        if (value > 1000) { // What does 1000 represent?
+            // Handle special case
+        }
+        
+        char buffer[256]; // Why 256?
+        // Process data...
+    }
+    
+    // Better approach: Named constants
+    #define MAX_THRESHOLD 1000
+    #define BUFFER_SIZE 256
+    
+    void process_data(int value) {
+        if (value > MAX_THRESHOLD) {
+            // Handle special case
+        }
+        
+        char buffer[BUFFER_SIZE];
+        // Process data...
+    }
+    ```
+    Use named constants instead of magic numbers to improve code readability and maintainability.
+  </Accordion>
+  
+  <Accordion title="Using Global Variables" icon="warning">
+    ```c
+    // Anti-pattern: Global variables
+    int g_count = 0;
+    char g_buffer[1024];
+    
+    void increment_count() {
+        g_count++;
+    }
+    
+    void process_data() {
+        // Using global variables
+        strcpy(g_buffer, "data");
+        increment_count();
+    }
+    
+    // Better approach: Pass parameters
+    struct Context {
+        int count;
+        char buffer[1024];
+    };
+    
+    void increment_count(struct Context* ctx) {
+        ctx->count++;
+    }
+    
+    void process_data(struct Context* ctx) {
+        strcpy(ctx->buffer, "data");
+        increment_count(ctx);
+    }
+    ```
+    Avoid global variables as they create hidden dependencies and make code harder to test and reason about.
+  </Accordion>
+  
+  <Accordion title="Not Using Header Guards" icon="warning">
+    ```c
+    // Anti-pattern: No header guards
+    // file: utils.h
+    struct Point {
+        int x;
+        int y;
+    };
+    
+    void print_point(struct Point p);
+    
+    // Better approach: Use header guards
+    // file: utils.h
+    #ifndef UTILS_H
+    #define UTILS_H
+    
+    struct Point {
+        int x;
+        int y;
+    };
+    
+    void print_point(struct Point p);
+    
+    #endif // UTILS_H
+    ```
+    Always use header guards to prevent multiple inclusion of header files, which can lead to compilation errors.
+  </Accordion>
+  
+  <Accordion title="Using void* Without Type Checking" icon="warning">
+    ```c
+    // Anti-pattern: Unsafe void* usage
+    void process_data(void* data, int type) {
+        if (type == 0) {
+            int* int_data = (int*)data;
+            // Process int data...
+        } else if (type == 1) {
+            char* char_data = (char*)data;
+            // Process char data...
+        }
+    }
+    
+    // Better approach: Use a union with a type tag
+    enum DataType { INT_TYPE, CHAR_TYPE };
+    
+    struct Data {
+        enum DataType type;
+        union {
+            int int_value;
+            char* char_value;
+        } value;
+    };
+    
+    void process_data(struct Data* data) {
+        if (data->type == INT_TYPE) {
+            // Process int data...
+            int value = data->value.int_value;
+        } else if (data->type == CHAR_TYPE) {
+            // Process char data...
+            char* value = data->value.char_value;
+        }
+    }
+    ```
+    Avoid using `void*` without proper type checking. Use tagged unions or other type-safe alternatives when possible.
+  </Accordion>
+  
+  <Accordion title="Not Using Function Prototypes" icon="warning">
+    ```c
+    // Anti-pattern: Missing function prototype
+    // file: main.c
+    int main() {
+        int result = add(5, 3); // No prototype, compiler assumes int add()
+        printf("Result: %d\n", result);
+        return 0;
+    }
+    
+    // file: math.c
+    int add(int a, int b) {
+        return a + b;
+    }
+    
+    // Better approach: Use function prototypes
+    // file: math.h
+    #ifndef MATH_H
+    #define MATH_H
+    
+    int add(int a, int b);
+    
+    #endif // MATH_H
+    
+    // file: main.c
+    #include "math.h"
+    
+    int main() {
+        int result = add(5, 3); // Proper prototype available
+        printf("Result: %d\n", result);
+        return 0;
+    }
+    ```
+    Always use function prototypes to enable compiler type checking and avoid implicit declarations.
+  </Accordion>
+  
+  <Accordion title="Not Checking for NULL After Memory Allocation" icon="warning">
+    ```c
+    // Anti-pattern: Not checking for NULL
+    void process_data(size_t size) {
+        int* buffer = (int*)malloc(size * sizeof(int));
+        buffer[0] = 42; // Crash if malloc returned NULL
+        // Process buffer...
+        free(buffer);
+    }
+    
+    // Better approach: Check for NULL
+    void process_data(size_t size) {
+        int* buffer = (int*)malloc(size * sizeof(int));
+        if (buffer == NULL) {
+            perror("Failed to allocate memory");
+            return;
+        }
+        
+        buffer[0] = 42;
+        // Process buffer...
+        free(buffer);
+    }
+    ```
+    Always check if memory allocation functions like `malloc` return NULL before using the allocated memory.
+  </Accordion>
+  
+  <Accordion title="Using strcpy and strcat Unsafely" icon="warning">
+    ```c
+    // Anti-pattern: Unsafe string functions
+    void concatenate_strings(char* dest, const char* src1, const char* src2) {
+        strcpy(dest, src1); // No bounds checking
+        strcat(dest, src2); // No bounds checking
+    }
+    
+    // Better approach: Use bounded string functions
+    void concatenate_strings(char* dest, size_t dest_size, const char* src1, const char* src2) {
+        size_t remaining = dest_size;
+        
+        // Copy first string with bounds checking
+        strncpy(dest, src1, remaining - 1);
+        dest[remaining - 1] = '\0'; // Ensure null termination
+        
+        // Calculate remaining space
+        size_t used = strlen(dest);
+        if (used < remaining - 1) {
+            // Append second string with bounds checking
+            strncat(dest, src2, remaining - used - 1);
+        }
+    }
+    ```
+    Avoid using unsafe string functions like `strcpy` and `strcat`. Use bounded alternatives like `strncpy` and `strncat`, or better yet, use safer string handling libraries.
+  </Accordion>
+  
+  <Accordion title="Using Switch Statements Without Default Case" icon="warning">
+    ```c
+    // Anti-pattern: Switch without default
+    void process_command(int cmd) {
+        switch (cmd) {
+            case CMD_OPEN:
+                // Handle open
+                break;
+            case CMD_CLOSE:
+                // Handle close
+                break;
+            case CMD_READ:
+                // Handle read
+                break;
+            // No default case - what if cmd is invalid?
+        }
+    }
+    
+    // Better approach: Include default case
+    void process_command(int cmd) {
+        switch (cmd) {
+            case CMD_OPEN:
+                // Handle open
+                break;
+            case CMD_CLOSE:
+                // Handle close
+                break;
+            case CMD_READ:
+                // Handle read
+                break;
+            default:
+                fprintf(stderr, "Unknown command: %d\n", cmd);
+                // Handle unknown command
+                break;
+        }
+    }
+    ```
+    Always include a default case in switch statements to handle unexpected values.
+  </Accordion>
+  
+  <Accordion title="Not Using Static Analysis Tools" icon="warning">
+    ```c
+    // Anti-pattern: Code with subtle bugs
+    int calculate_average(int* values, int count) {
+        int sum = 0;
+        for (int i = 0; i <= count; i++) { // Off-by-one error
+            sum += values[i];
+        }
+        return sum / count;
+    }
+    
+    // Better approach: Use static analysis tools
+    // $ gcc -Wall -Wextra -Werror -pedantic file.c
+    // $ clang --analyze file.c
+    // $ cppcheck file.c
+    
+    int calculate_average(int* values, int count) {
+        if (values == NULL || count <= 0) {
+            return 0; // Handle edge cases
+        }
+        
+        int sum = 0;
+        for (int i = 0; i < count; i++) { // Correct loop bounds
+            sum += values[i];
+        }
+        return sum / count;
+    }
+    ```
+    Use static analysis tools and compiler warnings to catch common bugs and issues in your code.
+  </Accordion>
+  
+  <Accordion title="Using Macros Instead of Inline Functions" icon="warning">
+    ```c
+    // Anti-pattern: Unsafe macros
+    #define SQUARE(x) x * x
+    
+    int result = SQUARE(2 + 3); // Expands to 2 + 3 * 2 + 3 = 11, not 25!
+    
+    // Better approach: Safer macros with parentheses
+    #define SQUARE(x) ((x) * (x))
+    
+    // Even better: Use inline functions (C99)
+    static inline int square(int x) {
+        return x * x;
+    }
+    ```
+    Prefer inline functions over macros when possible, as they provide type checking and avoid common macro pitfalls.
+  </Accordion>
+  
+  <Accordion title="Not Using Defensive Programming" icon="warning">
+    ```c
+    // Anti-pattern: Assuming valid input
+    int divide(int a, int b) {
+        return a / b; // Crashes if b is 0
+    }
+    
+    // Better approach: Defensive programming
+    int divide(int a, int b, int* success) {
+        if (b == 0) {
+            if (success != NULL) {
+                *success = 0; // Indicate failure
+            }
+            return 0; // Default value
+        }
+        
+        if (success != NULL) {
+            *success = 1; // Indicate success
+        }
+        return a / b;
+    }
+    ```
+    Use defensive programming techniques to handle invalid inputs and edge cases.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Codes" icon="warning">
+    ```c
+    // Anti-pattern: Inconsistent error handling
+    int process_file(const char* filename) {
+        FILE* file = fopen(filename, "r");
+        if (file == NULL) {
+            return -1; // Error code, but what does -1 mean?
+        }
+        
+        // Process file...
+        
+        fclose(file);
+        return 0; // Success
+    }
+    
+    // Better approach: Use consistent error codes
+    // Define error codes
+    #define SUCCESS 0
+    #define ERROR_FILE_NOT_FOUND 1
+    #define ERROR_READ_FAILED 2
+    #define ERROR_INVALID_FORMAT 3
+    
+    int process_file(const char* filename) {
+        FILE* file = fopen(filename, "r");
+        if (file == NULL) {
+            return ERROR_FILE_NOT_FOUND;
+        }
+        
+        // Process file...
+        
+        fclose(file);
+        return SUCCESS;
+    }
+    ```
+    Use consistent, well-documented error codes or an error handling system to communicate failures.
+  </Accordion>
+</AccordionGroup>

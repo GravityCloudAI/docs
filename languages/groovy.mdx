@@ -1,0 +1,450 @@
+---
+title: 'Groovy'
+description: 'Groovy is a powerful, optionally typed, and dynamic language for the Java platform. It integrates smoothly with Java while offering features like closures, dynamic typing, and embedded DSL support.'
+---
+
+<AccordionGroup>
+  <Accordion title="Groovy Anti-Patterns Overview" icon="groovy">
+    Groovy, despite being a flexible and powerful language for the JVM, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing Groovy code.
+  </Accordion>
+  
+  <Accordion title="Not Using def or Proper Type Declarations" icon="warning">
+    ```groovy
+    // Anti-pattern: Not using def or type declarations
+    result = someMethod() // Implicitly creates a binding variable
+    
+    // Better approach: Use def or explicit types
+    def result = someMethod() // Local variable
+    // Or with explicit type
+    String name = "John Doe"
+    ```
+    Always use `def` or explicit type declarations for variables. Without them, Groovy creates variables in the binding scope, which can lead to unexpected behavior and makes refactoring difficult.
+  </Accordion>
+  
+  <Accordion title="Overusing Dynamic Features" icon="warning">
+    ```groovy
+    // Anti-pattern: Overusing dynamic features
+    def person = [name: "John", age: 30]
+    def key = "name"
+    def value = person."${key}" // Dynamic property access
+    
+    def methodName = "toString"
+    def result = person."$methodName"() // Dynamic method invocation
+    
+    // Better approach: Use static features when possible
+    def person = [name: "John", age: 30]
+    def name = person.name // Direct property access
+    
+    // If dynamic access is needed, be explicit
+    def key = "name"
+    def value = person[key] // Map access syntax
+    ```
+    While Groovy's dynamic features are powerful, overusing them can make code harder to understand, maintain, and refactor. Use static features when possible for better IDE support and code clarity.
+  </Accordion>
+  
+  <Accordion title="Not Using Groovy Truth" icon="warning">
+    ```groovy
+    // Anti-pattern: Not using Groovy truth
+    if (list != null && list.size() > 0) {
+        // Do something with non-empty list
+    }
+    
+    // Better approach: Use Groovy truth
+    if (list) {
+        // Do something with non-empty list
+    }
+    ```
+    Embrace Groovy's concept of truth. Collections, strings, and other objects evaluate to `false` when empty or null, which leads to more concise and readable code.
+  </Accordion>
+  
+  <Accordion title="Using == Instead of equals" icon="warning">
+    ```groovy
+    // Anti-pattern: Using == for object comparison
+    String a = "Hello"
+    String b = new String("Hello")
+    if (a == b) { // This might work for strings due to JVM optimizations, but is not reliable
+        println "Equal"
+    }
+    
+    // Better approach: Use equals or Groovy's == (which maps to equals)
+    if (a.equals(b)) {
+        println "Equal"
+    }
+    
+    // In Groovy, == is actually mapped to equals() for objects
+    if (a == b) { // In Groovy, this is safe
+        println "Equal"
+    }
+    ```
+    In Groovy, `==` is mapped to `equals()` for objects, unlike Java where it checks reference equality. However, it's important to understand this distinction, especially when working with code that mixes Java and Groovy.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Closures" icon="warning">
+    ```groovy
+    // Anti-pattern: Not using closures effectively
+    def numbers = [1, 2, 3, 4, 5]
+    def sum = 0
+    for (num in numbers) {
+        sum += num
+    }
+    
+    // Better approach: Use closures with collection methods
+    def numbers = [1, 2, 3, 4, 5]
+    def sum = numbers.sum()
+    
+    // Or with a custom operation
+    def sumOfSquares = numbers.collect { it * it }.sum()
+    ```
+    Use Groovy's powerful closure syntax with collection methods like `each`, `collect`, `find`, and `sum` instead of traditional loops. This leads to more concise and expressive code.
+  </Accordion>
+  
+  <Accordion title="Not Using Safe Navigation Operator" icon="warning">
+    ```groovy
+    // Anti-pattern: Not using safe navigation
+    def name = null
+    if (person != null && person.address != null && person.address.city != null) {
+        name = person.address.city.name
+    }
+    
+    // Better approach: Use safe navigation operator
+    def name = person?.address?.city?.name
+    ```
+    Use the safe navigation operator (`?.`) to avoid null pointer exceptions when accessing properties of potentially null objects. This makes code more concise and safer.
+  </Accordion>
+  
+  <Accordion title="Not Using Elvis Operator" icon="warning">
+    ```groovy
+    // Anti-pattern: Not using Elvis operator
+    def displayName
+    if (user.name != null) {
+        displayName = user.name
+    } else {
+        displayName = "Anonymous"
+    }
+    
+    // Better approach: Use Elvis operator
+    def displayName = user.name ?: "Anonymous"
+    ```
+    Use the Elvis operator (`?:`) for providing default values. It returns the left expression if it's not null/false, otherwise it returns the right expression.
+  </Accordion>
+  
+  <Accordion title="Not Using With Method" icon="warning">
+    ```groovy
+    // Anti-pattern: Verbose object configuration
+    def person = new Person()
+    person.firstName = "John"
+    person.lastName = "Doe"
+    person.age = 30
+    person.email = "john.doe@example.com"
+    
+    // Better approach: Use with method
+    def person = new Person().with {
+        firstName = "John"
+        lastName = "Doe"
+        age = 30
+        email = "john.doe@example.com"
+        return it // Optional, 'it' is returned by default
+    }
+    ```
+    Use the `with` method to configure objects in a more concise and readable way. This is especially useful when setting multiple properties on an object.
+  </Accordion>
+  
+  <Accordion title="Not Using Tap Method" icon="warning">
+    ```groovy
+    // Anti-pattern: Breaking method chains for debugging
+    def result = service.fetchData()
+    println "Data: $result"
+    def processed = processor.process(result)
+    
+    // Better approach: Use tap method
+    def processed = service.fetchData().tap {
+        println "Data: $it"
+    }.with(processor.&process)
+    ```
+    Use the `tap` method to perform side effects (like logging) in the middle of a method chain without breaking the chain. This is useful for debugging and logging.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper String Interpolation" icon="warning">
+    ```groovy
+    // Anti-pattern: String concatenation
+    def message = "Hello, " + user.name + "! You have " + user.messages.size() + " new messages."
+    
+    // Better approach: Use GStrings (string interpolation)
+    def message = "Hello, ${user.name}! You have ${user.messages.size()} new messages."
+    ```
+    Use Groovy's string interpolation (GStrings) instead of string concatenation. It's more readable and often more efficient.
+  </Accordion>
+  
+  <Accordion title="Not Using Spread Operator" icon="warning">
+    ```groovy
+    // Anti-pattern: Manual collection transformation
+    def names = []
+    for (person in people) {
+        names.add(person.name)
+    }
+    
+    // Better approach: Use spread operator
+    def names = people*.name
+    ```
+    Use the spread operator (`*.`) to collect property values from a collection of objects. It's a concise way to transform collections.
+  </Accordion>
+  
+  <Accordion title="Not Using Method References" icon="warning">
+    ```groovy
+    // Anti-pattern: Verbose method references
+    def uppercaseNames = names.collect { it.toUpperCase() }
+    
+    // Better approach: Use method references
+    def uppercaseNames = names.collect(String.&toUpperCase)
+    ```
+    Use method references (`Class.&method`) when passing methods as closures. This is more concise and can be more efficient.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Exception Handling" icon="warning">
+    ```groovy
+    // Anti-pattern: Try-catch with empty catch block
+    try {
+        // Some code that might throw an exception
+    } catch (Exception e) {
+        // Empty catch block or just e.printStackTrace()
+    }
+    
+    // Better approach: Proper exception handling
+    try {
+        // Some code that might throw an exception
+    } catch (IOException e) {
+        log.error("IO error: ${e.message}", e)
+        // Handle the specific exception
+    } catch (Exception e) {
+        log.error("Unexpected error: ${e.message}", e)
+        // Handle other exceptions
+    } finally {
+        // Cleanup code
+    }
+    ```
+    Use proper exception handling with specific exception types and meaningful error handling. Avoid empty catch blocks or just printing stack traces.
+  </Accordion>
+  
+  <Accordion title="Not Using Resource Management" icon="warning">
+    ```groovy
+    // Anti-pattern: Manual resource management
+    def file = new File("data.txt")
+    def reader = new FileReader(file)
+    try {
+        // Read from file
+    } finally {
+        reader.close()
+    }
+    
+    // Better approach: Use withCloseable or withResource
+    new File("data.txt").withReader { reader ->
+        // Read from file
+        // reader is automatically closed
+    }
+    ```
+    Use methods like `withCloseable`, `withReader`, `withWriter`, etc., for automatic resource management. These methods ensure that resources are properly closed, even if an exception occurs.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Multiline Strings" icon="warning">
+    ```groovy
+    // Anti-pattern: Concatenated strings for multiline content
+    def sql = "SELECT * " +
+              "FROM users " +
+              "WHERE active = true " +
+              "ORDER BY name"
+    
+    // Better approach: Use triple-quoted strings
+    def sql = """
+        SELECT *
+        FROM users
+        WHERE active = true
+        ORDER BY name
+    """
+    ```
+    Use triple-quoted strings (`"""`) for multiline content like SQL queries, HTML, or JSON. They preserve formatting and are more readable.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Builders" icon="warning">
+    ```groovy
+    // Anti-pattern: Manual XML construction
+    def writer = new StringWriter()
+    def xml = new MarkupBuilder(writer)
+    xml.person {
+        name {
+            first("John")
+            last("Doe")
+        }
+        age(30)
+    }
+    
+    // Better approach: Use DSL-style builders
+    def person = new groovy.xml.MarkupBuilder().person {
+        name {
+            first "John"
+            last "Doe"
+        }
+        age 30
+    }
+    ```
+    Use Groovy's builder pattern for constructing complex structures like XML, HTML, JSON, or Swing UIs. Builders provide a domain-specific language (DSL) that is more readable and maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```groovy
+    // Anti-pattern: Manual testing or no testing
+    def add(a, b) {
+        return a + b
+    }
+    
+    // Manual test
+    assert add(2, 3) == 5
+    
+    // Better approach: Use a testing framework
+    import spock.lang.Specification
+    
+    class MathSpec extends Specification {
+        def "adding two numbers"() {
+            expect:
+            add(a, b) == result
+            
+            where:
+            a | b | result
+            2 | 3 | 5
+            -1 | 1 | 0
+            0 | 0 | 0
+        }
+    }
+    ```
+    Use proper testing frameworks like Spock or JUnit for testing your code. Spock, in particular, leverages Groovy's features to provide expressive and powerful tests.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```groovy
+    // Anti-pattern: Poor or no documentation
+    def processData(data, options) {
+        // Implementation...
+    }
+    
+    // Better approach: Use Groovydoc
+    /**
+     * Process the given data according to the specified options.
+     *
+     * @param data The data to process, must be a collection of maps.
+     * @param options A map of options with the following keys:
+     *        - verbose: Whether to output verbose logs (default: false)
+     *        - maxItems: Maximum number of items to process (default: all)
+     * @return A list of processed items.
+     * @throws IllegalArgumentException If data is null or empty.
+     */
+    def processData(data, options) {
+        // Implementation...
+    }
+    ```
+    Document your code with Groovydoc comments. Include descriptions of parameters, return values, exceptions, and usage examples.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Dependency Management" icon="warning">
+    ```groovy
+    // Anti-pattern: Manual dependency management
+    // Copying JAR files into lib directory
+    
+    // Better approach: Use Gradle or Maven
+    // build.gradle
+    plugins {
+        id 'groovy'
+    }
+    
+    repositories {
+        mavenCentral()
+    }
+    
+    dependencies {
+        implementation 'org.codehaus.groovy:groovy-all:3.0.8'
+        implementation 'org.apache.commons:commons-lang3:3.12.0'
+        testImplementation 'org.spockframework:spock-core:2.0-groovy-3.0'
+    }
+    ```
+    Use proper dependency management tools like Gradle or Maven instead of manually managing JAR files. This ensures consistent builds and makes it easier to manage dependencies.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Configuration Management" icon="warning">
+    ```groovy
+    // Anti-pattern: Hardcoded configuration
+    def dbUrl = "jdbc:mysql://localhost:3306/mydb"
+    def dbUser = "root"
+    def dbPassword = "password"
+    
+    // Better approach: Externalize configuration
+    // config.groovy
+    environments {
+        development {
+            db {
+                url = "jdbc:mysql://localhost:3306/mydb"
+                user = "dev_user"
+                password = "dev_password"
+            }
+        }
+        production {
+            db {
+                url = "jdbc:mysql://prod-server:3306/mydb"
+                user = System.getenv("DB_USER")
+                password = System.getenv("DB_PASSWORD")
+            }
+        }
+    }
+    
+    // Usage
+    def config = new ConfigSlurper(environment).parse(new File('config.groovy').toURL())
+    def dbUrl = config.db.url
+    ```
+    Externalize configuration instead of hardcoding values. Use Groovy's `ConfigSlurper` or other configuration mechanisms to manage environment-specific settings.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Logging" icon="warning">
+    ```groovy
+    // Anti-pattern: Using println for logging
+    def processOrder(order) {
+        println "Processing order: $order"
+        // Process order...
+        println "Order processed successfully"
+    }
+    
+    // Better approach: Use a logging framework
+    import groovy.util.logging.Slf4j
+    
+    @Slf4j
+    class OrderService {
+        def processOrder(order) {
+            log.info("Processing order: $order")
+            // Process order...
+            log.info("Order processed successfully")
+        }
+    }
+    ```
+    Use a proper logging framework like SLF4J with Logback or Log4j instead of `println` statements. Groovy provides annotations like `@Slf4j` to simplify logger setup.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Null Handling" icon="warning">
+    ```groovy
+    // Anti-pattern: Not handling nulls properly
+    def getName(user) {
+        return user.name // Might throw NPE if user is null
+    }
+    
+    // Better approach: Use null-safe operators and Optional
+    import java.util.Optional
+    
+    def getName(user) {
+        return Optional.ofNullable(user).
+                map { it.name }.
+                orElse("Unknown")
+    }
+    
+    // Or with Groovy's null-safe operator
+    def getName(user) {
+        return user?.name ?: "Unknown"
+    }
+    ```
+    Handle null values explicitly using Groovy's null-safe operators (`?.`, `?:`) or Java 8's `Optional`. This prevents null pointer exceptions and makes the code more robust.
+  </Accordion>
+</AccordionGroup>

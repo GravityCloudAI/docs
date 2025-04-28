@@ -1,0 +1,413 @@
+---
+title: 'R'
+description: 'R is a programming language and free software environment for statistical computing and graphics supported by the R Foundation for Statistical Computing. It is widely used among statisticians and data miners for data analysis and developing statistical software.'
+---
+
+<AccordionGroup>
+  <Accordion title="R Anti-Patterns Overview" icon="r">
+    R, despite being a powerful language for statistical computing and data analysis, has several common anti-patterns that can lead to inefficient code, memory issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing R code.
+  </Accordion>
+  
+  <Accordion title="Growing Objects in a Loop" icon="warning">
+    ```r
+    # Anti-pattern: Growing objects in a loop
+    result <- c()
+    for (i in 1:1000000) {
+      result <- c(result, i)  # Inefficient: creates a new vector each time
+    }
+    
+    # Better approach: Pre-allocate memory
+    result <- numeric(1000000)
+    for (i in 1:1000000) {
+      result[i] <- i
+    }
+    
+    # Even better: Use vectorization
+    result <- 1:1000000
+    ```
+    Avoid growing objects incrementally in loops. Pre-allocate memory for the final object size or use vectorized operations instead.
+  </Accordion>
+  
+  <Accordion title="Using apply() on Data Frames" icon="warning">
+    ```r
+    # Anti-pattern: Using apply() on data frames
+    df <- data.frame(a = 1:10, b = 11:20, c = 21:30)
+    result <- apply(df, 2, mean)  # Converts to matrix, losing column types
+    
+    # Better approach: Use lapply() or vapply() for data frames
+    result <- vapply(df, mean, numeric(1))
+    
+    # Or use dplyr
+    library(dplyr)
+    result <- df %>% summarise_all(mean)
+    ```
+    Avoid using `apply()` on data frames as it converts them to matrices, which can lead to unexpected results if columns have different types. Use `lapply()`, `vapply()`, or packages like dplyr instead.
+  </Accordion>
+  
+  <Accordion title="Using $ and [[]] Inconsistently" icon="warning">
+    ```r
+    # Anti-pattern: Inconsistent subsetting
+    df <- data.frame(a = 1:10, b = 11:20)
+    x <- df$a  # Using $
+    y <- df[['b']]  # Using [[]]
+    
+    # Function that fails with $ notation
+    process_column <- function(data, col_name) {
+      return(mean(data$col_name))  # This doesn't work as expected
+    }
+    
+    # Better approach: Consistent use of [[]]
+    process_column <- function(data, col_name) {
+      return(mean(data[[col_name]]))  # This works correctly
+    }
+    ```
+    Be consistent with subsetting operators. Use `[[]]` when the column name is stored in a variable or when writing functions that take column names as parameters.
+  </Accordion>
+  
+  <Accordion title="Using attach()" icon="warning">
+    ```r
+    # Anti-pattern: Using attach()
+    df <- data.frame(x = 1:10, y = 11:20)
+    attach(df)
+    result <- x + y  # Seems convenient but dangerous
+    # What if we modify df or create new variables with the same names?
+    detach(df)
+    
+    # Better approach: Use with() or explicit references
+    result <- with(df, x + y)
+    
+    # Or use pipe operators
+    library(dplyr)
+    result <- df %>% mutate(sum = x + y) %>% pull(sum)
+    ```
+    Avoid using `attach()` as it can lead to confusing scoping issues and hard-to-find bugs. Use `with()`, explicit references, or pipe operators instead.
+  </Accordion>
+  
+  <Accordion title="Using row.names" icon="warning">
+    ```r
+    # Anti-pattern: Using row.names for data
+    df <- data.frame(x = 1:3, y = 4:6)
+    row.names(df) <- c("A", "B", "C")
+    
+    # Better approach: Use a proper column
+    df <- data.frame(id = c("A", "B", "C"), x = 1:3, y = 4:6)
+    ```
+    Avoid using `row.names()` to store actual data. Instead, include the information as a proper column in your data frame.
+  </Accordion>
+  
+  <Accordion title="Using for Loops Instead of Vectorization" icon="warning">
+    ```r
+    # Anti-pattern: Using for loops for simple operations
+    x <- 1:1000
+    result <- numeric(length(x))
+    for (i in seq_along(x)) {
+      result[i] <- x[i] * 2
+    }
+    
+    # Better approach: Use vectorization
+    result <- x * 2
+    ```
+    Avoid using for loops for operations that can be vectorized. R is optimized for vector operations, which are typically much faster.
+  </Accordion>
+  
+  <Accordion title="Using global() and <<-" icon="warning">
+    ```r
+    # Anti-pattern: Using global variables and <<-
+    counter <- 0
+    increment_counter <- function() {
+      counter <<- counter + 1  # Modifies global variable
+    }
+    
+    # Better approach: Pass and return values explicitly
+    increment_counter <- function(counter) {
+      return(counter + 1)
+    }
+    counter <- increment_counter(counter)
+    ```
+    Avoid using global variables and the `<<-` operator. Instead, pass values explicitly to functions and return modified values.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```r
+    # Anti-pattern: No error handling
+    process_file <- function(file_path) {
+      data <- read.csv(file_path)  # Will error if file doesn't exist
+      # Process data...
+      return(result)
+    }
+    
+    # Better approach: Use tryCatch
+    process_file <- function(file_path) {
+      tryCatch({
+        data <- read.csv(file_path)
+        # Process data...
+        return(result)
+      }, error = function(e) {
+        warning(paste("Error processing file:", e$message))
+        return(NULL)
+      })
+    }
+    ```
+    Use proper error handling with `tryCatch()` to gracefully handle errors and provide meaningful error messages.
+  </Accordion>
+  
+  <Accordion title="Using T and F Instead of TRUE and FALSE" icon="warning">
+    ```r
+    # Anti-pattern: Using T and F
+    if (x > 10) {
+      flag <- T
+    } else {
+      flag <- F
+    }
+    
+    # Better approach: Use TRUE and FALSE
+    if (x > 10) {
+      flag <- TRUE
+    } else {
+      flag <- FALSE
+    }
+    
+    # Even better: Direct logical result
+    flag <- x > 10
+    ```
+    Avoid using `T` and `F` as shortcuts for `TRUE` and `FALSE`. They are just variables that can be reassigned, potentially leading to confusing bugs.
+  </Accordion>
+  
+  <Accordion title="Using stringsAsFactors=TRUE" icon="warning">
+    ```r
+    # Anti-pattern: Letting strings be converted to factors
+    df <- read.csv("data.csv")  # By default, strings become factors
+    
+    # Better approach: Be explicit about factor conversion
+    df <- read.csv("data.csv", stringsAsFactors = FALSE)
+    
+    # Convert specific columns to factors as needed
+    df$category <- factor(df$category)
+    ```
+    Avoid letting R automatically convert strings to factors. Be explicit about which columns should be factors. Note that in R 4.0.0 and later, the default changed to `stringsAsFactors = FALSE`.
+  </Accordion>
+  
+  <Accordion title="Using rm(list=ls()) to Clean Environment" icon="warning">
+    ```r
+    # Anti-pattern: Using rm(list=ls()) at the beginning of scripts
+    rm(list=ls())  # Clears the entire environment
+    
+    # Better approach: Use separate R sessions or restart R
+    # Or be specific about what to remove
+    rm(temp_var, another_var)
+    ```
+    Avoid using `rm(list=ls())` to clean your environment, especially in scripts or functions. It can lead to unexpected behavior and makes code less reproducible. Instead, restart R or use separate R sessions.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Package Management" icon="warning">
+    ```r
+    # Anti-pattern: Loading packages without checking
+    library(dplyr)
+    library(ggplot2)
+    # What if these packages aren't installed?
+    
+    # Better approach: Check and install if needed
+    if (!requireNamespace("dplyr", quietly = TRUE)) {
+      install.packages("dplyr")
+    }
+    library(dplyr)
+    
+    # Even better: Use pacman or similar
+    if (!requireNamespace("pacman", quietly = TRUE)) {
+      install.packages("pacman")
+    }
+    pacman::p_load(dplyr, ggplot2, tidyr)
+    ```
+    Use proper package management to check if packages are installed before loading them, and install them if needed.
+  </Accordion>
+  
+  <Accordion title="Using setwd() in Scripts" icon="warning">
+    ```r
+    # Anti-pattern: Using setwd() in scripts
+    setwd("/path/to/my/project")  # Not portable across different systems
+    
+    # Better approach: Use here package or relative paths
+    library(here)
+    data <- read.csv(here("data", "mydata.csv"))
+    ```
+    Avoid using `setwd()` in scripts as it makes them less portable. Use the `here` package or relative paths instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```r
+    # Anti-pattern: No or minimal documentation
+    process_data <- function(data, threshold) {
+      # Complex processing...
+      return(result)
+    }
+    
+    # Better approach: Use roxygen2 style documentation
+    #' Process data based on threshold
+    #'
+    #' @param data A data frame containing the input data
+    #' @param threshold Numeric threshold for filtering
+    #' @return A processed data frame
+    #' @examples
+    #' process_data(my_data, 0.5)
+    process_data <- function(data, threshold) {
+      # Complex processing...
+      return(result)
+    }
+    ```
+    Document your functions and scripts properly, preferably using roxygen2-style comments for functions.
+  </Accordion>
+  
+  <Accordion title="Using sapply() When Value Type Might Vary" icon="warning">
+    ```r
+    # Anti-pattern: Using sapply() when return type might vary
+    result <- sapply(mixed_list, process_item)  # Might return list, vector, or matrix
+    
+    # Better approach: Use vapply() with explicit return type
+    result <- vapply(mixed_list, process_item, numeric(1))
+    
+    # Or use lapply() if you need a list
+    result <- lapply(mixed_list, process_item)
+    ```
+    Avoid using `sapply()` when the return type might vary. Use `vapply()` with an explicit return type or `lapply()` instead.
+  </Accordion>
+  
+  <Accordion title="Using Inefficient Data Structures" icon="warning">
+    ```r
+    # Anti-pattern: Using data frames for simple lookups
+    lookup_df <- data.frame(key = c("A", "B", "C"), value = c(1, 2, 3))
+    get_value <- function(key) {
+      lookup_df$value[lookup_df$key == key]  # Inefficient for large data
+    }
+    
+    # Better approach: Use named vectors or environments
+    lookup_vec <- c(A = 1, B = 2, C = 3)
+    get_value <- function(key) {
+      lookup_vec[key]  # Much faster
+    }
+    ```
+    Choose appropriate data structures for your task. For lookups, named vectors or environments are often more efficient than data frames.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Subsetting" icon="warning">
+    ```r
+    # Anti-pattern: Inefficient subsetting
+    df <- data.frame(id = 1:1000, value = rnorm(1000))
+    subset_df <- df[df$id %in% target_ids, ]  # Creates a copy
+    
+    # Better approach: Use data.table or dplyr
+    library(data.table)
+    dt <- as.data.table(df)
+    subset_dt <- dt[id %in% target_ids]  # More efficient
+    
+    # Or with dplyr
+    library(dplyr)
+    subset_df <- df %>% filter(id %in% target_ids)
+    ```
+    Use efficient subsetting methods, especially for large datasets. Consider using packages like data.table or dplyr for better performance.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Naming Conventions" icon="warning">
+    ```r
+    # Anti-pattern: Inconsistent or unclear naming
+    x <- 10
+    procesData <- function(d) { /* ... */ }
+    calc.result <- procesData(x)
+    
+    # Better approach: Consistent, descriptive naming
+    temperature_celsius <- 10
+    process_data <- function(data) { /* ... */ }
+    calculated_result <- process_data(temperature_celsius)
+    ```
+    Use consistent, descriptive naming conventions for variables and functions. The most common convention in R is snake_case (words separated by underscores).
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```r
+    # Anti-pattern: No testing
+    calculate_mean <- function(x) {
+      sum(x) / length(x)  # What if x is empty or contains NA?
+    }
+    
+    # Better approach: Use testthat or similar
+    library(testthat)
+    
+    test_that("calculate_mean works correctly", {
+      expect_equal(calculate_mean(c(1, 2, 3)), 2)
+      expect_equal(calculate_mean(c(1, NA, 3), na.rm = TRUE), 2)
+      expect_error(calculate_mean(numeric(0)))
+    })
+    
+    # And fix the function
+    calculate_mean <- function(x, na.rm = FALSE) {
+      if (length(x) == 0) stop("Cannot calculate mean of empty vector")
+      sum(x, na.rm = na.rm) / sum(!is.na(x) | !na.rm)
+    }
+    ```
+    Write tests for your functions to ensure they work correctly in different scenarios. Use packages like testthat for structured testing.
+  </Accordion>
+  
+  <Accordion title="Using print() for Debugging" icon="warning">
+    ```r
+    # Anti-pattern: Using print() for debugging
+    process_data <- function(data) {
+      print("Processing data...")
+      result <- some_calculation(data)
+      print(result)
+      return(result)
+    }
+    
+    # Better approach: Use logging packages
+    library(logger)
+    
+    process_data <- function(data) {
+      log_info("Processing data...")
+      result <- some_calculation(data)
+      log_debug("Calculation result: {result}")
+      return(result)
+    }
+    ```
+    Avoid using `print()` statements for debugging. Use proper logging packages like logger or futile.logger instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Memory Management" icon="warning">
+    ```r
+    # Anti-pattern: Creating large intermediate objects
+    process_large_data <- function(data) {
+      temp1 <- expensive_operation1(data)  # Large intermediate object
+      temp2 <- expensive_operation2(temp1)  # Another large object
+      result <- final_calculation(temp2)
+      return(result)
+    }
+    
+    # Better approach: Clean up intermediate objects
+    process_large_data <- function(data) {
+      temp1 <- expensive_operation1(data)
+      temp2 <- expensive_operation2(temp1)
+      rm(temp1)  # Remove when no longer needed
+      gc()  # Suggest garbage collection
+      result <- final_calculation(temp2)
+      return(result)
+    }
+    ```
+    Be mindful of memory usage, especially when working with large datasets. Remove large objects when they're no longer needed and consider using packages like data.table or ff for out-of-memory processing.
+  </Accordion>
+  
+  <Accordion title="Using Default Arguments Incorrectly" icon="warning">
+    ```r
+    # Anti-pattern: Mutable default arguments
+    add_to_list <- function(item, my_list = c()) {
+      my_list <- c(my_list, item)
+      return(my_list)
+    }
+    # This works as expected in R, unlike Python, but is still confusing
+    
+    # Better approach: Initialize inside the function
+    add_to_list <- function(item, my_list = NULL) {
+      if (is.null(my_list)) my_list <- c()
+      my_list <- c(my_list, item)
+      return(my_list)
+    }
+    ```
+    Be careful with default arguments, especially when they are complex objects. Initialize them inside the function if needed.
+  </Accordion>
+</AccordionGroup>

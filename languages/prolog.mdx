@@ -1,0 +1,530 @@
+---
+title: 'Prolog'
+description: 'Prolog is a logic programming language associated with artificial intelligence and computational linguistics. It is based on formal logic and is particularly well-suited for problems involving complex relationships and pattern matching.'
+---
+
+<AccordionGroup>
+  <Accordion title="Prolog Anti-Patterns Overview" icon="prolog">
+    Prolog, despite being a powerful logic programming language, has several common anti-patterns that can lead to inefficient code, maintenance problems, and logical errors. Here are the most important anti-patterns to avoid when writing Prolog code.
+  </Accordion>
+  
+  <Accordion title="Using Cut (!) Incorrectly" icon="warning">
+    ```prolog
+    % Anti-pattern: Misusing cut
+    max(X, Y, X) :- X >= Y, !.
+    max(X, Y, Y).
+    
+    % This can lead to unexpected behavior when used with variables
+    % For example, max(5, 3, 3) will fail, even though 3 is not the maximum
+    
+    % Better approach: Use cut correctly
+    max(X, Y, X) :- X >= Y, !.
+    max(X, Y, Y) :- X < Y.
+    
+    % Or even better, use explicit conditions
+    max(X, Y, Max) :-
+        (X >= Y -> Max = X ; Max = Y).
+    ```
+    The cut operator (!) in Prolog prevents backtracking past a certain point. When used incorrectly, it can lead to unexpected failures or incorrect results. Be careful with cuts, and always ensure that your predicates behave correctly for all valid inputs.
+  </Accordion>
+  
+  <Accordion title="Relying on Specific Clause Order" icon="warning">
+    ```prolog
+    % Anti-pattern: Relying on clause order
+    member(X, [X|_]).
+    member(X, [_|T]) :- member(X, T).
+    
+    % This works fine for membership tests, but...
+    
+    % If we use it to generate members, the order matters:
+    % ?- member(X, [1,2,3]).
+    % X = 1 ;
+    % X = 2 ;
+    % X = 3.
+    
+    % If we reverse the clauses:
+    member(X, [_|T]) :- member(X, T).
+    member(X, [X|_]).
+    
+    % Now we get infinite recursion:
+    % ?- member(X, [1,2,3]).
+    % X = 1 ;
+    % X = 2 ;
+    % X = 3 ;
+    % ... (infinite loop)
+    
+    % Better approach: Design predicates to work regardless of clause order
+    % Or use explicit control structures
+    member_safe(X, List) :-
+        (   List = [Head|_],
+            X = Head
+        ;   List = [_|Tail],
+            member_safe(X, Tail)
+        ).
+    ```
+    Avoid writing predicates that rely on a specific clause order to work correctly. This makes your code fragile and harder to maintain. Instead, use explicit control structures or design your predicates to work correctly regardless of clause order.
+  </Accordion>
+  
+  <Accordion title="Not Using Tail Recursion" icon="warning">
+    ```prolog
+    % Anti-pattern: Non-tail recursive predicates
+    sum_list([], 0).
+    sum_list([H|T], Sum) :-
+        sum_list(T, TailSum),
+        Sum is H + TailSum.
+    
+    % Better approach: Use tail recursion with an accumulator
+    sum_list(List, Sum) :-
+        sum_list_acc(List, 0, Sum).
+    
+    sum_list_acc([], Acc, Acc).
+    sum_list_acc([H|T], Acc, Sum) :-
+        NewAcc is Acc + H,
+        sum_list_acc(T, NewAcc, Sum).
+    ```
+    Non-tail recursive predicates can lead to stack overflows with large inputs. Use tail recursion with accumulators to avoid this problem and make your code more efficient.
+  </Accordion>
+  
+  <Accordion title="Using assert/retract for State" icon="warning">
+    ```prolog
+    % Anti-pattern: Using assert/retract for state management
+    :- dynamic counter/1.
+    
+    initialize_counter :- 
+        retractall(counter(_)),
+        assert(counter(0)).
+    
+    increment_counter :-
+        retract(counter(Value)),
+        NewValue is Value + 1,
+        assert(counter(NewValue)).
+    
+    get_counter(Value) :-
+        counter(Value).
+    
+    % Better approach: Pass state explicitly
+    increment(Counter, NewCounter) :-
+        NewCounter is Counter + 1.
+    
+    % Or use DCGs (Definite Clause Grammars) for state threading
+    increment --> [Counter], { NewCounter is Counter + 1 }, [NewCounter].
+    
+    process(Initial, Final) :-
+        phrase((
+            increment,
+            increment,
+            increment
+        ), [Initial], [Final]).
+    ```
+    Avoid using `assert/1` and `retract/1` for managing state. These predicates modify the global database, making your code harder to reason about, test, and parallelize. Instead, pass state explicitly through arguments or use techniques like DCGs (Definite Clause Grammars) for state threading.
+  </Accordion>
+  
+  <Accordion title="Ignoring Determinism" icon="warning">
+    ```prolog
+    % Anti-pattern: Ignoring determinism
+    % This predicate is nondeterministic even though it could be deterministic
+    factorial(0, 1).
+    factorial(N, F) :-
+        N > 0,
+        N1 is N - 1,
+        factorial(N1, F1),
+        F is N * F1.
+    
+    % Better approach: Make deterministic predicates deterministic
+    factorial(0, 1) :- !.
+    factorial(N, F) :-
+        N > 0,
+        N1 is N - 1,
+        factorial(N1, F1),
+        F is N * F1.
+    
+    % Or use if-then-else
+    factorial(N, F) :-
+        (N =:= 0 ->
+            F = 1
+        ;
+            N1 is N - 1,
+            factorial(N1, F1),
+            F is N * F1
+        ).
+    ```
+    Pay attention to the determinism of your predicates. If a predicate should be deterministic (i.e., produce exactly one solution), make it explicitly so using cuts or if-then-else constructs. This improves efficiency and prevents unexpected results.
+  </Accordion>
+  
+  <Accordion title="Inefficient Use of Built-in Predicates" icon="warning">
+    ```prolog
+    % Anti-pattern: Inefficient use of built-in predicates
+    % Finding the length and then accessing an element
+    nth_element(List, N, Elem) :-
+        length(List, Len),
+        N =< Len,
+        nth1(N, List, Elem).
+    
+    % Checking if an element is in a list and then finding its position
+    find_position(Elem, List, Pos) :-
+        member(Elem, List),
+        nth1(Pos, List, Elem).
+    
+    % Better approach: Use the appropriate built-in predicates directly
+    nth_element(List, N, Elem) :-
+        nth1(N, List, Elem).
+    
+    find_position(Elem, List, Pos) :-
+        nth1(Pos, List, Elem).
+    ```
+    Understand and use built-in predicates efficiently. Avoid redundant operations or combining predicates in ways that lead to inefficient execution. Familiarize yourself with the available built-in predicates and their behavior.
+  </Accordion>
+  
+  <Accordion title="Not Using Indexing Effectively" icon="warning">
+    ```prolog
+    % Anti-pattern: Not using indexing effectively
+    % Prolog typically indexes on the first argument, so this is inefficient:
+    employee(john, developer, 100000).
+    employee(jane, manager, 120000).
+    employee(bob, developer, 95000).
+    
+    find_by_role(Role, Name) :-
+        employee(Name, Role, _).
+    
+    % Better approach: Structure facts to leverage indexing
+    employee_role(developer, john).
+    employee_role(manager, jane).
+    employee_role(developer, bob).
+    
+    employee_salary(john, 100000).
+    employee_salary(jane, 120000).
+    employee_salary(bob, 95000).
+    
+    find_by_role(Role, Name) :-
+        employee_role(Role, Name).
+    ```
+    Most Prolog implementations index facts based on the first argument. Structure your facts to take advantage of this indexing for efficient lookups. If you frequently need to query on different arguments, consider creating multiple predicates with different argument orders.
+  </Accordion>
+  
+  <Accordion title="Using Cuts to Prevent Exploration" icon="warning">
+    ```prolog
+    % Anti-pattern: Using cuts to prevent exploration
+    first_solution(X) :-
+        generate(X),
+        test(X),
+        !.  % Cut prevents finding alternative solutions
+    
+    % Better approach: Let the caller decide how many solutions they want
+    solution(X) :-
+        generate(X),
+        test(X).
+    
+    % The caller can use once/1 if they only want one solution
+    first_solution(X) :-
+        once(solution(X)).
+    ```
+    Avoid using cuts to artificially limit the number of solutions a predicate can generate. Instead, let the caller decide how many solutions they want. This makes your predicates more reusable and composable.
+  </Accordion>
+  
+  <Accordion title="Not Using Higher-Order Predicates" icon="warning">
+    ```prolog
+    % Anti-pattern: Duplicating code for similar operations
+    sum_list([], 0).
+    sum_list([H|T], Sum) :-
+        sum_list(T, TailSum),
+        Sum is H + TailSum.
+    
+    product_list([], 1).
+    product_list([H|T], Product) :-
+        product_list(T, TailProduct),
+        Product is H * TailProduct.
+    
+    % Better approach: Use higher-order predicates
+    :- meta_predicate foldl(3, +, +, -).
+    
+    foldl(_, Acc, [], Acc).
+    foldl(Goal, Acc, [H|T], Result) :-
+        call(Goal, Acc, H, NewAcc),
+        foldl(Goal, NewAcc, T, Result).
+    
+    sum(Acc, X, Result) :- Result is Acc + X.
+    product(Acc, X, Result) :- Result is Acc * X.
+    
+    sum_list(List, Sum) :- foldl(sum, 0, List, Sum).
+    product_list(List, Product) :- foldl(product, 1, List, Product).
+    ```
+    Use higher-order predicates like `maplist/2-5`, `foldl/4`, and `include/3` to abstract common patterns and reduce code duplication. Many Prolog implementations provide these predicates in their standard libraries.
+  </Accordion>
+  
+  <Accordion title="Not Using Modules" icon="warning">
+    ```prolog
+    % Anti-pattern: Everything in one file without modules
+    
+    % Better approach: Use modules to organize code
+    :- module(employee_management, [
+        add_employee/3,
+        find_employee/2,
+        update_salary/3
+    ]).
+    
+    :- use_module(library(lists)).
+    
+    % Private predicates
+    :- dynamic employee/3.
+    
+    validate_salary(Salary) :-
+        number(Salary),
+        Salary > 0.
+    
+    % Public API
+    add_employee(Name, Role, Salary) :-
+        validate_salary(Salary),
+        assertz(employee(Name, Role, Salary)).
+    
+    find_employee(Name, Employee) :-
+        employee(Name, Role, Salary),
+        Employee = employee(Name, Role, Salary).
+    
+    update_salary(Name, NewSalary, Status) :-
+        validate_salary(NewSalary),
+        (   retract(employee(Name, Role, _))
+        ->  assertz(employee(Name, Role, NewSalary)),
+            Status = success
+        ;   Status = not_found
+        ).
+    ```
+    Organize your code into modules with well-defined interfaces. This improves maintainability, reduces naming conflicts, and allows for better encapsulation of implementation details.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```prolog
+    % Anti-pattern: Poor error handling
+    process_file(Filename) :-
+        open(Filename, read, Stream),
+        read_data(Stream, Data),
+        close(Stream),
+        process_data(Data).
+    
+    % Better approach: Handle errors properly
+    process_file(Filename) :-
+        catch(
+            (
+                open(Filename, read, Stream),
+                call_cleanup(
+                    read_data(Stream, Data),
+                    close(Stream)
+                ),
+                process_data(Data)
+            ),
+            Error,
+            handle_error(Error)
+        ).
+    
+    handle_error(error(existence_error(source_sink, Filename), _)) :-
+        format('Error: File ~w does not exist~n', [Filename]),
+        fail.
+    handle_error(Error) :-
+        format('Unexpected error: ~w~n', [Error]),
+        fail.
+    ```
+    Implement proper error handling in your code. Use `catch/3` to catch and handle exceptions, and ensure resources are properly cleaned up using `call_cleanup/2` or similar mechanisms.
+  </Accordion>
+  
+  <Accordion title="Not Using Declarative Programming" icon="warning">
+    ```prolog
+    % Anti-pattern: Imperative style in Prolog
+    sort_list(List, Sorted) :-
+        List = [H|T],
+        partition(T, H, Less, Greater),
+        sort_list(Less, SortedLess),
+        sort_list(Greater, SortedGreater),
+        append(SortedLess, [H|SortedGreater], Sorted).
+    sort_list([], []).
+    
+    partition([], _, [], []).
+    partition([X|Xs], Pivot, [X|Less], Greater) :-
+        X =< Pivot,
+        partition(Xs, Pivot, Less, Greater).
+    partition([X|Xs], Pivot, Less, [X|Greater]) :-
+        X > Pivot,
+        partition(Xs, Pivot, Less, Greater).
+    
+    % Better approach: Use declarative built-ins when available
+    sort_list(List, Sorted) :-
+        sort(List, Sorted).
+    ```
+    Embrace declarative programming in Prolog. Focus on defining what you want to compute, not how to compute it. Use built-in predicates and libraries when available instead of reimplementing algorithms imperatively.
+  </Accordion>
+  
+  <Accordion title="Not Using Database Abstraction" icon="warning">
+    ```prolog
+    % Anti-pattern: Direct database manipulation
+    add_user(Name, Age) :-
+        assertz(user(Name, Age)).
+    
+    delete_user(Name) :-
+        retract(user(Name, _)).
+    
+    update_user_age(Name, NewAge) :-
+        retract(user(Name, _)),
+        assertz(user(Name, NewAge)).
+    
+    % Better approach: Abstract database operations
+    :- dynamic user/2.
+    
+    add_user(Name, Age) :-
+        (   user(Name, _)
+        ->  throw(error(user_exists(Name), _))
+        ;   assertz(user(Name, Age))
+        ).
+    
+    delete_user(Name) :-
+        (   retract(user(Name, _))
+        ->  true
+        ;   throw(error(user_not_found(Name), _))
+        ).
+    
+    update_user_age(Name, NewAge) :-
+        (   retract(user(Name, _))
+        ->  assertz(user(Name, NewAge))
+        ;   throw(error(user_not_found(Name), _))
+        ).
+    
+    with_transaction(Goal) :-
+        setup_call_cleanup(
+            ( nb_setval(transaction, []) ),
+            ( call(Goal) ),
+            ( nb_getval(transaction, Actions),
+              maplist(call, Actions) )
+        ).
+    ```
+    Abstract database operations behind a clean API. This makes your code more maintainable and allows you to change the underlying storage mechanism without affecting client code. Consider implementing transactions for operations that need to be atomic.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```prolog
+    % Anti-pattern: No documentation
+    factorial(0, 1).
+    factorial(N, F) :-
+        N > 0,
+        N1 is N - 1,
+        factorial(N1, F1),
+        F is N * F1.
+    
+    % Better approach: Include documentation
+    %! factorial(+N, -F) is det
+    %  Calculates the factorial of N.
+    %  @param N A non-negative integer
+    %  @param F The factorial of N (N!)
+    %  @throws error(type_error(integer, N)) if N is not an integer
+    %  @throws error(domain_error(not_less_than_zero, N)) if N < 0
+    factorial(0, 1) :- !.
+    factorial(N, F) :-
+        integer(N),
+        N > 0,
+        N1 is N - 1,
+        factorial(N1, F1),
+        F is N * F1.
+    factorial(N, _) :-
+        (   \+ integer(N)
+        ->  type_error(integer, N)
+        ;   N < 0
+        ->  domain_error(not_less_than_zero, N)
+        ).
+    ```
+    Document your predicates with their modes (input/output patterns), determinism, purpose, parameters, and possible exceptions. This helps users of your code understand how to use it correctly.
+  </Accordion>
+  
+  <Accordion title="Not Writing Tests" icon="warning">
+    ```prolog
+    % Anti-pattern: No tests
+    
+    % Better approach: Write tests
+    :- begin_tests(factorial).
+    
+    test(factorial_zero) :-
+        factorial(0, F),
+        assertion(F =:= 1).
+    
+    test(factorial_positive) :-
+        factorial(5, F),
+        assertion(F =:= 120).
+    
+    test(factorial_negative, [throws(error(domain_error(not_less_than_zero, -1), _))]) :-
+        factorial(-1, _).
+    
+    test(factorial_non_integer, [throws(error(type_error(integer, a), _))]) :-
+        factorial(a, _).
+    
+    :- end_tests(factorial).
+    ```
+    Write tests for your Prolog code. Testing helps ensure your code works correctly and continues to work as you make changes. Use testing frameworks like `plunit` to structure and run your tests.
+  </Accordion>
+  
+  <Accordion title="Not Using Type Checking" icon="warning">
+    ```prolog
+    % Anti-pattern: No type checking
+    add_numbers(A, B, Sum) :-
+        Sum is A + B.
+    
+    % Better approach: Add type checking
+    add_numbers(A, B, Sum) :-
+        must_be(number, A),
+        must_be(number, B),
+        Sum is A + B.
+    ```
+    Add type checking to your predicates to catch errors early. Use predicates like `must_be/2`, `integer/1`, `number/1`, etc., to validate inputs before processing them.
+  </Accordion>
+  
+  <Accordion title="Not Using Constraint Logic Programming" icon="warning">
+    ```prolog
+    % Anti-pattern: Generate-and-test approach
+    sudoku(Puzzle) :-
+        % Fill in empty cells with numbers 1-9
+        fill_puzzle(Puzzle, FilledPuzzle),
+        % Check if the filled puzzle is valid
+        valid_puzzle(FilledPuzzle).
+    
+    % Better approach: Use constraints
+    :- use_module(library(clpfd)).
+    
+    sudoku(Rows) :-
+        length(Rows, 9),
+        maplist(same_length(Rows), Rows),
+        append(Rows, Vs),
+        Vs ins 1..9,
+        maplist(all_distinct, Rows),
+        transpose(Rows, Columns),
+        maplist(all_distinct, Columns),
+        blocks(Rows, Blocks),
+        maplist(all_distinct, Blocks).
+    ```
+    Use constraint logic programming for problems involving constraints, such as puzzles, scheduling, and planning. Libraries like `clpfd` (Constraint Logic Programming over Finite Domains) allow you to express constraints declaratively and let the solver find solutions efficiently.
+  </Accordion>
+  
+  <Accordion title="Not Using DCGs for Parsing" icon="warning">
+    ```prolog
+    % Anti-pattern: Manual parsing
+    parse_csv(String, Rows) :-
+        split_string(String, "\n", "", Lines),
+        maplist(parse_csv_line, Lines, Rows).
+    
+    parse_csv_line(Line, Row) :-
+        split_string(Line, ",", "", Row).
+    
+    % Better approach: Use DCGs
+    :- use_module(library(dcg/basics)).
+    
+    csv(Rows) --> csv_rows(Rows).
+    
+    csv_rows([Row|Rows]) --> csv_row(Row), ("\n" -> csv_rows(Rows) ; [], { Rows = [] }).
+    
+    csv_row([Field|Fields]) --> csv_field(Field), ("," -> csv_row(Fields) ; [], { Fields = [] }).
+    
+    csv_field(Field) --> { string_codes("\"", [Quote]) }, [Quote], csv_quoted_field(Codes), [Quote], { string_codes(Field, Codes) }.
+    csv_field(Field) --> csv_unquoted_field(Codes), { string_codes(Field, Codes) }.
+    
+    csv_quoted_field([]) --> [].
+    csv_quoted_field([C|Cs]) --> [C], { C \= 34 }, csv_quoted_field(Cs).
+    
+    csv_unquoted_field([]) --> [].
+    csv_unquoted_field([C|Cs]) --> [C], { C \= 44, C \= 10, C \= 13 }, csv_unquoted_field(Cs).
+    ```
+    Use Definite Clause Grammars (DCGs) for parsing text and other structured data. DCGs provide a clean and declarative way to express grammars and parsers in Prolog.
+  </Accordion>
+</AccordionGroup>

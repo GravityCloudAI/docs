@@ -1,0 +1,615 @@
+---
+title: 'Apex'
+description: 'Apex is a strongly typed, object-oriented programming language that allows developers to execute flow and transaction control statements on the Salesforce platform server in conjunction with calls to the API. It has a Java-like syntax and acts like database stored procedures.'
+---
+
+<AccordionGroup>
+  <Accordion title="Apex Anti-Patterns Overview" icon="apex">
+    Apex, despite being a powerful language for Salesforce development, has several common anti-patterns that can lead to performance issues, governor limit violations, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing Apex code.
+  </Accordion>
+  
+  <Accordion title="SOQL Queries Inside Loops" icon="warning">
+    ```apex
+    // Anti-pattern: SOQL query inside a loop
+    for (Account acc : [SELECT Id, Name FROM Account LIMIT 100]) {
+        // For each account, find its contacts
+        List<Contact> contacts = [SELECT Id, FirstName, LastName 
+                                 FROM Contact 
+                                 WHERE AccountId = :acc.Id];
+        
+        // Process contacts
+        for (Contact con : contacts) {
+            // Do something with each contact
+        }
+    }
+    
+    // Better approach: Use relationship queries or maps
+    // Option 1: Use relationship query
+    for (Account acc : [SELECT Id, Name, 
+                        (SELECT Id, FirstName, LastName FROM Contacts)
+                        FROM Account LIMIT 100]) {
+        // Process contacts
+        for (Contact con : acc.Contacts) {
+            // Do something with each contact
+        }
+    }
+    
+    // Option 2: Use a single query with a map
+    Map<Id, Account> accountMap = new Map<Id, Account>([SELECT Id, Name FROM Account LIMIT 100]);
+    List<Contact> allContacts = [SELECT Id, FirstName, LastName, AccountId 
+                               FROM Contact 
+                               WHERE AccountId IN :accountMap.keySet()];
+    
+    // Group contacts by AccountId
+    Map<Id, List<Contact>> contactsByAccount = new Map<Id, List<Contact>>();
+    for (Contact con : allContacts) {
+        if (!contactsByAccount.containsKey(con.AccountId)) {
+            contactsByAccount.put(con.AccountId, new List<Contact>());
+        }
+        contactsByAccount.get(con.AccountId).add(con);
+    }
+    
+    // Process accounts and their contacts
+    for (Account acc : accountMap.values()) {
+        List<Contact> contacts = contactsByAccount.get(acc.Id);
+        if (contacts != null) {
+            for (Contact con : contacts) {
+                // Do something with each contact
+            }
+        }
+    }
+    ```
+    Never put SOQL queries inside loops. This can quickly exceed the governor limit of 100 SOQL queries per transaction. Instead, use relationship queries to retrieve related records in a single query, or use a map-based approach to fetch all related records in one query and then process them in memory.
+  </Accordion>
+  
+  <Accordion title="DML Operations Inside Loops" icon="warning">
+    ```apex
+    // Anti-pattern: DML inside a loop
+    for (Account acc : [SELECT Id, Name FROM Account WHERE Rating = 'Hot']) {
+        acc.Description = 'Hot account - high priority';
+        update acc; // DML inside loop
+    }
+    
+    // Better approach: Collect records and perform bulk DML
+    List<Account> accountsToUpdate = new List<Account>();
+    
+    for (Account acc : [SELECT Id, Name FROM Account WHERE Rating = 'Hot']) {
+        acc.Description = 'Hot account - high priority';
+        accountsToUpdate.add(acc);
+    }
+    
+    // Single DML operation outside the loop
+    if (!accountsToUpdate.isEmpty()) {
+        update accountsToUpdate;
+    }
+    ```
+    Avoid performing DML operations (insert, update, delete, upsert) inside loops. This can quickly exceed the governor limit of 150 DML operations per transaction. Instead, collect all records that need to be modified and perform a single bulk DML operation outside the loop.
+  </Accordion>
+  
+  <Accordion title="Not Bulkifying Triggers" icon="warning">
+    ```apex
+    // Anti-pattern: Non-bulkified trigger
+    trigger ContactTrigger on Contact (after insert) {
+        // Process one record at a time
+        for (Contact con : Trigger.new) {
+            // Query account for each contact
+            Account acc = [SELECT Id, Name FROM Account WHERE Id = :con.AccountId];
+            
+            // Create a task for each contact
+            Task t = new Task();
+            t.Subject = 'Follow up with new contact';
+            t.WhatId = acc.Id;
+            t.WhoId = con.Id;
+            insert t; // DML inside loop
+        }
+    }
+    
+    // Better approach: Bulkified trigger
+    trigger ContactTrigger on Contact (after insert) {
+        // Collect all Account IDs
+        Set<Id> accountIds = new Set<Id>();
+        for (Contact con : Trigger.new) {
+            if (con.AccountId != null) {
+                accountIds.add(con.AccountId);
+            }
+        }
+        
+        // Query accounts in bulk
+        Map<Id, Account> accountMap = new Map<Id, Account>(
+            [SELECT Id, Name FROM Account WHERE Id IN :accountIds]
+        );
+        
+        // Create tasks in bulk
+        List<Task> tasksToInsert = new List<Task>();
+        for (Contact con : Trigger.new) {
+            if (con.AccountId != null && accountMap.containsKey(con.AccountId)) {
+                Task t = new Task();
+                t.Subject = 'Follow up with new contact';
+                t.WhatId = con.AccountId;
+                t.WhoId = con.Id;
+                tasksToInsert.add(t);
+            }
+        }
+        
+        // Insert tasks in bulk
+        if (!tasksToInsert.isEmpty()) {
+            insert tasksToInsert;
+        }
+    }
+    ```
+    Always bulkify your triggers to handle multiple records efficiently. Salesforce can process up to 200 records in a single transaction, and your triggers should be designed to handle this scenario without exceeding governor limits. Use bulk queries and DML operations, and avoid processing records one at a time.
+  </Accordion>
+  
+  <Accordion title="Hardcoding Record IDs" icon="warning">
+    ```apex
+    // Anti-pattern: Hardcoding record IDs
+    public void assignToDefaultQueue() {
+        // Hardcoded ID of a specific queue
+        Id queueId = '00G1a000001XgXx';
+        
+        List<Case> cases = [SELECT Id FROM Case WHERE Status = 'New'];
+        for (Case c : cases) {
+            c.OwnerId = queueId;
+        }
+        update cases;
+    }
+    
+    // Better approach: Query for IDs or use custom metadata/settings
+    public void assignToDefaultQueue() {
+        // Query for the queue ID
+        Group defaultQueue = [SELECT Id FROM Group 
+                             WHERE Type = 'Queue' AND DeveloperName = 'DefaultCaseQueue' 
+                             LIMIT 1];
+        
+        List<Case> cases = [SELECT Id FROM Case WHERE Status = 'New'];
+        for (Case c : cases) {
+            c.OwnerId = defaultQueue.Id;
+        }
+        update cases;
+    }
+    
+    // Even better: Use custom metadata or custom settings
+    public void assignToDefaultQueue() {
+        // Retrieve queue ID from custom setting
+        Queue_Settings__c settings = Queue_Settings__c.getInstance('Default');
+        Id queueId = settings.Default_Case_Queue_ID__c;
+        
+        List<Case> cases = [SELECT Id FROM Case WHERE Status = 'New'];
+        for (Case c : cases) {
+            c.OwnerId = queueId;
+        }
+        update cases;
+    }
+    ```
+    Never hardcode record IDs in your code. IDs can be different across environments (sandbox, production), and hardcoded IDs make your code environment-specific and brittle. Instead, query for the IDs dynamically or store them in custom metadata types or custom settings.
+  </Accordion>
+  
+  <Accordion title="Not Using the Limits Class" icon="warning">
+    ```apex
+    // Anti-pattern: Not checking limits
+    public void processAccounts() {
+        List<Account> accounts = [SELECT Id FROM Account LIMIT 50000];
+        // Process accounts without checking limits
+    }
+    
+    // Better approach: Check limits and handle accordingly
+    public void processAccounts() {
+        // Check if we have enough SOQL queries available
+        if (Limits.getQueries() >= Limits.getLimitQueries() - 1) {
+            throw new CustomException('Too many SOQL queries used in this transaction');
+        }
+        
+        // Check if we can process all accounts or need to batch
+        Integer recordLimit = Limits.getLimitHeapSize() / 10000; // Approximate size per record
+        List<Account> accounts = [SELECT Id FROM Account LIMIT :recordLimit];
+        
+        // Process accounts
+    }
+    ```
+    Use the Limits class to check governor limits at runtime and handle situations where you might exceed them. This is especially important for code that processes variable amounts of data or is called from multiple contexts.
+  </Accordion>
+  
+  <Accordion title="Not Using Try-Catch Blocks" icon="warning">
+    ```apex
+    // Anti-pattern: No exception handling
+    public void createAccount(String name) {
+        Account acc = new Account(Name = name);
+        insert acc; // Will throw exception if insert fails
+        
+        // Create related records
+        Contact con = new Contact(LastName = 'Contact for ' + name, AccountId = acc.Id);
+        insert con; // Might not be reached if account insert fails
+    }
+    
+    // Better approach: Use try-catch for proper error handling
+    public void createAccount(String name) {
+        try {
+            Account acc = new Account(Name = name);
+            insert acc;
+            
+            // Create related records
+            Contact con = new Contact(LastName = 'Contact for ' + name, AccountId = acc.Id);
+            insert con;
+        } catch (DmlException e) {
+            // Log the error
+            System.debug('Error creating account: ' + e.getMessage());
+            
+            // Rethrow as custom exception with more context
+            throw new AccountCreationException('Failed to create account: ' + e.getMessage(), e);
+        }
+    }
+    
+    // Custom exception class
+    public class AccountCreationException extends Exception {}
+    ```
+    Use try-catch blocks to handle exceptions gracefully. This allows you to provide better error messages, perform cleanup operations, and prevent partial transactions. Create custom exception classes for specific error scenarios to make error handling more structured.
+  </Accordion>
+  
+  <Accordion title="Using System.debug for Production Logging" icon="warning">
+    ```apex
+    // Anti-pattern: Using System.debug for production logging
+    public void processOrders() {
+        System.debug('Starting order processing');
+        
+        List<Order__c> orders = [SELECT Id, Status__c FROM Order__c WHERE Status__c = 'Pending'];
+        System.debug('Found ' + orders.size() + ' orders to process');
+        
+        // Process orders
+        for (Order__c ord : orders) {
+            try {
+                // Process order
+                System.debug('Processed order: ' + ord.Id);
+            } catch (Exception e) {
+                System.debug('Error processing order: ' + e.getMessage());
+            }
+        }
+    }
+    
+    // Better approach: Use a logging framework or Platform Events
+    public void processOrders() {
+        Logger.info('Starting order processing');
+        
+        List<Order__c> orders = [SELECT Id, Status__c FROM Order__c WHERE Status__c = 'Pending'];
+        Logger.info('Found ' + orders.size() + ' orders to process');
+        
+        // Process orders
+        for (Order__c ord : orders) {
+            try {
+                // Process order
+                Logger.info('Processed order: ' + ord.Id);
+            } catch (Exception e) {
+                Logger.error('Error processing order: ' + ord.Id, e);
+                
+                // Create error log record
+                Error_Log__c log = new Error_Log__c(
+                    Object_Type__c = 'Order__c',
+                    Record_Id__c = ord.Id,
+                    Error_Message__c = e.getMessage(),
+                    Stack_Trace__c = e.getStackTraceString()
+                );
+                insert log;
+            }
+        }
+    }
+    ```
+    Don't rely on System.debug for production logging. Debug logs are not easily accessible in production and are only retained for a limited time. Instead, use a custom logging framework, custom objects to store logs, or Platform Events for more robust logging in production environments.
+  </Accordion>
+  
+  <Accordion title="Not Using Test.startTest() and Test.stopTest()" icon="warning">
+    ```apex
+    // Anti-pattern: Not using Test.startTest() and Test.stopTest()
+    @isTest
+    private class OrderServiceTest {
+        @isTest
+        static void testProcessOrders() {
+            // Create test data
+            List<Order__c> testOrders = createTestOrders(100);
+            insert testOrders;
+            
+            // Call the method to test
+            OrderService service = new OrderService();
+            service.processOrders();
+            
+            // Verify results
+            List<Order__c> processedOrders = [SELECT Id, Status__c FROM Order__c WHERE Status__c = 'Processed'];
+            System.assertEquals(100, processedOrders.size());
+        }
+    }
+    
+    // Better approach: Use Test.startTest() and Test.stopTest()
+    @isTest
+    private class OrderServiceTest {
+        @isTest
+        static void testProcessOrders() {
+            // Create test data
+            List<Order__c> testOrders = createTestOrders(100);
+            insert testOrders;
+            
+            // Reset governor limits
+            Test.startTest();
+            
+            // Call the method to test
+            OrderService service = new OrderService();
+            service.processOrders();
+            
+            // Force async processes to complete and restore governor limits
+            Test.stopTest();
+            
+            // Verify results
+            List<Order__c> processedOrders = [SELECT Id, Status__c FROM Order__c WHERE Status__c = 'Processed'];
+            System.assertEquals(100, processedOrders.size());
+        }
+    }
+    ```
+    Always use Test.startTest() and Test.stopTest() in your test methods. These methods reset governor limits for the code executed between them and force any asynchronous processes to complete. This ensures that your tests accurately verify the behavior of your code under normal governor limits.
+  </Accordion>
+  
+  <Accordion title="Not Using @TestVisible" icon="warning">
+    ```apex
+    // Anti-pattern: Making methods public just for testing
+    public class OrderService {
+        // Method made public only for testing
+        public Boolean isValidOrder(Order__c order) {
+            // Validation logic
+            return order.Amount__c > 0 && order.Status__c == 'Pending';
+        }
+        
+        public void processOrders() {
+            // Process orders using isValidOrder
+        }
+    }
+    
+    // Better approach: Use @TestVisible
+    public class OrderService {
+        // Private method with @TestVisible annotation
+        @TestVisible
+        private Boolean isValidOrder(Order__c order) {
+            // Validation logic
+            return order.Amount__c > 0 && order.Status__c == 'Pending';
+        }
+        
+        public void processOrders() {
+            // Process orders using isValidOrder
+        }
+    }
+    ```
+    Don't make methods or variables public just for testing. This exposes implementation details and breaks encapsulation. Instead, use the @TestVisible annotation to make private members accessible to test classes while keeping them private to the rest of your code.
+  </Accordion>
+  
+  <Accordion title="Not Using SObjectType for Field and Object Access" icon="warning">
+    ```apex
+    // Anti-pattern: Using string literals for field and object names
+    public List<SObject> getRecords(String objectName, String fieldName, String value) {
+        // Vulnerable to SOQL injection
+        String query = 'SELECT Id, Name FROM ' + objectName + 
+                       ' WHERE ' + fieldName + ' = \'' + value + '\'';
+        return Database.query(query);
+    }
+    
+    // Better approach: Use SObjectType for dynamic references
+    public List<SObject> getRecords(String objectName, String fieldName, String value) {
+        // Validate object name
+        Schema.SObjectType objType = Schema.getGlobalDescribe().get(objectName);
+        if (objType == null) {
+            throw new IllegalArgumentException('Invalid object name: ' + objectName);
+        }
+        
+        // Validate field name
+        Schema.DescribeSObjectResult objDescribe = objType.getDescribe();
+        Map<String, Schema.SObjectField> fieldMap = objDescribe.fields.getMap();
+        if (!fieldMap.containsKey(fieldName)) {
+            throw new IllegalArgumentException('Invalid field name: ' + fieldName);
+        }
+        
+        // Build and execute query safely
+        String safeObjectName = String.valueOf(objType);
+        String safeFieldName = String.valueOf(fieldMap.get(fieldName));
+        
+        String query = 'SELECT Id, Name FROM ' + safeObjectName + 
+                       ' WHERE ' + safeFieldName + ' = :value';
+        return Database.query(query);
+    }
+    ```
+    Use Schema.SObjectType and Schema.SObjectField for dynamic references to objects and fields instead of string literals. This prevents SOQL injection vulnerabilities and catches errors at compile time rather than runtime.
+  </Accordion>
+  
+  <Accordion title="Not Using WITH SECURITY_ENFORCED" icon="warning">
+    ```apex
+    // Anti-pattern: Not enforcing object and field level security
+    public List<Account> getAccounts() {
+        return [SELECT Id, Name, AnnualRevenue FROM Account];
+    }
+    
+    // Better approach: Use WITH SECURITY_ENFORCED
+    public List<Account> getAccounts() {
+        return [SELECT Id, Name, AnnualRevenue 
+                FROM Account 
+                WITH SECURITY_ENFORCED];
+    }
+    
+    // Alternative approach: Use Security.stripInaccessible
+    public List<Account> getAccounts() {
+        List<Account> accounts = [SELECT Id, Name, AnnualRevenue FROM Account];
+        
+        // Strip fields the user doesn't have access to
+        SObjectAccessDecision decision = Security.stripInaccessible(
+            AccessType.READABLE, accounts
+        );
+        
+        return (List<Account>) decision.getRecords();
+    }
+    ```
+    Enforce object and field level security in your SOQL queries using WITH SECURITY_ENFORCED or Security.stripInaccessible(). This ensures that users can only access data they have permission to see, following the principle of least privilege.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Sharing Settings" icon="warning">
+    ```apex
+    // Anti-pattern: Not specifying sharing settings
+    public class AccountService {
+        public List<Account> getAccounts() {
+            return [SELECT Id, Name FROM Account];
+        }
+    }
+    
+    // Better approach: Explicitly declare sharing model
+    // With sharing: Respects user's permissions
+    public with sharing class AccountService {
+        public List<Account> getAccounts() {
+            return [SELECT Id, Name FROM Account];
+        }
+    }
+    
+    // Without sharing: Ignores user's permissions (use carefully)
+    public without sharing class SystemService {
+        public void performSystemOperation() {
+            // Operations that need system-level access
+        }
+    }
+    
+    // Inherited sharing: Inherits sharing setting from calling code
+    public inherited sharing class UtilityService {
+        public List<Account> getAccountsWithSharing() {
+            return [SELECT Id, Name FROM Account];
+        }
+    }
+    ```
+    Always explicitly declare the sharing model for your Apex classes using `with sharing`, `without sharing`, or `inherited sharing`. The `with sharing` keyword enforces record-level security, while `without sharing` bypasses it. Use `without sharing` only when absolutely necessary, and document why it's needed.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Trigger Frameworks" icon="warning">
+    ```apex
+    // Anti-pattern: Monolithic trigger with business logic
+    trigger AccountTrigger on Account (before insert, before update, after insert, after update) {
+        if (Trigger.isBefore && Trigger.isInsert) {
+            // Validation logic
+            for (Account acc : Trigger.new) {
+                if (acc.Name == null || acc.Name.length() < 3) {
+                    acc.Name.addError('Account name must be at least 3 characters');
+                }
+            }
+        } else if (Trigger.isAfter && Trigger.isInsert) {
+            // Create related records
+            List<Contact> contactsToInsert = new List<Contact>();
+            for (Account acc : Trigger.new) {
+                Contact con = new Contact(
+                    LastName = 'Primary Contact',
+                    AccountId = acc.Id
+                );
+                contactsToInsert.add(con);
+            }
+            insert contactsToInsert;
+        }
+        // More logic for other contexts...
+    }
+    
+    // Better approach: Use a trigger framework
+    // Trigger - thin dispatcher
+    trigger AccountTrigger on Account (before insert, before update, after insert, after update) {
+        TriggerHandler.run(new AccountTriggerHandler());
+    }
+    
+    // Handler class
+    public class AccountTriggerHandler extends TriggerHandler {
+        public override void beforeInsert() {
+            AccountService.validateAccounts(Trigger.new);
+        }
+        
+        public override void afterInsert() {
+            AccountService.createPrimaryContacts(Trigger.new);
+        }
+        
+        // Other handler methods...
+    }
+    
+    // Service class with business logic
+    public class AccountService {
+        public static void validateAccounts(List<Account> accounts) {
+            for (Account acc : accounts) {
+                if (acc.Name == null || acc.Name.length() < 3) {
+                    acc.Name.addError('Account name must be at least 3 characters');
+                }
+            }
+        }
+        
+        public static void createPrimaryContacts(List<Account> accounts) {
+            List<Contact> contactsToInsert = new List<Contact>();
+            for (Account acc : accounts) {
+                Contact con = new Contact(
+                    LastName = 'Primary Contact',
+                    AccountId = acc.Id
+                );
+                contactsToInsert.add(con);
+            }
+            insert contactsToInsert;
+        }
+    }
+    ```
+    Use a trigger framework to organize your trigger logic. A good framework separates trigger dispatching from business logic, prevents recursive trigger execution, and makes it easier to maintain and test your code. Avoid putting business logic directly in trigger files.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Naming Conventions" icon="warning">
+    ```apex
+    // Anti-pattern: Poor naming conventions
+    public class cls {
+        public void p(List<Account> l) {
+            for (Account a : l) {
+                a.n = a.n.toUpperCase();
+            }
+            update l;
+        }
+    }
+    
+    // Better approach: Use descriptive names
+    public class AccountService {
+        public void processAccounts(List<Account> accounts) {
+            for (Account account : accounts) {
+                account.Name = account.Name.toUpperCase();
+            }
+            update accounts;
+        }
+    }
+    ```
+    Follow proper naming conventions for classes, methods, and variables. Use descriptive names that clearly indicate the purpose of each entity. This makes your code more readable and maintainable. Class names should be nouns, method names should be verbs, and variable names should be descriptive.
+  </Accordion>
+  
+  <Accordion title="Not Using Asynchronous Apex When Appropriate" icon="warning">
+    ```apex
+    // Anti-pattern: Doing too much in synchronous context
+    public void processLargeDataSet() {
+        List<Account> accounts = [SELECT Id FROM Account LIMIT 50000];
+        for (Account acc : accounts) {
+            // Complex processing
+        }
+        // More operations that could hit governor limits
+    }
+    
+    // Better approach: Use asynchronous Apex
+    public void processLargeDataSet() {
+        // Queue the job for asynchronous processing
+        System.enqueueJob(new AccountProcessingJob());
+    }
+    
+    // Queueable implementation
+    public class AccountProcessingJob implements Queueable {
+        public void execute(QueueableContext context) {
+            // Process accounts in chunks
+            List<Account> accounts = [SELECT Id FROM Account LIMIT 1000];
+            
+            // Process this batch
+            for (Account acc : accounts) {
+                // Complex processing
+            }
+            
+            // If more accounts to process, chain another job
+            List<Account> remainingAccounts = [SELECT Id FROM Account 
+                                             WHERE Id > :accounts[accounts.size()-1].Id 
+                                             LIMIT 1];
+            if (!remainingAccounts.isEmpty()) {
+                System.enqueueJob(new AccountProcessingJob());
+            }
+        }
+    }
+    ```
+    Use asynchronous Apex (Queueable, Batch, Scheduled, or Future methods) for operations that process large amounts of data or might exceed governor limits. Asynchronous Apex has higher governor limits and can be chained or scheduled to process data in manageable chunks.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,576 @@
+---
+title: 'PowerShell'
+description: 'PowerShell is a task automation and configuration management framework from Microsoft, consisting of a command-line shell and associated scripting language built on .NET. PowerShell helps system administrators and power-users rapidly automate tasks that manage operating systems and processes.'
+---
+
+<AccordionGroup>
+  <Accordion title="PowerShell Anti-Patterns Overview" icon="powershell">
+    PowerShell, despite its power and flexibility, has several common anti-patterns that can lead to performance issues, security vulnerabilities, and maintainability problems. Here are the most important anti-patterns to avoid when writing PowerShell scripts.
+  </Accordion>
+  
+  <Accordion title="Using Invoke-Expression Unnecessarily" icon="warning">
+    ```powershell
+    # Anti-pattern: Using Invoke-Expression with string concatenation
+    $command = "Get-Process -Name " + $processName
+    Invoke-Expression $command
+    
+    # Better approach: Use parameters and splatting
+    Get-Process -Name $processName
+    
+    # For dynamic parameter names, use splatting
+    $params = @{
+        Name = $processName
+    }
+    Get-Process @params
+    ```
+    Avoid using `Invoke-Expression` (or its alias `iex`) when possible, especially with user input or external data. It can lead to code injection vulnerabilities. Use parameters, splatting, or the call operator (`&`) instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```powershell
+    # Anti-pattern: No error handling
+    Remove-Item $path
+    Copy-Item $source $destination
+    
+    # Better approach: Use try/catch blocks
+    try {
+        Remove-Item $path -ErrorAction Stop
+        Copy-Item $source $destination -ErrorAction Stop
+    }
+    catch {
+        Write-Error "An error occurred: $_"
+        # Handle the error appropriately
+    }
+    
+    # Alternative: Use -ErrorAction and -ErrorVariable
+    Remove-Item $path -ErrorAction SilentlyContinue -ErrorVariable removeError
+    if ($removeError) {
+        Write-Warning "Could not remove $path: $removeError"
+    }
+    ```
+    Use proper error handling with `try/catch` blocks or the `-ErrorAction` and `-ErrorVariable` parameters. This helps you handle errors gracefully and provide meaningful feedback to users.
+  </Accordion>
+  
+  <Accordion title="Using Select-String Instead of Regex Methods" icon="warning">
+    ```powershell
+    # Anti-pattern: Using Select-String for simple pattern matching
+    $text = "The quick brown fox"
+    if ($text | Select-String "fox") {
+        # Do something
+    }
+    
+    # Better approach: Use regex methods or -match operator
+    $text = "The quick brown fox"
+    if ($text -match "fox") {
+        # Do something
+    }
+    
+    # For complex regex with capture groups
+    $text = "ID: 12345"
+    if ($text -match "ID:\s*(\d+)") {
+        $id = $matches[1]  # Access captured group
+        Write-Output "Found ID: $id"
+    }
+    ```
+    Use the `-match` operator or regex methods instead of `Select-String` for simple pattern matching in strings. `Select-String` is designed for searching through files or collections of strings, not for simple string operations.
+  </Accordion>
+  
+  <Accordion title="Using ForEach-Object in a Pipeline Unnecessarily" icon="warning">
+    ```powershell
+    # Anti-pattern: Using ForEach-Object unnecessarily
+    Get-Process | ForEach-Object { $_.Name }
+    
+    # Better approach: Use Select-Object
+    Get-Process | Select-Object -ExpandProperty Name
+    
+    # Or even better for this simple case
+    (Get-Process).Name
+    ```
+    Avoid using `ForEach-Object` (or its alias `%`) when simpler alternatives exist. For property extraction, use `Select-Object -ExpandProperty` or direct property access. `ForEach-Object` is slower and more verbose for simple operations.
+  </Accordion>
+  
+  <Accordion title="Not Using the Pipeline Effectively" icon="warning">
+    ```powershell
+    # Anti-pattern: Not using the pipeline effectively
+    $processes = Get-Process
+    $filteredProcesses = @()
+    foreach ($process in $processes) {
+        if ($process.WorkingSet -gt 100MB) {
+            $filteredProcesses += $process
+        }
+    }
+    $filteredProcesses | Sort-Object CPU -Descending | Select-Object -First 5
+    
+    # Better approach: Use the pipeline effectively
+    Get-Process | 
+        Where-Object { $_.WorkingSet -gt 100MB } | 
+        Sort-Object CPU -Descending | 
+        Select-Object -First 5
+    ```
+    Use PowerShell's pipeline to chain commands together. This is more idiomatic, often more readable, and can be more efficient as it processes objects one at a time through the pipeline rather than storing intermediate collections.
+  </Accordion>
+  
+  <Accordion title="Using Write-Host Instead of Write-Output" icon="warning">
+    ```powershell
+    # Anti-pattern: Using Write-Host for output
+    function Get-UserInfo {
+        Write-Host "User: $env:USERNAME"
+        Write-Host "Domain: $env:USERDOMAIN"
+    }
+    
+    # This won't work because Write-Host doesn't output to the pipeline
+    $userInfo = Get-UserInfo | Select-String "Domain"
+    
+    # Better approach: Use Write-Output for data
+    function Get-UserInfo {
+        Write-Output "User: $env:USERNAME"
+        Write-Output "Domain: $env:USERDOMAIN"
+    }
+    
+    # Now this works
+    $userInfo = Get-UserInfo | Select-String "Domain"
+    
+    # Use Write-Host only for UI/visual output that isn't meant to be processed
+    function Show-Status {
+        Write-Host "Processing..." -ForegroundColor Green
+    }
+    ```
+    Use `Write-Output` (or simply let PowerShell implicitly output objects) for data that might be consumed by other commands in a pipeline. Use `Write-Host` only for visual feedback that isn't meant to be processed further.
+  </Accordion>
+  
+  <Accordion title="Not Using Parameter Validation" icon="warning">
+    ```powershell
+    # Anti-pattern: Manual parameter validation
+    function Get-FileContent {
+        param($Path)
+        
+        if (-not $Path) {
+            throw "Path parameter is required"
+        }
+        
+        if (-not (Test-Path $Path)) {
+            throw "File not found: $Path"
+        }
+        
+        Get-Content $Path
+    }
+    
+    # Better approach: Use parameter validation attributes
+    function Get-FileContent {
+        param(
+            [Parameter(Mandatory = $true)]
+            [ValidateNotNullOrEmpty()]
+            [ValidateScript({ Test-Path $_ })]
+            [string]$Path
+        )
+        
+        Get-Content $Path
+    }
+    ```
+    Use PowerShell's parameter validation attributes instead of writing manual validation code. This makes your functions more robust, self-documenting, and consistent with PowerShell conventions.
+  </Accordion>
+  
+  <Accordion title="Using String Concatenation Instead of Format Strings" icon="warning">
+    ```powershell
+    # Anti-pattern: String concatenation
+    $message = "User " + $username + " logged in at " + $time
+    
+    # Better approach: Format operator
+    $message = "User $username logged in at $time"
+    
+    # For complex formatting
+    $message = [string]::Format("User {0} logged in at {1:HH:mm:ss}", $username, $time)
+    
+    # Or with PowerShell's -f operator
+    $message = "User {0} logged in at {1:HH:mm:ss}" -f $username, $time
+    ```
+    Use string interpolation, the format operator (`-f`), or `[string]::Format()` instead of string concatenation. These methods are more readable and efficient, especially for complex strings.
+  </Accordion>
+  
+  <Accordion title="Not Using Strong Types" icon="warning">
+    ```powershell
+    # Anti-pattern: Not using strong types
+    function Add-Numbers {
+        param($a, $b)
+        return $a + $b
+    }
+    
+    # This might not work as expected
+    Add-Numbers "5" "10"  # Returns "510" (string concatenation)
+    
+    # Better approach: Use strong types
+    function Add-Numbers {
+        param(
+            [int]$a,
+            [int]$b
+        )
+        return $a + $b
+    }
+    
+    # Now this works correctly
+    Add-Numbers "5" "10"  # Returns 15 (numeric addition)
+    ```
+    Use strong types for function parameters and variables when appropriate. This helps catch type-related errors early and makes your code more self-documenting and robust.
+  </Accordion>
+  
+  <Accordion title="Using Aliases in Scripts" icon="warning">
+    ```powershell
+    # Anti-pattern: Using aliases in scripts
+    gps | ? { $_.WS -gt 100MB } | sort CPU -desc | select -first 5
+    
+    # Better approach: Use full command and parameter names
+    Get-Process | 
+        Where-Object { $_.WorkingSet -gt 100MB } | 
+        Sort-Object -Property CPU -Descending | 
+        Select-Object -First 5
+    ```
+    Avoid using aliases (like `gps`, `?`, `%`, `sort`, `select`) in scripts and functions. Use full command and parameter names for better readability, maintainability, and to avoid issues if aliases change or aren't available in all environments.
+  </Accordion>
+  
+  <Accordion title="Not Using PSCustomObject for Structured Data" icon="warning">
+    ```powershell
+    # Anti-pattern: Using hashtables or arrays for structured data
+    $user = @{
+        Name = "John Doe"
+        Email = "john@example.com"
+        Age = 30
+    }
+    Write-Output $user.Name
+    
+    # Better approach: Use PSCustomObject
+    $user = [PSCustomObject]@{
+        Name = "John Doe"
+        Email = "john@example.com"
+        Age = 30
+    }
+    Write-Output $user.Name
+    
+    # PSCustomObject works better with the pipeline
+    $users = @(
+        [PSCustomObject]@{ Name = "John"; Age = 30 },
+        [PSCustomObject]@{ Name = "Jane"; Age = 28 }
+    )
+    $users | Where-Object { $_.Age -lt 30 }
+    ```
+    Use `[PSCustomObject]` for structured data instead of hashtables or arrays. It provides better property access syntax, works well with the pipeline, and is more idiomatic in PowerShell.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Scopes" icon="warning">
+    ```powershell
+    # Anti-pattern: Using global variables unnecessarily
+    $config = @{ Server = "localhost"; Port = 8080 }
+    
+    function Connect-Server {
+        # Uses the global $config variable
+        $connection = New-Object System.Net.Sockets.TcpClient $config.Server, $config.Port
+        return $connection
+    }
+    
+    # Better approach: Pass parameters explicitly
+    function Connect-Server {
+        param(
+            [string]$Server = "localhost",
+            [int]$Port = 8080
+        )
+        
+        $connection = New-Object System.Net.Sockets.TcpClient $Server, $Port
+        return $connection
+    }
+    
+    # Or use script scope when appropriate
+    $script:config = @{ Server = "localhost"; Port = 8080 }
+    ```
+    Be mindful of variable scopes. Avoid using global variables unnecessarily. Pass parameters explicitly to functions or use appropriate scopes (`$script:`, `$local:`, `$private:`) to limit variable visibility.
+  </Accordion>
+  
+  <Accordion title="Not Using Begin/Process/End Blocks in Advanced Functions" icon="warning">
+    ```powershell
+    # Anti-pattern: Not using Begin/Process/End blocks
+    function Process-Items {
+        param(
+            [Parameter(ValueFromPipeline = $true)]
+            [string[]]$Items
+        )
+        
+        foreach ($item in $Items) {
+            "Processing $item"
+        }
+    }
+    
+    # This won't work as expected with pipeline input
+    "item1", "item2" | Process-Items
+    
+    # Better approach: Use Begin/Process/End blocks
+    function Process-Items {
+        [CmdletBinding()]
+        param(
+            [Parameter(ValueFromPipeline = $true)]
+            [string]$Item
+        )
+        
+        begin {
+            "Starting processing"
+            $count = 0
+        }
+        
+        process {
+            "Processing $Item"
+            $count++
+        }
+        
+        end {
+            "Processed $count items"
+        }
+    }
+    
+    # Now this works correctly with pipeline input
+    "item1", "item2" | Process-Items
+    ```
+    Use `begin`, `process`, and `end` blocks in advanced functions that accept pipeline input. The `process` block runs once for each pipeline object, while `begin` and `end` run once before and after processing.
+  </Accordion>
+  
+  <Accordion title="Not Using CmdletBinding" icon="warning">
+    ```powershell
+    # Anti-pattern: Simple function without CmdletBinding
+    function Get-UserData {
+        param($Username)
+        
+        # Function logic...
+    }
+    
+    # Better approach: Use CmdletBinding
+    function Get-UserData {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$Username
+        )
+        
+        # Function logic...
+    }
+    ```
+    Use `[CmdletBinding()]` for your functions to make them behave more like cmdlets. This gives you access to common parameters like `-Verbose`, `-Debug`, and `-ErrorAction`, and enables better error handling and parameter validation.
+  </Accordion>
+  
+  <Accordion title="Using Write-Debug or Write-Verbose Without Checking Preferences" icon="warning">
+    ```powershell
+    # Anti-pattern: Using Write-Debug or Write-Verbose without CmdletBinding
+    function Process-Data {
+        param($Data)
+        
+        Write-Verbose "Processing data..."
+        Write-Debug "Data value: $Data"
+        
+        # Process data...
+    }
+    
+    # Better approach: Use CmdletBinding
+    function Process-Data {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory = $true)]
+            $Data
+        )
+        
+        Write-Verbose "Processing data..."
+        Write-Debug "Data value: $Data"
+        
+        # Process data...
+    }
+    ```
+    Always use `[CmdletBinding()]` when using `Write-Verbose` or `Write-Debug`. This ensures that these messages are only displayed when the corresponding preference variables are set or when the `-Verbose` or `-Debug` switches are used.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Output Types" icon="warning">
+    ```powershell
+    # Anti-pattern: Not specifying output type
+    function Get-User {
+        param([string]$Username)
+        
+        # Return user object
+        return @{
+            Username = $Username
+            FullName = "John Doe"
+            Email = "$Username@example.com"
+        }
+    }
+    
+    # Better approach: Specify output type
+    function Get-User {
+        [CmdletBinding()]
+        [OutputType([PSCustomObject])]
+        param([string]$Username)
+        
+        # Return user object
+        return [PSCustomObject]@{
+            Username = $Username
+            FullName = "John Doe"
+            Email = "$Username@example.com"
+        }
+    }
+    ```
+    Use `[OutputType()]` to specify the type of objects your function returns. This helps with documentation, IntelliSense, and makes your code more self-documenting.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Module Structure" icon="warning">
+    ```powershell
+    # Anti-pattern: All functions in one file without exports
+    # MyModule.psm1
+    function Get-Something { /* ... */ }
+    function Set-Something { /* ... */ }
+    function Internal-Helper { /* ... */ }
+    
+    # Better approach: Proper module structure with exports
+    # MyModule.psm1
+    function Get-Something { /* ... */ }
+    function Set-Something { /* ... */ }
+    function Internal-Helper { /* ... */ }
+    
+    # Only export the public functions
+    Export-ModuleMember -Function Get-Something, Set-Something
+    
+    # Even better: Use a module manifest
+    # MyModule.psd1
+    @{
+        ModuleVersion = '1.0'
+        GUID = 'unique-guid-here'
+        Author = 'Your Name'
+        FunctionsToExport = @('Get-Something', 'Set-Something')
+        # Other metadata...
+    }
+    ```
+    Use proper module structure with explicit exports and module manifests. This helps control which functions are exposed to users and provides important metadata about your module.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Comment-Based Help" icon="warning">
+    ```powershell
+    # Anti-pattern: No or minimal documentation
+    function Get-UserData {
+        param($Username)
+        
+        # Function logic...
+    }
+    
+    # Better approach: Use comment-based help
+    <#
+    .SYNOPSIS
+        Retrieves user data from the system.
+    
+    .DESCRIPTION
+        The Get-UserData function retrieves detailed information about a user
+        from the system database.
+    
+    .PARAMETER Username
+        The username of the user to retrieve data for.
+    
+    .EXAMPLE
+        Get-UserData -Username "john.doe"
+        
+        Retrieves data for user john.doe.
+    
+    .NOTES
+        Author: Your Name
+        Date: Current Date
+    #>
+    function Get-UserData {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$Username
+        )
+        
+        # Function logic...
+    }
+    ```
+    Use comment-based help to document your functions and scripts. This provides help information to users via the `Get-Help` cmdlet and makes your code more maintainable.
+  </Accordion>
+  
+  <Accordion title="Using Invoke-WebRequest Inefficiently" icon="warning">
+    ```powershell
+    # Anti-pattern: Using Invoke-WebRequest in a loop
+    $urls = @("https://example.com/1", "https://example.com/2", "https://example.com/3")
+    $results = @()
+    
+    foreach ($url in $urls) {
+        $response = Invoke-WebRequest -Uri $url
+        $results += $response
+    }
+    
+    # Better approach: Use parallelism
+    $urls = @("https://example.com/1", "https://example.com/2", "https://example.com/3")
+    
+    $jobs = $urls | ForEach-Object {
+        $url = $_
+        Start-Job -ScriptBlock {
+            param($u)
+            Invoke-WebRequest -Uri $u
+        } -ArgumentList $url
+    }
+    
+    $results = $jobs | Wait-Job | Receive-Job
+    Remove-Job $jobs
+    
+    # Even better: Use Invoke-Parallel or similar
+    $results = $urls | Invoke-Parallel -ScriptBlock {
+        Invoke-WebRequest -Uri $_
+    }
+    ```
+    Avoid using `Invoke-WebRequest` sequentially in loops for multiple requests. Use parallelism with `Start-Job`, `ForEach-Object -Parallel` (in PowerShell 7+), or a module like `PSParallel` for better performance.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Cmdlets for File Operations" icon="warning">
+    ```powershell
+    # Anti-pattern: Using .NET methods directly for simple file operations
+    [System.IO.File]::ReadAllText("C:\path\to\file.txt")
+    [System.IO.File]::WriteAllText("C:\path\to\output.txt", $content)
+    
+    # Better approach: Use PowerShell cmdlets
+    Get-Content -Path "C:\path\to\file.txt" -Raw
+    Set-Content -Path "C:\path\to\output.txt" -Value $content
+    ```
+    Use PowerShell cmdlets like `Get-Content`, `Set-Content`, `Get-ChildItem`, etc., for file operations instead of .NET methods directly. The cmdlets are more idiomatic in PowerShell and often provide additional functionality like handling different encodings, working with the pipeline, and supporting PowerShell paths.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Comparison Operators" icon="warning">
+    ```powershell
+    # Anti-pattern: Using == and != operators
+    if ($value == 5) { # This works in PowerShell 7+ but not in Windows PowerShell
+        # Do something
+    }
+    
+    if ($name != "John") {
+        # Do something
+    }
+    
+    # Better approach: Use -eq and -ne operators
+    if ($value -eq 5) {
+        # Do something
+    }
+    
+    if ($name -ne "John") {
+        # Do something
+    }
+    ```
+    Use PowerShell's comparison operators (`-eq`, `-ne`, `-gt`, `-lt`, etc.) instead of C-style operators (`==`, `!=`, `>`, `<`, etc.). The PowerShell operators work consistently across all PowerShell versions and have special behavior for collections and wildcards.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate String Comparison" icon="warning">
+    ```powershell
+    # Anti-pattern: Not specifying case sensitivity
+    if ($name -eq "john") {
+        # This might not match "John" as expected
+    }
+    
+    # Better approach: Specify case sensitivity explicitly
+    if ($name -eq "john" -or $name -eq "John") {
+        # Explicit but verbose
+    }
+    
+    # Even better: Use case-insensitive comparison
+    if ($name -ieq "john") {
+        # Case-insensitive comparison
+    }
+    ```
+    Be explicit about case sensitivity in string comparisons. Use `-ieq`, `-ine`, etc., for case-insensitive comparisons, and `-ceq`, `-cne`, etc., for case-sensitive comparisons.
+  </Accordion>
+</AccordionGroup>

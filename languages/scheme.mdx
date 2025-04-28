@@ -1,0 +1,496 @@
+---
+title: 'Scheme'
+description: 'Scheme is a minimalist dialect of the Lisp family of programming languages. It emphasizes simplicity and clean design through a small core language and powerful tools for abstraction and language extension.'
+---
+
+<AccordionGroup>
+  <Accordion title="Scheme Anti-Patterns Overview" icon="scheme">
+    Scheme, despite being a clean and elegant language, has several common anti-patterns that can lead to code that's difficult to maintain, inefficient, or doesn't follow the language's idioms. Here are the most important anti-patterns to avoid when writing Scheme code.
+  </Accordion>
+  
+  <Accordion title="Excessive Mutation" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Excessive mutation
+    (define (sum-list lst)
+      (let ((total 0))
+        (for-each (lambda (x) (set! total (+ total x))) lst)
+        total))
+    
+    ;; Better approach: Use functional constructs
+    (define (sum-list lst)
+      (fold + 0 lst))
+    
+    ;; Or with explicit recursion
+    (define (sum-list lst)
+      (if (null? lst)
+          0
+          (+ (car lst) (sum-list (cdr lst)))))
+    ```
+    Avoid excessive use of mutation (`set!`, mutable variables, etc.) and imperative loops. Scheme is primarily a functional language, so prefer immutable data and functional constructs like recursion, `map`, and `fold`.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper List Operations" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Manual list traversal
+    (define (find-element lst pred)
+      (cond ((null? lst) #f)
+            ((pred (car lst)) (car lst))
+            (else (find-element (cdr lst) pred))))
+    
+    (define (map-elements lst func)
+      (if (null? lst)
+          '()
+          (cons (func (car lst)) (map-elements (cdr lst) func))))
+    
+    ;; Better approach: Use built-in list operations
+    (define (find-element lst pred)
+      (find pred lst))
+    
+    (define (map-elements lst func)
+      (map func lst))
+    ```
+    Use built-in list operations like `map`, `filter`, `find`, and `fold` instead of writing your own recursive functions for common list operations. These built-ins are often more efficient and make your code more readable.
+  </Accordion>
+  
+  <Accordion title="Not Using Let Expressions" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Repeating complex expressions
+    (define (distance x1 y1 x2 y2)
+      (sqrt (+ (expt (- x2 x1) 2) (expt (- y2 y1) 2))))
+    
+    (define (midpoint x1 y1 x2 y2)
+      (list (/ (+ x1 x2) 2) (/ (+ y1 y2) 2)))
+    
+    ;; Better approach: Use let to avoid repetition
+    (define (process-points x1 y1 x2 y2)
+      (let ((dx (- x2 x1))
+            (dy (- y2 y1)))
+        (let ((dist (sqrt (+ (expt dx 2) (expt dy 2)))))
+          (list dist (list (/ (+ x1 x2) 2) (/ (+ y1 y2) 2))))))
+    
+    ;; Or use let* for sequential bindings
+    (define (process-points x1 y1 x2 y2)
+      (let* ((dx (- x2 x1))
+             (dy (- y2 y1))
+             (dist (sqrt (+ (expt dx 2) (expt dy 2))))
+             (mid (list (/ (+ x1 x2) 2) (/ (+ y1 y2) 2))))
+        (list dist mid)))
+    ```
+    Use `let`, `let*`, and `letrec` expressions to bind intermediate results and avoid repeating complex expressions. This makes your code more readable and efficient.
+  </Accordion>
+  
+  <Accordion title="Not Using Tail Recursion" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Recursion without tail calls
+    (define (factorial n)
+      (if (= n 0)
+          1
+          (* n (factorial (- n 1)))))
+    
+    ;; Better approach: Use tail recursion
+    (define (factorial n)
+      (define (fact-iter n acc)
+        (if (= n 0)
+            acc
+            (fact-iter (- n 1) (* n acc))))
+      (fact-iter n 1))
+    ```
+    When using recursion, make your functions tail-recursive to avoid stack overflow errors with large inputs. In a tail-recursive function, the recursive call is the last operation in the function. Scheme implementations are required to optimize tail calls, making tail-recursive functions as efficient as loops.
+  </Accordion>
+  
+  <Accordion title="Not Using Higher-Order Functions" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Duplicated code for similar operations
+    (define (sum-list lst)
+      (if (null? lst)
+          0
+          (+ (car lst) (sum-list (cdr lst)))))
+    
+    (define (product-list lst)
+      (if (null? lst)
+          1
+          (* (car lst) (product-list (cdr lst)))))
+    
+    ;; Better approach: Use higher-order functions
+    (define (fold-right op init lst)
+      (if (null? lst)
+          init
+          (op (car lst) (fold-right op init (cdr lst)))))
+    
+    (define (sum-list lst)
+      (fold-right + 0 lst))
+    
+    (define (product-list lst)
+      (fold-right * 1 lst))
+    ```
+    Use higher-order functions to abstract common patterns and reduce code duplication. Functions like `map`, `filter`, and `fold` allow you to express complex operations more concisely.
+  </Accordion>
+  
+  <Accordion title="Improper Error Handling" icon="warning">
+    ```scheme
+    ;; Anti-pattern: No error handling
+    (define (divide a b)
+      (/ a b))
+    
+    ;; Usage that might raise an error
+    (divide 10 0) ; Division by zero
+    
+    ;; Better approach: Use condition handling
+    (define (divide a b)
+      (if (= b 0)
+          (error "Division by zero")
+          (/ a b)))
+    
+    ;; With more sophisticated error handling (SRFI-34/35 or similar)
+    (define (safe-divide a b)
+      (guard (ex ((and (error? ex) (equal? (error-message ex) "Division by zero"))
+                  (display "Cannot divide by zero\n")
+                  #f))
+        (divide a b)))
+    ```
+    Implement proper error handling in your code. Check for error conditions and use `error` or a more sophisticated error handling mechanism to report errors. This makes your code more robust and user-friendly.
+  </Accordion>
+  
+  <Accordion title="Not Using Named Let for Iteration" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Defining helper functions for iteration
+    (define (sum-integers-up-to n)
+      (define (iter i sum)
+        (if (> i n)
+            sum
+            (iter (+ i 1) (+ sum i))))
+      (iter 1 0))
+    
+    ;; Better approach: Use named let
+    (define (sum-integers-up-to n)
+      (let loop ((i 1) (sum 0))
+        (if (> i n)
+            sum
+            (loop (+ i 1) (+ sum i)))))
+    ```
+    Use named `let` for iteration instead of defining separate helper functions. Named `let` provides a cleaner syntax for iterative processes and keeps the iteration logic within the main function.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Data Abstraction" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Direct manipulation of data structures
+    (define (make-point x y) (cons x y))
+    (define (point-x p) (car p))
+    (define (point-y p) (cdr p))
+    
+    (define (make-rectangle top-left bottom-right)
+      (cons top-left bottom-right))
+    (define (rectangle-top-left r) (car r))
+    (define (rectangle-bottom-right r) (cdr r))
+    
+    (define (rectangle-width r)
+      (- (point-x (rectangle-bottom-right r))
+         (point-x (rectangle-top-left r))))
+    
+    ;; Client code directly accesses implementation
+    (define rect (cons (cons 0 0) (cons 10 10)))
+    (define width (- (car (cdr rect)) (car (car rect))))
+    
+    ;; Better approach: Use data abstraction
+    (define (make-point x y) (cons x y))
+    (define (point-x p) (car p))
+    (define (point-y p) (cdr p))
+    
+    (define (make-rectangle top-left bottom-right)
+      (cons top-left bottom-right))
+    (define (rectangle-top-left r) (car r))
+    (define (rectangle-bottom-right r) (cdr r))
+    
+    (define (rectangle-width r)
+      (- (point-x (rectangle-bottom-right r))
+         (point-x (rectangle-top-left r))))
+    
+    ;; Client code uses abstraction
+    (define rect (make-rectangle (make-point 0 0) (make-point 10 10)))
+    (define width (rectangle-width rect))
+    ```
+    Use data abstraction to hide the implementation details of your data structures. Define constructor and accessor functions and use them consistently instead of directly manipulating the underlying representation. This makes your code more maintainable and allows you to change the implementation without affecting client code.
+  </Accordion>
+  
+  <Accordion title="Not Using Macros Appropriately" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Using functions when macros would be more appropriate
+    (define (my-and a b)
+      (if a b #f))
+    
+    ;; This evaluates both arguments, which is not how and should work
+    (my-and (null? '()) (display "This always prints"))
+    
+    ;; Better approach: Use macros for control structures
+    (define-syntax my-and
+      (syntax-rules ()
+        ((my-and) #t)
+        ((my-and a) a)
+        ((my-and a b ...)
+         (if a (my-and b ...) #f))))
+    
+    ;; Now the second argument is only evaluated if the first is true
+    (my-and (null? '()) (display "This only prints if the first test passes"))
+    ```
+    Use macros appropriately for control structures and other forms that need to control the evaluation of their arguments. However, prefer functions for most other cases, as they are simpler and more predictable.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Naming Conventions" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Inconsistent naming
+    (define (calc_score p o)
+      (let ((atk (get-attack p))
+            (def (getDefense o)))
+        (* atk (/ 100 (+ 100 def)))))
+    
+    ;; Better approach: Follow Scheme naming conventions
+    (define (calculate-score player opponent)
+      (let ((attack (player-attack player))
+            (defense (opponent-defense opponent)))
+        (* attack (/ 100 (+ 100 defense)))))
+    
+    ;; Use ? suffix for predicates
+    (define (valid-player? player)
+      (and (player? player)
+           (> (player-health player) 0)))
+    
+    ;; Use ! suffix for mutators
+    (define (set-player-health! player health)
+      (set-car! (cdr player) health))
+    ```
+    Follow Scheme naming conventions. Use kebab-case (words separated by hyphens) for function and variable names. Use a `?` suffix for predicates and a `!` suffix for functions that mutate state. Consistent naming makes your code more readable and idiomatic.
+  </Accordion>
+  
+  <Accordion title="Not Using SRFI Libraries" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Reinventing functionality from SRFIs
+    (define (string-join strings delimiter)
+      (if (null? strings)
+          ""
+          (let loop ((result (car strings))
+                     (rest (cdr strings)))
+            (if (null? rest)
+                result
+                (loop (string-append result delimiter (car rest))
+                      (cdr rest))))))
+    
+    ;; Better approach: Use SRFI libraries
+    ;; With SRFI-13 (String Libraries)
+    (import (srfi :13))
+    
+    ;; Now we can use string-join directly
+    (string-join '("foo" "bar" "baz") "-")
+    ```
+    Use Scheme Requests for Implementation (SRFI) libraries for common functionality instead of reinventing the wheel. SRFIs provide standardized extensions to Scheme, covering areas like string manipulation, list operations, and more.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```scheme
+    ;; Anti-pattern: No documentation
+    (define (calculate-score player-stats opponent-stats)
+      (let ((attack (player-attack player-stats))
+            (defense (opponent-defense opponent-stats)))
+        (* attack (/ 100 (+ 100 defense)))))
+    
+    ;; Better approach: Include documentation
+    ;;; calculate-score: player-stats opponent-stats -> number
+    ;;; Calculate the effective score of an attack based on player and opponent stats.
+    ;;; player-stats: A player statistics object with at least an attack value.
+    ;;; opponent-stats: An opponent statistics object with at least a defense value.
+    ;;; Returns: A number representing the effective damage.
+    (define (calculate-score player-stats opponent-stats)
+      (let ((attack (player-attack player-stats))
+            (defense (opponent-defense opponent-stats)))
+        (* attack (/ 100 (+ 100 defense)))))
+    ```
+    Document your code with comments that explain the purpose, parameters, and return values of your functions. Good documentation helps others (and your future self) understand how to use your code correctly.
+  </Accordion>
+  
+  <Accordion title="Not Writing Tests" icon="warning">
+    ```scheme
+    ;; Anti-pattern: No tests
+    
+    ;; Better approach: Write tests
+    (define (factorial n)
+      (if (= n 0)
+          1
+          (* n (factorial (- n 1)))))
+    
+    ;; Simple test framework
+    (define (assert-equal expected actual message)
+      (if (equal? expected actual)
+          (display (string-append "PASS: " message "\n"))
+          (display (string-append "FAIL: " message 
+                                 " - Expected: " (write-to-string expected)
+                                 ", Got: " (write-to-string actual) "\n"))))
+    
+    ;; Tests
+    (assert-equal 1 (factorial 0) "factorial of 0")
+    (assert-equal 1 (factorial 1) "factorial of 1")
+    (assert-equal 120 (factorial 5) "factorial of 5")
+    ```
+    Write tests for your Scheme code. Testing helps ensure your code works correctly and continues to work as you make changes. Use a testing framework if available, or write simple test functions if not.
+  </Accordion>
+  
+  <Accordion title="Improper Use of Continuations" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Overusing or misusing continuations
+    (define (find-element lst pred)
+      (call-with-current-continuation
+        (lambda (return)
+          (for-each (lambda (x)
+                      (if (pred x)
+                          (return x)))
+                    lst)
+          #f)))
+    
+    ;; Better approach: Use simpler constructs when appropriate
+    (define (find-element lst pred)
+      (cond ((null? lst) #f)
+            ((pred (car lst)) (car lst))
+            (else (find-element (cdr lst) pred))))
+    
+    ;; Or use built-in functions
+    (define (find-element lst pred)
+      (find pred lst))
+    
+    ;; Use continuations for complex control flow where appropriate
+    (define (amb-demo)
+      (call-with-current-continuation
+        (lambda (escape)
+          (let ((amb-fail escape))
+            (define (amb choices)
+              (if (null? choices)
+                  (amb-fail 'backtrack)
+                  (call-with-current-continuation
+                    (lambda (k)
+                      (let ((save-fail amb-fail))
+                        (set! amb-fail
+                              (lambda (v)
+                                (set! amb-fail save-fail)
+                                (k (car (cdr choices)))))
+                        (car choices))))))
+            
+            (let ((x (amb '(1 2 3)))
+                  (y (amb '(4 5 6))))
+              (if (= (+ x y) 7)
+                  (list x y)
+                  (amb-fail 'backtrack)))))))
+    ```
+    Use continuations judiciously. While continuations are a powerful feature of Scheme, they can make code hard to understand and reason about. Use simpler constructs when they suffice, and reserve continuations for cases where they provide significant benefits, such as implementing complex control structures or backtracking algorithms.
+  </Accordion>
+  
+  <Accordion title="Not Using Modules" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Everything in one file without modules
+    
+    ;; Better approach: Use modules (R6RS or R7RS style)
+    ;; R6RS style
+    (library (geometry shapes)
+      (export make-point point-x point-y
+              make-rectangle rectangle-width rectangle-height)
+      (import (rnrs))
+      
+      (define (make-point x y) (cons x y))
+      (define (point-x p) (car p))
+      (define (point-y p) (cdr p))
+      
+      (define (make-rectangle top-left bottom-right)
+        (cons top-left bottom-right))
+      (define (rectangle-top-left r) (car r))
+      (define (rectangle-bottom-right r) (cdr r))
+      
+      (define (rectangle-width r)
+        (- (point-x (rectangle-bottom-right r))
+           (point-x (rectangle-top-left r))))
+      
+      (define (rectangle-height r)
+        (- (point-y (rectangle-bottom-right r))
+           (point-y (rectangle-top-left r)))))
+    
+    ;; R7RS style
+    (define-library (geometry shapes)
+      (export make-point point-x point-y
+              make-rectangle rectangle-width rectangle-height)
+      (import (scheme base))
+      
+      (begin
+        (define (make-point x y) (cons x y))
+        (define (point-x p) (car p))
+        (define (point-y p) (cdr p))
+        
+        (define (make-rectangle top-left bottom-right)
+          (cons top-left bottom-right))
+        (define (rectangle-top-left r) (car r))
+        (define (rectangle-bottom-right r) (cdr r))
+        
+        (define (rectangle-width r)
+          (- (point-x (rectangle-bottom-right r))
+             (point-x (rectangle-top-left r))))
+        
+        (define (rectangle-height r)
+          (- (point-y (rectangle-bottom-right r))
+             (point-y (rectangle-top-left r))))))
+    ```
+    Organize your code into modules with well-defined interfaces. This improves maintainability, reduces naming conflicts, and allows for better encapsulation of implementation details. Use the module system provided by your Scheme implementation (e.g., R6RS libraries, R7RS libraries, or implementation-specific module systems).
+  </Accordion>
+  
+  <Accordion title="Not Using Proper List Structure" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Improper list structure
+    (define (last-element lst)
+      (if (null? (cdr lst))
+          (car lst)
+          (last-element (cdr lst))))
+    
+    ;; This will fail on empty lists or improper lists
+    (last-element '()) ; Error: car of empty list
+    (last-element '(1 . 2)) ; Doesn't terminate correctly
+    
+    ;; Better approach: Handle edge cases
+    (define (last-element lst)
+      (cond ((null? lst) (error "last-element: empty list"))
+            ((not (pair? lst)) (error "last-element: not a list"))
+            ((null? (cdr lst)) (car lst))
+            ((not (pair? (cdr lst))) (error "last-element: improper list"))
+            (else (last-element (cdr lst)))))
+    
+    ;; Or use library functions when available
+    (define (last-element lst)
+      (if (null? lst)
+          (error "last-element: empty list")
+          (list-ref lst (- (length lst) 1))))
+    ```
+    Be careful with list structure and handle edge cases properly. Check for empty lists, improper lists, and other special cases to make your code more robust.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Recursion Patterns" icon="warning">
+    ```scheme
+    ;; Anti-pattern: Inefficient recursion patterns
+    (define (append-lists lst1 lst2)
+      (if (null? lst1)
+          lst2
+          (cons (car lst1) (append-lists (cdr lst1) lst2))))
+    
+    ;; This creates a new copy of lst1
+    
+    ;; Better approach: Use efficient recursion patterns
+    (define (append-lists! lst1 lst2)
+      (if (null? lst1)
+          lst2
+          (begin
+            (let loop ((l lst1))
+              (if (null? (cdr l))
+                  (set-cdr! l lst2)
+                  (loop (cdr l))))
+            lst1)))
+    
+    ;; This modifies lst1 in-place, which is more efficient but has side effects
+    
+    ;; Or use built-in functions
+    (define (append-lists lst1 lst2)
+      (append lst1 lst2))
+    ```
+    Choose appropriate recursion patterns for your algorithms. Be aware of the trade-offs between creating new data structures and modifying existing ones in-place. Use built-in functions when available for common operations.
+  </Accordion>
+</AccordionGroup>

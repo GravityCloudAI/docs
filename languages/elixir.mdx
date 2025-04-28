@@ -1,0 +1,651 @@
+---
+title: 'Elixir'
+description: 'Elixir is a dynamic, functional programming language designed for building scalable and maintainable applications. It leverages the Erlang VM, known for running low-latency, distributed, and fault-tolerant systems.'
+---
+
+<AccordionGroup>
+  <Accordion title="Elixir Anti-Patterns Overview" icon="elixir">
+    Elixir, despite being a well-designed functional language, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing Elixir code.
+  </Accordion>
+  
+  <Accordion title="Using Processes for Everything" icon="warning">
+    ```elixir
+    # Anti-pattern: Using processes unnecessarily
+    defmodule Calculator do
+      def start do
+        spawn(fn -> loop(%{}) end)
+      end
+      
+      def loop(state) do
+        receive do
+          {:add, a, b, caller} ->
+            send(caller, {:result, a + b})
+            loop(state)
+          # Other operations...
+        end
+      end
+    end
+    
+    # Usage
+    calculator = Calculator.start()
+    send(calculator, {:add, 2, 3, self()})
+    
+    receive do
+      {:result, value} -> IO.puts("Result: #{value}")
+    end
+    
+    # Better approach: Use regular functions for simple operations
+    defmodule Calculator do
+      def add(a, b), do: a + b
+      # Other operations...
+    end
+    
+    # Usage
+    result = Calculator.add(2, 3)
+    IO.puts("Result: #{result}")
+    ```
+    Don't use processes for simple operations that don't need concurrency, state isolation, or fault tolerance. Processes have overhead and should be used when their benefits are needed.
+  </Accordion>
+  
+  <Accordion title="Not Using OTP Behaviors" icon="warning">
+    ```elixir
+    # Anti-pattern: Reinventing OTP patterns
+    defmodule UserStore do
+      def start do
+        spawn(fn -> loop(%{}) end)
+      end
+      
+      def loop(state) do
+        receive do
+          {:get, key, caller} ->
+            send(caller, {:ok, Map.get(state, key)})
+            loop(state)
+          {:put, key, value} ->
+            loop(Map.put(state, key, value))
+          # No proper error handling, supervision, etc.
+        end
+      end
+    end
+    
+    # Better approach: Use GenServer
+    defmodule UserStore do
+      use GenServer
+      
+      # Client API
+      def start_link(opts \\ []) do
+        GenServer.start_link(__MODULE__, %{}, opts)
+      end
+      
+      def get(pid, key) do
+        GenServer.call(pid, {:get, key})
+      end
+      
+      def put(pid, key, value) do
+        GenServer.cast(pid, {:put, key, value})
+      end
+      
+      # Server callbacks
+      @impl true
+      def init(state) do
+        {:ok, state}
+      end
+      
+      @impl true
+      def handle_call({:get, key}, _from, state) do
+        {:reply, Map.get(state, key), state}
+      end
+      
+      @impl true
+      def handle_cast({:put, key, value}, state) do
+        {:noreply, Map.put(state, key, value)}
+      end
+    end
+    ```
+    Use OTP behaviors like GenServer, Supervisor, and Application instead of reinventing them. They provide battle-tested solutions for common patterns.
+  </Accordion>
+  
+  <Accordion title="Using Agents for Complex State" icon="warning">
+    ```elixir
+    # Anti-pattern: Using Agent for complex state management
+    defmodule ComplexStore do
+      def start_link do
+        Agent.start_link(fn -> %{} end)
+      end
+      
+      def get_user_posts(agent, user_id) do
+        Agent.get(agent, fn state ->
+          # Complex data processing inside Agent
+          posts = Map.get(state, :posts, %{})
+          user_posts = Map.get(posts, user_id, [])
+          Enum.filter(user_posts, &(&1.published))
+          |> Enum.sort_by(&(&1.date), {:desc, Date})
+        end)
+      end
+      
+      def add_post(agent, user_id, post) do
+        Agent.update(agent, fn state ->
+          posts = Map.get(state, :posts, %{})
+          user_posts = Map.get(posts, user_id, [])
+          updated_posts = [post | user_posts]
+          Map.put(state, :posts, Map.put(posts, user_id, updated_posts))
+        end)
+      end
+    end
+    
+    # Better approach: Use GenServer for complex state
+    defmodule ComplexStore do
+      use GenServer
+      
+      # Client API
+      def start_link(opts \\ []) do
+        GenServer.start_link(__MODULE__, %{}, opts)
+      end
+      
+      def get_user_posts(pid, user_id) do
+        GenServer.call(pid, {:get_user_posts, user_id})
+      end
+      
+      def add_post(pid, user_id, post) do
+        GenServer.cast(pid, {:add_post, user_id, post})
+      end
+      
+      # Server callbacks
+      @impl true
+      def init(state) do
+        {:ok, state}
+      end
+      
+      @impl true
+      def handle_call({:get_user_posts, user_id}, _from, state) do
+        posts = Map.get(state, :posts, %{})
+        user_posts = Map.get(posts, user_id, [])
+        result = Enum.filter(user_posts, &(&1.published))
+                |> Enum.sort_by(&(&1.date), {:desc, Date})
+        {:reply, result, state}
+      end
+      
+      @impl true
+      def handle_cast({:add_post, user_id, post}, state) do
+        posts = Map.get(state, :posts, %{})
+        user_posts = Map.get(posts, user_id, [])
+        updated_posts = [post | user_posts]
+        new_state = Map.put(state, :posts, Map.put(posts, user_id, updated_posts))
+        {:noreply, new_state}
+      end
+    end
+    ```
+    Use Agent only for simple state. For complex state management with custom logic, use GenServer which gives you more control and better performance.
+  </Accordion>
+  
+  <Accordion title="Not Using Pattern Matching Effectively" icon="warning">
+    ```elixir
+    # Anti-pattern: Not using pattern matching
+    def process_response(response) do
+      if response.status == :ok do
+        data = response.body
+        # Process data
+      else
+        error = response.error
+        # Handle error
+      end
+    end
+    
+    # Better approach: Use pattern matching
+    def process_response({:ok, body}) do
+      # Process data
+    end
+    
+    def process_response({:error, reason}) do
+      # Handle error
+    end
+    ```
+    Leverage Elixir's pattern matching for cleaner, more declarative code. Use it in function heads, case statements, and with expressions.
+  </Accordion>
+  
+  <Accordion title="Using Strings Instead of Atoms for Keys" icon="warning">
+    ```elixir
+    # Anti-pattern: Using strings for map keys
+    user = %{"name" => "John", "age" => 30}
+    name = user["name"]
+    
+    # Better approach: Use atoms for map keys
+    user = %{name: "John", age: 30}
+    name = user.name  # More concise access
+    ```
+    Use atoms for map keys when the set of keys is known and limited. Atoms are more efficient and allow for the dot notation. However, be careful not to create atoms dynamically from user input as they are not garbage collected.
+  </Accordion>
+  
+  <Accordion title="Not Using with for Multiple Transformations" icon="warning">
+    ```elixir
+    # Anti-pattern: Nested case statements
+    def process_data(data) do
+      case parse_data(data) do
+        {:ok, parsed} ->
+          case validate_data(parsed) do
+            {:ok, validated} ->
+              case save_data(validated) do
+                {:ok, result} -> {:ok, result}
+                {:error, reason} -> {:error, reason}
+              end
+            {:error, reason} -> {:error, reason}
+          end
+        {:error, reason} -> {:error, reason}
+      end
+    end
+    
+    # Better approach: Use with
+    def process_data(data) do
+      with {:ok, parsed} <- parse_data(data),
+           {:ok, validated} <- validate_data(parsed),
+           {:ok, result} <- save_data(validated) do
+        {:ok, result}
+      end
+    end
+    ```
+    Use `with` expressions for sequences of operations where each step depends on the success of the previous one. It makes the code more readable and avoids the "pyramid of doom".
+  </Accordion>
+  
+  <Accordion title="Not Using Protocols for Polymorphism" icon="warning">
+    ```elixir
+    # Anti-pattern: Type checking
+    def stringify(value) do
+      cond do
+        is_integer(value) -> Integer.to_string(value)
+        is_float(value) -> Float.to_string(value)
+        is_list(value) -> Enum.join(value, ", ")
+        true -> raise "Unsupported type"
+      end
+    end
+    
+    # Better approach: Use protocols
+    defprotocol Stringify do
+      def to_string(value)
+    end
+    
+    defimpl Stringify, for: Integer do
+      def to_string(value), do: Integer.to_string(value)
+    end
+    
+    defimpl Stringify, for: Float do
+      def to_string(value), do: Float.to_string(value)
+    end
+    
+    defimpl Stringify, for: List do
+      def to_string(value), do: Enum.join(value, ", ")
+    end
+    ```
+    Use protocols for polymorphic behavior instead of type checking. They provide a clean way to implement behavior that varies based on type.
+  </Accordion>
+  
+  <Accordion title="Using List Concatenation in Loops" icon="warning">
+    ```elixir
+    # Anti-pattern: Inefficient list concatenation
+    def process_items(items) do
+      Enum.reduce(items, [], fn item, acc ->
+        processed = process_item(item)
+        acc ++ [processed]  # Inefficient: O(n) operation
+      end)
+    end
+    
+    # Better approach: Use list prepending and reverse
+    def process_items(items) do
+      items
+      |> Enum.reduce([], fn item, acc ->
+        processed = process_item(item)
+        [processed | acc]  # Efficient: O(1) operation
+      end)
+      |> Enum.reverse()  # Reverse once at the end
+    end
+    ```
+    Avoid using `++` for list concatenation in loops. Instead, use list prepending (`[head | tail]`) and reverse the result at the end if order matters.
+  </Accordion>
+  
+  <Accordion title="Not Using Stream for Large Collections" icon="warning">
+    ```elixir
+    # Anti-pattern: Eager evaluation of large collections
+    def process_large_file(file_path) do
+      File.stream!(file_path)
+      |> Enum.map(&String.trim/1)
+      |> Enum.filter(&(String.length(&1) > 0))
+      |> Enum.map(&process_line/1)
+      |> Enum.take(10)
+    end
+    
+    # Better approach: Use Stream for lazy evaluation
+    def process_large_file(file_path) do
+      File.stream!(file_path)
+      |> Stream.map(&String.trim/1)
+      |> Stream.filter(&(String.length(&1) > 0))
+      |> Stream.map(&process_line/1)
+      |> Enum.take(10)  # Only now is the stream evaluated
+    end
+    ```
+    Use `Stream` instead of `Enum` for large collections or when you only need part of the result. Streams are lazy and avoid unnecessary computation.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Supervision Trees" icon="warning">
+    ```elixir
+    # Anti-pattern: Manual process management
+    defmodule MyApp do
+      def start do
+        database_pid = Database.start_link()
+        cache_pid = Cache.start_link()
+        api_pid = API.start_link(database_pid, cache_pid)
+        # What if one of these crashes?
+      end
+    end
+    
+    # Better approach: Use supervision trees
+    defmodule MyApp.Application do
+      use Application
+      
+      def start(_type, _args) do
+        children = [
+          MyApp.Database,
+          MyApp.Cache,
+          {MyApp.API, []}
+        ]
+        
+        opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+        Supervisor.start_link(children, opts)
+      end
+    end
+    ```
+    Use proper supervision trees to manage process lifecycles and handle failures. This is a core strength of the BEAM VM and Elixir's OTP framework.
+  </Accordion>
+  
+  <Accordion title="Using Task.async Without Task.await" icon="warning">
+    ```elixir
+    # Anti-pattern: Not awaiting tasks
+    def process_items(items) do
+      items
+      |> Enum.map(fn item ->
+        Task.async(fn -> process_item(item) end)
+      end)
+      # Tasks are started but never awaited
+    end
+    
+    # Better approach: Properly await tasks
+    def process_items(items) do
+      tasks = Enum.map(items, fn item ->
+        Task.async(fn -> process_item(item) end)
+      end)
+      
+      Enum.map(tasks, &Task.await/1)
+    end
+    ```
+    Always call `Task.await/1` or `Task.await/2` on tasks started with `Task.async/1` to avoid memory leaks and ensure proper error propagation.
+  </Accordion>
+  
+  <Accordion title="Not Using ExUnit for Testing" icon="warning">
+    ```elixir
+    # Anti-pattern: Manual testing
+    defmodule Calculator do
+      def add(a, b), do: a + b
+    end
+    
+    # Manual test
+    IO.puts("Testing add...")
+    result = Calculator.add(2, 3)
+    if result == 5 do
+      IO.puts("Test passed!")
+    else
+      IO.puts("Test failed!")
+    end
+    
+    # Better approach: Use ExUnit
+    defmodule CalculatorTest do
+      use ExUnit.Case
+      
+      test "adds two numbers" do
+        assert Calculator.add(2, 3) == 5
+      end
+      
+      test "handles negative numbers" do
+        assert Calculator.add(-2, 3) == 1
+        assert Calculator.add(2, -3) == -1
+      end
+    end
+    ```
+    Use ExUnit for testing instead of writing manual test code. It provides a structured way to write and run tests with helpful assertions and reporting.
+  </Accordion>
+  
+  <Accordion title="Not Using Typespecs" icon="warning">
+    ```elixir
+    # Anti-pattern: No typespecs
+    defmodule User do
+      def create(name, age) do
+        %{name: name, age: age}
+      end
+      
+      def adult?(user) do
+        user.age >= 18
+      end
+    end
+    
+    # Better approach: Use typespecs
+    defmodule User do
+      @type t :: %{name: String.t(), age: non_neg_integer()}
+      
+      @spec create(String.t(), non_neg_integer()) :: t()
+      def create(name, age) do
+        %{name: name, age: age}
+      end
+      
+      @spec adult?(t()) :: boolean()
+      def adult?(user) do
+        user.age >= 18
+      end
+    end
+    ```
+    Use typespecs to document function signatures and data structures. They improve code documentation and allow tools like Dialyzer to perform static analysis.
+  </Accordion>
+  
+  <Accordion title="Using try/rescue Excessively" icon="warning">
+    ```elixir
+    # Anti-pattern: Excessive use of try/rescue
+    def divide(a, b) do
+      try do
+        a / b
+      rescue
+        ArithmeticError -> 0
+      end
+    end
+    
+    # Better approach: Use pattern matching and guard clauses
+    def divide(a, _b = 0), do: {:error, :division_by_zero}
+    def divide(a, b), do: {:ok, a / b}
+    ```
+    Avoid using `try/rescue` for control flow. In Elixir, it's more idiomatic to use pattern matching, guard clauses, and tagged tuples for error handling.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Module Structure" icon="warning">
+    ```elixir
+    # Anti-pattern: Poor module structure
+    defmodule UserSystem do
+      # Hundreds of functions in one module
+      def create_user(params), do: # ...
+      def update_user(id, params), do: # ...
+      def delete_user(id), do: # ...
+      def get_user(id), do: # ...
+      def list_users, do: # ...
+      def authenticate_user(email, password), do: # ...
+      def generate_password_reset_token(email), do: # ...
+      # And many more...
+    end
+    
+    # Better approach: Proper module organization
+    defmodule MyApp.Accounts do
+      # Public API for account management
+      def create_user(params), do: # ...
+      def update_user(id, params), do: # ...
+      def delete_user(id), do: # ...
+      def get_user(id), do: # ...
+      def list_users, do: # ...
+    end
+    
+    defmodule MyApp.Accounts.Authentication do
+      # Authentication-specific functionality
+      def authenticate_user(email, password), do: # ...
+      def generate_password_reset_token(email), do: # ...
+    end
+    
+    defmodule MyApp.Accounts.User do
+      # User struct and validations
+      defstruct [:id, :name, :email, :password_hash]
+      
+      def changeset(user, params), do: # ...
+    end
+    ```
+    Organize your code into cohesive modules with clear responsibilities. Follow the principle of single responsibility and create a logical hierarchy of modules.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Tuples" icon="warning">
+    ```elixir
+    # Anti-pattern: Inconsistent error handling
+    def create_user(params) do
+      if valid_params?(params) do
+        # Create user
+        %{id: 123, name: params.name}
+      else
+        nil  # What went wrong?
+      end
+    end
+    
+    # Usage
+    user = create_user(params)
+    if user do
+      # Success
+    else
+      # Error, but what kind?
+    end
+    
+    # Better approach: Use tagged tuples
+    def create_user(params) do
+      case validate_params(params) do
+        :ok ->
+          # Create user
+          {:ok, %{id: 123, name: params.name}}
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+    
+    # Usage
+    case create_user(params) do
+      {:ok, user} ->
+        # Success
+      {:error, :invalid_email} ->
+        # Handle specific error
+      {:error, reason} ->
+        # Handle other errors
+    end
+    ```
+    Use tagged tuples like `{:ok, result}` and `{:error, reason}` for functions that can fail. This makes error handling explicit and allows for pattern matching on specific error types.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```elixir
+    # Anti-pattern: Poor or no documentation
+    defmodule UserAPI do
+      def create(params) do
+        # Implementation...
+      end
+    end
+    
+    # Better approach: Proper documentation
+    defmodule UserAPI do
+      @moduledoc """
+      Provides functions for managing users in the system.
+      """
+      
+      @doc """
+      Creates a new user with the given parameters.
+      
+      ## Parameters
+      
+        * `params` - A map containing user attributes:
+          * `:name` - The user's full name (required)
+          * `:email` - The user's email address (required)
+          * `:age` - The user's age (optional)
+      
+      ## Examples
+      
+          iex> UserAPI.create(%{name: "John Doe", email: "john@example.com"})
+          {:ok, %User{id: 123, name: "John Doe", email: "john@example.com"}}
+          
+          iex> UserAPI.create(%{name: "John Doe"})
+          {:error, :email_required}
+      
+      ## Returns
+      
+        * `{:ok, user}` if the user was created successfully
+        * `{:error, reason}` if there was an error
+      """
+      def create(params) do
+        # Implementation...
+      end
+    end
+    ```
+    Write comprehensive documentation for your modules and functions using `@moduledoc` and `@doc` attributes. Include examples, parameter descriptions, and return value information.
+  </Accordion>
+  
+  <Accordion title="Using String Interpolation for Complex Queries" icon="warning">
+    ```elixir
+    # Anti-pattern: String interpolation for SQL queries
+    def find_users(name, min_age) do
+      query = "SELECT * FROM users WHERE name LIKE '%#{name}%' AND age >= #{min_age}"
+      # Execute query...
+    end
+    
+    # Better approach: Use parameterized queries
+    def find_users(name, min_age) do
+      query = "SELECT * FROM users WHERE name LIKE $1 AND age >= $2"
+      params = ["%#{name}%", min_age]
+      # Execute query with params...
+    end
+    
+    # Even better with Ecto
+    def find_users(name, min_age) do
+      from(u in User,
+        where: like(u.name, ^"%#{name}%") and u.age >= ^min_age
+      )
+      |> Repo.all()
+    end
+    ```
+    Never use string interpolation for building database queries. Use parameterized queries or query builders like Ecto to prevent SQL injection attacks.
+  </Accordion>
+  
+  <Accordion title="Not Using Application Configuration Properly" icon="warning">
+    ```elixir
+    # Anti-pattern: Hardcoded configuration
+    defmodule MyApp.API do
+      def base_url do
+        "https://api.example.com"
+      end
+      
+      def api_key do
+        "hardcoded_api_key"
+      end
+    end
+    
+    # Better approach: Use application configuration
+    # In config/config.exs
+    config :my_app, :api,
+      base_url: "https://api.example.com",
+      api_key: System.get_env("API_KEY")
+    
+    # In your module
+    defmodule MyApp.API do
+      def base_url do
+        Application.get_env(:my_app, :api)[:base_url]
+      end
+      
+      def api_key do
+        Application.get_env(:my_app, :api)[:api_key]
+      end
+    end
+    ```
+    Use Elixir's application configuration system instead of hardcoding configuration values. This allows for different configurations in different environments.
+  </Accordion>
+</AccordionGroup>

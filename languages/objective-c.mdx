@@ -1,0 +1,621 @@
+---
+title: 'Objective-C'
+description: 'Objective-C is a general-purpose, object-oriented programming language that adds Smalltalk-style messaging to the C programming language. It was the main programming language supported by Apple for macOS, iOS, and their respective APIs (Cocoa and Cocoa Touch) before the introduction of Swift.'
+---
+
+<AccordionGroup>
+  <Accordion title="Objective-C Anti-Patterns Overview" icon="objective-c">
+    Objective-C, despite being a powerful language for Apple platforms, has several common anti-patterns that can lead to memory leaks, performance issues, and maintainability problems. Here are the most important anti-patterns to avoid when writing Objective-C code.
+  </Accordion>
+  
+  <Accordion title="Not Using ARC (Automatic Reference Counting)" icon="warning">
+    ```objective-c
+    // Anti-pattern: Manual memory management
+    - (void)createPerson {
+        Person *person = [[Person alloc] init];
+        [self processPerson:person];
+        [person release]; // Manual release required
+    }
+    
+    // Better approach: Use ARC
+    - (void)createPerson {
+        Person *person = [[Person alloc] init];
+        [self processPerson:person];
+        // No release needed with ARC
+    }
+    ```
+    Always use Automatic Reference Counting (ARC) in new Objective-C projects. ARC automatically manages memory for Objective-C objects, reducing the risk of memory leaks and crashes due to over-releasing or accessing deallocated objects.
+  </Accordion>
+  
+  <Accordion title="Strong Reference Cycles" icon="warning">
+    ```objective-c
+    // Anti-pattern: Strong reference cycle
+    @interface Parent : NSObject
+    @property (strong, nonatomic) Child *child;
+    @end
+    
+    @interface Child : NSObject
+    @property (strong, nonatomic) Parent *parent;
+    @end
+    
+    // Usage that creates a cycle
+    Parent *parent = [[Parent alloc] init];
+    Child *child = [[Child alloc] init];
+    parent.child = child;
+    child.parent = parent;
+    // Both objects will never be deallocated
+    
+    // Better approach: Use weak references to break cycles
+    @interface Parent : NSObject
+    @property (strong, nonatomic) Child *child;
+    @end
+    
+    @interface Child : NSObject
+    @property (weak, nonatomic) Parent *parent; // Weak reference
+    @end
+    ```
+    Avoid creating strong reference cycles (retain cycles) where two objects hold strong references to each other. Use `weak` or `unsafe_unretained` properties for back-references to break these cycles. This is especially important in delegate patterns and parent-child relationships.
+  </Accordion>
+  
+  <Accordion title="Not Using Properties" icon="warning">
+    ```objective-c
+    // Anti-pattern: Direct ivar access without properties
+    @interface Person : NSObject {
+        NSString *_name;
+        NSInteger _age;
+    }
+    - (NSString *)name;
+    - (void)setName:(NSString *)name;
+    - (NSInteger)age;
+    - (void)setAge:(NSInteger)age;
+    @end
+    
+    @implementation Person
+    - (NSString *)name {
+        return _name;
+    }
+    - (void)setName:(NSString *)name {
+        [_name release];
+        _name = [name copy];
+    }
+    - (NSInteger)age {
+        return _age;
+    }
+    - (void)setAge:(NSInteger)age {
+        _age = age;
+    }
+    @end
+    
+    // Better approach: Use properties
+    @interface Person : NSObject
+    @property (copy, nonatomic) NSString *name;
+    @property (assign, nonatomic) NSInteger age;
+    @end
+    
+    @implementation Person
+    // No need to implement getters and setters
+    @end
+    ```
+    Use properties instead of direct instance variable access and manual getter/setter methods. Properties provide automatic memory management, KVC/KVO compliance, and make your code more concise and less error-prone.
+  </Accordion>
+  
+  <Accordion title="Not Using Modern Objective-C Syntax" icon="warning">
+    ```objective-c
+    // Anti-pattern: Old-style syntax
+    NSArray *oldArray = [NSArray arrayWithObjects:@"one", @"two", @"three", nil];
+    NSDictionary *oldDict = [NSDictionary dictionaryWithObjectsAndKeys:
+                            @"value1", @"key1",
+                            @"value2", @"key2",
+                            nil];
+    
+    // Better approach: Use modern literal syntax
+    NSArray *modernArray = @[@"one", @"two", @"three"];
+    NSDictionary *modernDict = @{
+        @"key1": @"value1",
+        @"key2": @"value2"
+    };
+    
+    // Anti-pattern: Old-style method calls
+    [array addObject:[NSNumber numberWithInt:42]];
+    BOOL contains = [array containsObject:[NSNumber numberWithInt:42]];
+    
+    // Better approach: Use boxed expressions
+    [array addObject:@42];
+    BOOL contains = [array containsObject:@42];
+    ```
+    Use modern Objective-C syntax features like literals for NSArray, NSDictionary, and NSNumber, subscripting for collections, and boxed expressions. These make your code more concise, readable, and less error-prone.
+  </Accordion>
+  
+  <Accordion title="Massive View Controllers" icon="warning">
+    ```objective-c
+    // Anti-pattern: Massive View Controller
+    @interface UserViewController : UIViewController <UITableViewDelegate, UITableViewDataSource, UITextFieldDelegate, NetworkManagerDelegate>
+    @property (strong, nonatomic) UITableView *tableView;
+    @property (strong, nonatomic) NSArray *users;
+    @property (strong, nonatomic) NetworkManager *networkManager;
+    // Many more properties and methods...
+    @end
+    
+    @implementation UserViewController
+    // Hundreds of lines of code handling UI, networking, data processing...
+    @end
+    
+    // Better approach: Separate concerns
+    // UserViewController.h - Focused on view management
+    @interface UserViewController : UIViewController
+    @property (strong, nonatomic) UserViewModel *viewModel;
+    @end
+    
+    // UserViewModel.h - Handles data and business logic
+    @interface UserViewModel : NSObject
+    @property (strong, nonatomic) NSArray *users;
+    - (void)fetchUsers:(void(^)(BOOL success))completion;
+    - (NSInteger)numberOfUsers;
+    - (User *)userAtIndex:(NSInteger)index;
+    @end
+    
+    // UserTableViewDataSource.h - Handles table view data source
+    @interface UserTableViewDataSource : NSObject <UITableViewDataSource>
+    @property (weak, nonatomic) UserViewModel *viewModel;
+    @end
+    ```
+    Avoid creating massive view controllers that handle too many responsibilities. Use patterns like MVVM (Model-View-ViewModel), MVP (Model-View-Presenter), or VIPER to separate concerns and make your code more modular, testable, and maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Blocks for Asynchronous Operations" icon="warning">
+    ```objective-c
+    // Anti-pattern: Using delegate pattern for simple callbacks
+    @protocol NetworkManagerDelegate <NSObject>
+    - (void)networkManager:(NetworkManager *)manager didFetchData:(NSData *)data;
+    - (void)networkManager:(NetworkManager *)manager didFailWithError:(NSError *)error;
+    @end
+    
+    @interface NetworkManager : NSObject
+    @property (weak, nonatomic) id<NetworkManagerDelegate> delegate;
+    - (void)fetchDataFromURL:(NSURL *)url;
+    @end
+    
+    // Usage
+    - (void)fetchData {
+        NetworkManager *manager = [[NetworkManager alloc] init];
+        manager.delegate = self;
+        [manager fetchDataFromURL:url];
+    }
+    
+    - (void)networkManager:(NetworkManager *)manager didFetchData:(NSData *)data {
+        // Handle data
+    }
+    
+    - (void)networkManager:(NetworkManager *)manager didFailWithError:(NSError *)error {
+        // Handle error
+    }
+    
+    // Better approach: Use blocks for callbacks
+    @interface NetworkManager : NSObject
+    - (void)fetchDataFromURL:(NSURL *)url 
+                   completion:(void(^)(NSData *data, NSError *error))completion;
+    @end
+    
+    // Usage
+    - (void)fetchData {
+        NetworkManager *manager = [[NetworkManager alloc] init];
+        [manager fetchDataFromURL:url completion:^(NSData *data, NSError *error) {
+            if (error) {
+                // Handle error
+            } else {
+                // Handle data
+            }
+        }];
+    }
+    ```
+    Use blocks (closures) for asynchronous callbacks instead of delegate patterns for simple operations. Blocks make the code more concise and keep related code together, improving readability and maintainability.
+  </Accordion>
+  
+  <Accordion title="Not Using Designated Initializers" icon="warning">
+    ```objective-c
+    // Anti-pattern: Multiple initializers without a clear pattern
+    @implementation Person
+    - (instancetype)init {
+        self = [super init];
+        if (self) {
+            _name = @"Unknown";
+            _age = 0;
+        }
+        return self;
+    }
+    
+    - (instancetype)initWithName:(NSString *)name {
+        self = [super init]; // Should call the designated initializer
+        if (self) {
+            _name = [name copy];
+            _age = 0;
+        }
+        return self;
+    }
+    
+    - (instancetype)initWithAge:(NSInteger)age {
+        self = [super init]; // Should call the designated initializer
+        if (self) {
+            _name = @"Unknown";
+            _age = age;
+        }
+        return self;
+    }
+    @end
+    
+    // Better approach: Use designated initializers
+    @implementation Person
+    - (instancetype)initWithName:(NSString *)name age:(NSInteger)age {
+        self = [super init];
+        if (self) {
+            _name = [name copy];
+            _age = age;
+        }
+        return self;
+    }
+    
+    - (instancetype)init {
+        return [self initWithName:@"Unknown" age:0];
+    }
+    
+    - (instancetype)initWithName:(NSString *)name {
+        return [self initWithName:name age:0];
+    }
+    
+    - (instancetype)initWithAge:(NSInteger)age {
+        return [self initWithName:@"Unknown" age:age];
+    }
+    @end
+    ```
+    Use the designated initializer pattern to ensure proper object initialization. Have one primary initializer that all other initializers call. This ensures consistent initialization and makes your code more maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Class Extensions for Private Methods" icon="warning">
+    ```objective-c
+    // Anti-pattern: Declaring private methods in the public interface
+    @interface Person : NSObject
+    @property (copy, nonatomic) NSString *name;
+    @property (assign, nonatomic) NSInteger age;
+    
+    // Public API
+    - (void)celebrateBirthday;
+    
+    // These should be private
+    - (void)incrementAge;
+    - (void)logBirthdayMessage;
+    @end
+    
+    // Better approach: Use a class extension for private methods
+    // Person.h - Public interface
+    @interface Person : NSObject
+    @property (copy, nonatomic) NSString *name;
+    @property (assign, nonatomic) NSInteger age;
+    
+    // Public API
+    - (void)celebrateBirthday;
+    @end
+    
+    // Person.m - Implementation with class extension
+    @interface Person ()
+    // Private methods
+    - (void)incrementAge;
+    - (void)logBirthdayMessage;
+    @end
+    
+    @implementation Person
+    // Implementation...
+    @end
+    ```
+    Use class extensions (anonymous categories) in implementation files to declare private methods and properties. This keeps your public interface clean and focused on what clients of your class need to know, while hiding implementation details.
+  </Accordion>
+  
+  <Accordion title="Not Using Nullability Annotations" icon="warning">
+    ```objective-c
+    // Anti-pattern: No nullability annotations
+    @interface User : NSObject
+    @property (strong, nonatomic) NSString *name;
+    @property (strong, nonatomic) NSString *email;
+    
+    - (User *)friendWithID:(NSString *)friendID;
+    - (NSArray *)allFriends;
+    @end
+    
+    // Better approach: Use nullability annotations
+    NS_ASSUME_NONNULL_BEGIN
+    @interface User : NSObject
+    @property (strong, nonatomic) NSString *name;
+    @property (strong, nonatomic, nullable) NSString *email;
+    
+    - (nullable User *)friendWithID:(NSString *)friendID;
+    - (NSArray<User *> *)allFriends;
+    @end
+    NS_ASSUME_NONNULL_END
+    ```
+    Use nullability annotations (`nullable`, `nonnull`, `null_unspecified`, `null_resettable`) to clarify whether properties and method parameters/return values can be nil. This improves code clarity, enables better Swift interoperability, and helps catch nil-related bugs at compile time.
+  </Accordion>
+  
+  <Accordion title="Not Using Lightweight Generics" icon="warning">
+    ```objective-c
+    // Anti-pattern: Not using generics for collections
+    @interface Library : NSObject
+    @property (strong, nonatomic) NSArray *books;
+    - (void)addBook:(Book *)book;
+    - (NSArray *)booksByAuthor:(Author *)author;
+    @end
+    
+    // Usage
+    Book *firstBook = library.books[0]; // Requires casting
+    
+    // Better approach: Use lightweight generics
+    @interface Library : NSObject
+    @property (strong, nonatomic) NSArray<Book *> *books;
+    - (void)addBook:(Book *)book;
+    - (NSArray<Book *> *)booksByAuthor:(Author *)author;
+    @end
+    
+    // Usage
+    Book *firstBook = library.books[0]; // No casting needed
+    ```
+    Use lightweight generics for collection types (NSArray, NSDictionary, NSSet) to specify the types they contain. This improves type checking, enables better autocompletion, and makes your code more self-documenting.
+  </Accordion>
+  
+  <Accordion title="Not Using Categories and Extensions Appropriately" icon="warning">
+    ```objective-c
+    // Anti-pattern: Subclassing just to add functionality
+    @interface CustomString : NSString
+    - (BOOL)containsEmoji;
+    - (NSString *)truncateToLength:(NSInteger)length;
+    @end
+    
+    // Better approach: Use categories to extend existing classes
+    @interface NSString (Utilities)
+    - (BOOL)containsEmoji;
+    - (NSString *)truncateToLength:(NSInteger)length;
+    @end
+    
+    // Anti-pattern: Using categories for core functionality
+    @interface Person (CoreFunctionality)
+    - (void)setName:(NSString *)name; // Bad: Core functionality in category
+    - (NSString *)name;
+    @end
+    
+    // Better approach: Keep core functionality in the main class
+    @interface Person : NSObject
+    @property (copy, nonatomic) NSString *name; // Core property in main class
+    @end
+    
+    // Use categories for extending with utilities
+    @interface Person (Utilities)
+    - (NSString *)formattedDescription;
+    - (BOOL)isAdult;
+    @end
+    ```
+    Use categories and extensions appropriately. Use categories to add methods to existing classes without subclassing. Keep core functionality in the main class, and use categories for grouping related utility methods. Be aware that categories cannot add instance variables (only properties backed by associative references).
+  </Accordion>
+  
+  <Accordion title="Not Using Enumerations for Constants" icon="warning">
+    ```objective-c
+    // Anti-pattern: Using #define or global constants
+    #define USER_TYPE_REGULAR 0
+    #define USER_TYPE_ADMIN 1
+    #define USER_TYPE_GUEST 2
+    
+    // Or even with global constants
+    static const NSInteger UserTypeRegular = 0;
+    static const NSInteger UserTypeAdmin = 1;
+    static const NSInteger UserTypeGuest = 2;
+    
+    // Usage
+    if (user.type == USER_TYPE_ADMIN) {
+        // Do admin stuff
+    }
+    
+    // Better approach: Use NS_ENUM
+    typedef NS_ENUM(NSInteger, UserType) {
+        UserTypeRegular,
+        UserTypeAdmin,
+        UserTypeGuest
+    };
+    
+    // Usage
+    if (user.type == UserTypeAdmin) {
+        // Do admin stuff
+    }
+    ```
+    Use `NS_ENUM` or `NS_OPTIONS` for enumerated constants instead of #define or global constants. Enumerations provide type safety, better autocompletion, and make your code more readable and maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using instancetype for Initializers" icon="warning">
+    ```objective-c
+    // Anti-pattern: Using id as return type for initializers
+    @interface Person : NSObject
+    + (id)personWithName:(NSString *)name;
+    - (id)initWithName:(NSString *)name;
+    @end
+    
+    // Better approach: Use instancetype
+    @interface Person : NSObject
+    + (instancetype)personWithName:(NSString *)name;
+    - (instancetype)initWithName:(NSString *)name;
+    @end
+    ```
+    Use `instancetype` instead of `id` as the return type for initializers and factory methods. This provides better type checking and enables the compiler to know the actual return type, improving autocompletion and catching errors at compile time.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Memory Management Semantics" icon="warning">
+    ```objective-c
+    // Anti-pattern: Incorrect property attributes
+    @interface Person : NSObject
+    @property (strong, nonatomic) NSString *name; // Should be copy
+    @property (strong, nonatomic) NSMutableArray *friends; // Publicly exposed mutable object
+    @property (strong, nonatomic) id<PersonDelegate> delegate; // Should be weak
+    @end
+    
+    // Better approach: Use appropriate property attributes
+    @interface Person : NSObject
+    @property (copy, nonatomic) NSString *name; // Copy for immutable objects
+    @property (strong, nonatomic, readonly) NSArray *friends; // Public immutable, private mutable
+    @property (weak, nonatomic) id<PersonDelegate> delegate; // Weak for delegates
+    @end
+    
+    // In the implementation file
+    @interface Person ()
+    @property (strong, nonatomic, readwrite) NSMutableArray *mutableFriends; // Private mutable version
+    @end
+    
+    @implementation Person
+    - (NSArray *)friends {
+        return [self.mutableFriends copy]; // Return immutable copy
+    }
+    @end
+    ```
+    Use appropriate memory management semantics for properties. Use `copy` for immutable objects like NSString to prevent unexpected changes, `weak` for delegates and other references that shouldn't own the object, and expose mutable collections as readonly with private mutable versions.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Error Handling" icon="warning">
+    ```objective-c
+    // Anti-pattern: Poor error handling
+    - (BOOL)saveData:(NSData *)data {
+        BOOL success = [data writeToFile:@"path/to/file" atomically:YES];
+        return success;
+    }
+    
+    // Usage
+    if (![self saveData:data]) {
+        // Failed, but why?
+    }
+    
+    // Better approach: Use NSError for detailed error information
+    - (BOOL)saveData:(NSData *)data error:(NSError **)error {
+        NSError *writeError = nil;
+        BOOL success = [data writeToFile:@"path/to/file" 
+                              options:NSDataWritingAtomic 
+                                error:&writeError];
+        
+        if (!success && error) {
+            *error = writeError;
+        }
+        
+        return success;
+    }
+    
+    // Usage
+    NSError *error = nil;
+    if (![self saveData:data error:&error]) {
+        NSLog(@"Failed to save data: %@", error.localizedDescription);
+    }
+    ```
+    Use appropriate error handling mechanisms. For methods that can fail, use the NSError pattern (taking an NSError** parameter) to provide detailed error information. This allows callers to understand why an operation failed and take appropriate action.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Concurrency Patterns" icon="warning">
+    ```objective-c
+    // Anti-pattern: Blocking the main thread
+    - (void)loadData {
+        NSData *data = [NSData dataWithContentsOfURL:url]; // Blocks the thread
+        [self processData:data];
+    }
+    
+    // Anti-pattern: Unsafe thread access
+    - (void)fetchData {
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSData *data = [NSData dataWithContentsOfURL:url];
+            [self.tableView reloadData]; // Accessing UI from background thread
+        });
+    }
+    
+    // Better approach: Use GCD properly
+    - (void)fetchData {
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSData *data = [NSData dataWithContentsOfURL:url];
+            
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self processData:data];
+                [self.tableView reloadData]; // Now on main thread
+            });
+        });
+    }
+    ```
+    Use appropriate concurrency patterns. Don't block the main thread with long-running operations. Use Grand Central Dispatch (GCD) or NSOperationQueue for concurrent operations. Always update the UI on the main thread. Consider using higher-level abstractions like NSURLSession for network operations.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```objective-c
+    // Anti-pattern: No or poor documentation
+    - (NSArray *)filterItems:(NSArray *)items;
+    
+    // Better approach: Use proper documentation comments
+    /**
+     * Filters the given array of items based on the predefined criteria.
+     *
+     * @param items An array of Item objects to filter.
+     * @return An array containing only the items that match the criteria.
+     * @throws NSInvalidArgumentException if items is nil or contains non-Item objects.
+     */
+    - (NSArray<Item *> *)filterItems:(NSArray<Item *> *)items;
+    ```
+    Use proper documentation for your classes and methods. Include information about parameters, return values, exceptions, and any side effects. Good documentation makes your code more maintainable and easier for others (and your future self) to understand and use correctly.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Testing Patterns" icon="warning">
+    ```objective-c
+    // Anti-pattern: Code that's hard to test
+    @implementation UserManager
+    + (instancetype)sharedManager {
+        static UserManager *sharedManager = nil;
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            sharedManager = [[self alloc] init];
+        });
+        return sharedManager;
+    }
+    
+    - (void)loginWithUsername:(NSString *)username password:(NSString *)password {
+        // Direct API call, hard to mock for testing
+        [APIClient.sharedClient loginWithUsername:username 
+                                        password:password 
+                                      completion:^(User *user, NSError *error) {
+            // Handle login
+        }];
+    }
+    @end
+    
+    // Better approach: Use dependency injection
+    @interface UserManager : NSObject
+    - (instancetype)initWithAPIClient:(APIClient *)apiClient;
+    - (void)loginWithUsername:(NSString *)username 
+                    password:(NSString *)password
+                  completion:(void(^)(User *user, NSError *error))completion;
+    @end
+    
+    @implementation UserManager
+    - (instancetype)initWithAPIClient:(APIClient *)apiClient {
+        self = [super init];
+        if (self) {
+            _apiClient = apiClient;
+        }
+        return self;
+    }
+    
+    - (void)loginWithUsername:(NSString *)username 
+                    password:(NSString *)password
+                  completion:(void(^)(User *user, NSError *error))completion {
+        [self.apiClient loginWithUsername:username 
+                                password:password 
+                              completion:completion];
+    }
+    @end
+    
+    // For convenience, still provide a shared instance
+    + (instancetype)sharedManager {
+        static UserManager *sharedManager = nil;
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            sharedManager = [[self alloc] initWithAPIClient:[APIClient sharedClient]];
+        });
+        return sharedManager;
+    }
+    ```
+    Use appropriate testing patterns like dependency injection to make your code testable. Avoid singletons or provide a way to inject dependencies. Write code that can be easily mocked and tested in isolation.
+  </Accordion>
+</AccordionGroup>

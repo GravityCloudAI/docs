@@ -1,0 +1,544 @@
+---
+title: 'MATLAB'
+description: 'MATLAB (Matrix Laboratory) is a proprietary multi-paradigm programming language and numeric computing environment developed by MathWorks. MATLAB allows matrix manipulations, plotting of functions and data, implementation of algorithms, creation of user interfaces, and interfacing with programs written in other languages.'
+---
+
+<AccordionGroup>
+  <Accordion title="MATLAB Anti-Patterns Overview" icon="matlab">
+    MATLAB, despite being a powerful platform for numerical computing and data analysis, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing MATLAB code.
+  </Accordion>
+  
+  <Accordion title="Growing Arrays in Loops" icon="warning">
+    ```matlab
+    % Anti-pattern: Growing arrays in loops
+    result = [];
+    for i = 1:1000
+        result(i) = i^2;
+    end
+    
+    % Better approach: Pre-allocate arrays
+    result = zeros(1, 1000);
+    for i = 1:1000
+        result(i) = i^2;
+    end
+    
+    % Even better: Use vectorization
+    i = 1:1000;
+    result = i.^2;
+    ```
+    Avoid growing arrays incrementally in loops. MATLAB needs to reallocate memory and copy the entire array each time it grows, which is very inefficient. Instead, pre-allocate arrays to their final size before filling them, or use vectorized operations to avoid loops entirely.
+  </Accordion>
+  
+  <Accordion title="Using Loops Instead of Vectorization" icon="warning">
+    ```matlab
+    % Anti-pattern: Using loops for element-wise operations
+    A = rand(1000, 1000);
+    B = rand(1000, 1000);
+    C = zeros(1000, 1000);
+    
+    for i = 1:1000
+        for j = 1:1000
+            C(i,j) = A(i,j) + B(i,j);
+        end
+    end
+    
+    % Better approach: Use vectorized operations
+    A = rand(1000, 1000);
+    B = rand(1000, 1000);
+    C = A + B;
+    ```
+    Avoid using loops for element-wise operations on arrays. MATLAB is optimized for vectorized operations, which are much faster and more concise. Use MATLAB's built-in vectorized functions and operators whenever possible.
+  </Accordion>
+  
+  <Accordion title="Using eval and str2func" icon="warning">
+    ```matlab
+    % Anti-pattern: Using eval
+    for i = 1:10
+        varname = ['var' num2str(i)];
+        eval([varname ' = ' num2str(i^2) ';']);
+    end
+    
+    % Anti-pattern: Using str2func with dynamic function names
+    func_name = 'sin';
+    f = str2func(func_name);
+    y = f(x);
+    
+    % Better approach: Use arrays or cell arrays
+    var = zeros(1, 10);
+    for i = 1:10
+        var(i) = i^2;
+    end
+    
+    % Better approach: Use function handles directly or from a container
+    func_map = containers.Map({'sin', 'cos', 'tan'}, {@sin, @cos, @tan});
+    func_name = 'sin';
+    if isKey(func_map, func_name)
+        f = func_map(func_name);
+        y = f(x);
+    end
+    ```
+    Avoid using `eval` and `str2func` with dynamically constructed strings. These functions can execute arbitrary code, making your program vulnerable to code injection if the strings come from external sources. They also make code harder to debug and maintain. Use arrays, cell arrays, or containers.Map to store multiple values or function handles instead.
+  </Accordion>
+  
+  <Accordion title="Using Global Variables" icon="warning">
+    ```matlab
+    % Anti-pattern: Using global variables
+    global data config;
+    
+    function processData()
+        global data;
+        % Process data
+    end
+    
+    function saveResults()
+        global data config;
+        % Save results using data and config
+    end
+    
+    % Better approach: Pass variables as parameters
+    function data = processData(data)
+        % Process data
+    end
+    
+    function saveResults(data, config)
+        % Save results using data and config
+    end
+    
+    % Usage
+    data = loadData();
+    config = loadConfig();
+    data = processData(data);
+    saveResults(data, config);
+    ```
+    Avoid using global variables. They create hidden dependencies between functions, make code harder to understand and test, and can lead to unexpected behavior. Instead, pass variables explicitly as function parameters and return values.
+  </Accordion>
+  
+  <Accordion title="Not Using Functions for Code Organization" icon="warning">
+    ```matlab
+    % Anti-pattern: Long scripts without functions
+    % Script.m
+    % Load data
+    data = load('data.mat');
+    
+    % Process data
+    % ... many lines of processing code ...
+    
+    % Plot results
+    % ... many lines of plotting code ...
+    
+    % Save results
+    % ... many lines of saving code ...
+    
+    % Better approach: Organize code into functions
+    % Main script
+    function main()
+        data = loadData('data.mat');
+        processedData = processData(data);
+        plotResults(processedData);
+        saveResults(processedData, 'results.mat');
+    end
+    
+    function data = loadData(filename)
+        data = load(filename);
+    end
+    
+    function processedData = processData(data)
+        % Process data
+        processedData = ...
+    end
+    
+    function plotResults(data)
+        % Plot results
+    end
+    
+    function saveResults(data, filename)
+        % Save results
+        save(filename, 'data');
+    end
+    ```
+    Avoid writing long scripts without breaking them into functions. This makes code harder to understand, test, and reuse. Instead, organize your code into functions with clear responsibilities, and use a main script or function to coordinate their execution.
+  </Accordion>
+  
+  <Accordion title="Using clear all/close all/clc" icon="warning">
+    ```matlab
+    % Anti-pattern: Using clear all/close all/clc in scripts
+    clear all;
+    close all;
+    clc;
+    
+    % Load and process data
+    % ...
+    
+    % Better approach: Be specific about what to clear
+    % Only clear variables you need to clear
+    clear x y z;
+    
+    % Only close figures you need to close
+    close(figHandle);
+    ```
+    Avoid using `clear all`, `close all`, and `clc` in scripts and functions, especially those that might be called by other scripts or functions. These commands affect the entire MATLAB environment, not just your script's scope, which can lead to unexpected behavior and make debugging more difficult. Instead, be specific about what variables to clear and what figures to close.
+  </Accordion>
+  
+  <Accordion title="Not Handling Errors Properly" icon="warning">
+    ```matlab
+    % Anti-pattern: Not handling errors
+    fileID = fopen('data.txt', 'r');
+    data = fscanf(fileID, '%f');
+    fclose(fileID);
+    % If file doesn't exist, this will crash without a helpful message
+    
+    % Better approach: Use try-catch for error handling
+    try
+        fileID = fopen('data.txt', 'r');
+        if fileID == -1
+            error('Could not open file data.txt');
+        end
+        data = fscanf(fileID, '%f');
+        fclose(fileID);
+    catch ME
+        disp(['Error: ' ME.message]);
+        % Handle the error appropriately
+        if exist('fileID', 'var') && fileID ~= -1
+            fclose(fileID);
+        end
+    end
+    ```
+    Always handle errors properly in your code. Use try-catch blocks to catch and handle exceptions, check return values from functions that might fail, and provide meaningful error messages. This makes your code more robust and easier to debug.
+  </Accordion>
+  
+  <Accordion title="Using i and j as Variable Names" icon="warning">
+    ```matlab
+    % Anti-pattern: Using i and j as variable names
+    for i = 1:10
+        for j = 1:10
+            % Using i and j as loop indices
+        end
+    end
+    
+    % Later in the code
+    z = x + i*y;  % Oops! i might not be the imaginary unit anymore
+    
+    % Better approach: Use different variable names for indices
+    for ii = 1:10
+        for jj = 1:10
+            % Using ii and jj as loop indices
+        end
+    end
+    
+    % Now i and j still refer to the imaginary unit
+    z = x + 1i*y;  % Even better: use 1i instead of i
+    ```
+    Avoid using `i` and `j` as variable names, especially for loop indices. In MATLAB, `i` and `j` are predefined as the imaginary unit (√-1), and overwriting them can lead to unexpected behavior in complex arithmetic. Use `ii`, `jj`, or other names for loop indices, and consider using `1i` instead of `i` for the imaginary unit.
+  </Accordion>
+  
+  <Accordion title="Using Magic Numbers" icon="warning">
+    ```matlab
+    % Anti-pattern: Using magic numbers
+    % Calculate area of a circle
+    area = 3.14159 * radius^2;
+    
+    % Convert temperature from Celsius to Fahrenheit
+    tempF = tempC * 1.8 + 32;
+    
+    % Better approach: Define constants
+    PI = 3.14159;  % Even better: use pi
+    area = PI * radius^2;
+    
+    % Better: use pi
+    area = pi * radius^2;
+    
+    % Define conversion factors
+    C_TO_F_SCALE = 1.8;
+    C_TO_F_OFFSET = 32;
+    tempF = tempC * C_TO_F_SCALE + C_TO_F_OFFSET;
+    ```
+    Avoid using magic numbers (hardcoded numeric literals) in your code. Instead, define constants with meaningful names at the beginning of your script or function. This makes your code more readable, maintainable, and less prone to errors. For mathematical constants like π, use MATLAB's built-in constants (e.g., `pi`).
+  </Accordion>
+  
+  <Accordion title="Ignoring Code Vectorization Opportunities" icon="warning">
+    ```matlab
+    % Anti-pattern: Missing vectorization opportunities
+    result = zeros(length(x), 1);
+    for i = 1:length(x)
+        if x(i) > 0
+            result(i) = sqrt(x(i));
+        else
+            result(i) = 0;
+        end
+    end
+    
+    % Better approach: Use logical indexing and vectorization
+    result = zeros(size(x));
+    positive = x > 0;
+    result(positive) = sqrt(x(positive));
+    ```
+    Don't miss opportunities for vectorization. MATLAB provides many ways to avoid loops, such as logical indexing, vectorized functions, and array operations. Look for patterns in your code where you're performing the same operation on many elements, and try to vectorize them.
+  </Accordion>
+  
+  <Accordion title="Not Using Logical Indexing" icon="warning">
+    ```matlab
+    % Anti-pattern: Using loops for filtering
+    data = rand(1000, 1);
+    filtered = zeros(1000, 1);
+    count = 0;
+    
+    for i = 1:length(data)
+        if data(i) > 0.5
+            count = count + 1;
+            filtered(count) = data(i);
+        end
+    end
+    
+    filtered = filtered(1:count);
+    
+    % Better approach: Use logical indexing
+    data = rand(1000, 1);
+    filtered = data(data > 0.5);
+    ```
+    Use logical indexing to filter arrays instead of loops. Logical indexing is a powerful MATLAB feature that allows you to select elements based on conditions. It's much faster and more concise than using loops.
+  </Accordion>
+  
+  <Accordion title="Inefficient File I/O" icon="warning">
+    ```matlab
+    % Anti-pattern: Reading a file line by line
+    fileID = fopen('data.txt', 'r');
+    data = {};
+    i = 1;
+    
+    while ~feof(fileID)
+        line = fgetl(fileID);
+        data{i} = line;
+        i = i + 1;
+    end
+    
+    fclose(fileID);
+    
+    % Better approach: Read the entire file at once
+    fileID = fopen('data.txt', 'r');
+    data = textscan(fileID, '%s', 'Delimiter', '\n');
+    fclose(fileID);
+    data = data{1};
+    
+    % Or even simpler
+    data = readlines('data.txt');  % In newer MATLAB versions
+    ```
+    Avoid inefficient file I/O operations, such as reading a file line by line in a loop. Instead, use functions like `textscan`, `readtable`, `readmatrix`, or `readlines` (in newer versions) to read the entire file at once. These functions are optimized for performance and make your code more concise.
+  </Accordion>
+  
+  <Accordion title="Not Using Built-in Functions" icon="warning">
+    ```matlab
+    % Anti-pattern: Reimplementing built-in functionality
+    % Calculate mean manually
+    sum_val = 0;
+    for i = 1:length(data)
+        sum_val = sum_val + data(i);
+    end
+    mean_val = sum_val / length(data);
+    
+    % Find maximum value manually
+    max_val = data(1);
+    for i = 2:length(data)
+        if data(i) > max_val
+            max_val = data(i);
+        end
+    end
+    
+    % Better approach: Use built-in functions
+    mean_val = mean(data);
+    max_val = max(data);
+    ```
+    Don't reinvent the wheel by implementing functionality that already exists in MATLAB. MATLAB provides a vast library of built-in functions that are optimized for performance. Familiarize yourself with common functions for statistics, linear algebra, signal processing, and other domains relevant to your work.
+  </Accordion>
+  
+  <Accordion title="Using Nested Loops for Matrix Operations" icon="warning">
+    ```matlab
+    % Anti-pattern: Using nested loops for matrix operations
+    A = rand(100, 100);
+    B = rand(100, 100);
+    C = zeros(100, 100);
+    
+    for i = 1:100
+        for j = 1:100
+            for k = 1:100
+                C(i,j) = C(i,j) + A(i,k) * B(k,j);
+            end
+        end
+    end
+    
+    % Better approach: Use built-in matrix operations
+    A = rand(100, 100);
+    B = rand(100, 100);
+    C = A * B;
+    ```
+    Avoid using nested loops for matrix operations like multiplication, transposition, or inversion. MATLAB's built-in matrix operations are highly optimized and much faster. Use operators like `*`, `'`, and functions like `inv` instead of implementing these operations manually.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Data Structures" icon="warning">
+    ```matlab
+    % Anti-pattern: Using arrays for heterogeneous data
+    names = {'Alice', 'Bob', 'Charlie'};
+    ages = [25, 30, 35];
+    scores = [95, 85, 90];
+    
+    % Accessing data for a specific person is cumbersome
+    person_idx = find(strcmp(names, 'Bob'));
+    bob_age = ages(person_idx);
+    bob_score = scores(person_idx);
+    
+    % Better approach: Use structures or tables
+    % Option 1: Structure array
+    people(1).name = 'Alice';
+    people(1).age = 25;
+    people(1).score = 95;
+    
+    people(2).name = 'Bob';
+    people(2).age = 30;
+    people(2).score = 85;
+    
+    people(3).name = 'Charlie';
+    people(3).age = 35;
+    people(3).score = 90;
+    
+    % Accessing data for a specific person
+    bob_idx = find(strcmp({people.name}, 'Bob'));
+    bob = people(bob_idx);
+    
+    % Option 2: Table (in newer MATLAB versions)
+    people = table(names', ages', scores', 'VariableNames', {'Name', 'Age', 'Score'});
+    
+    % Accessing data for a specific person
+    bob = people(strcmp(people.Name, 'Bob'), :);
+    ```
+    Use appropriate data structures for your data. For heterogeneous data with named fields, use structures or tables instead of parallel arrays. For large, homogeneous numerical data, use arrays. For sparse matrices, use sparse arrays. Choosing the right data structure can make your code more readable and efficient.
+  </Accordion>
+  
+  <Accordion title="Not Using Cell Arrays Appropriately" icon="warning">
+    ```matlab
+    % Anti-pattern: Using cell arrays inappropriately
+    % Storing numeric data in cell arrays
+    data = {1, 2, 3, 4, 5};
+    sum_val = 0;
+    for i = 1:length(data)
+        sum_val = sum_val + data{i};
+    end
+    
+    % Better approach: Use numeric arrays for numeric data
+    data = [1, 2, 3, 4, 5];
+    sum_val = sum(data);
+    
+    % Anti-pattern: Not using cell arrays when appropriate
+    % Storing strings of different lengths
+    names = ['Alice   '; 'Bob     '; 'Charlie '];
+    
+    % Better approach: Use cell arrays for strings
+    names = {'Alice', 'Bob', 'Charlie'};
+    ```
+    Use cell arrays appropriately. Cell arrays are useful for storing heterogeneous data or data of varying sizes, like strings of different lengths. However, they're less efficient than regular arrays for homogeneous numeric data. Use regular arrays for numeric data and cell arrays for mixed data types or varying-size data.
+  </Accordion>
+  
+  <Accordion title="Not Using Function Handles" icon="warning">
+    ```matlab
+    % Anti-pattern: Not using function handles
+    % Implementing numerical integration manually
+    function result = integrate(func_name, a, b, n)
+        dx = (b - a) / n;
+        result = 0;
+        for i = 1:n
+            x = a + (i - 0.5) * dx;
+            if strcmp(func_name, 'sin')
+                result = result + sin(x) * dx;
+            elseif strcmp(func_name, 'cos')
+                result = result + cos(x) * dx;
+            elseif strcmp(func_name, 'exp')
+                result = result + exp(x) * dx;
+            else
+                error('Unknown function');
+            end
+        end
+    end
+    
+    % Better approach: Use function handles
+    function result = integrate(func, a, b, n)
+        dx = (b - a) / n;
+        result = 0;
+        for i = 1:n
+            x = a + (i - 0.5) * dx;
+            result = result + func(x) * dx;
+        end
+    end
+    
+    % Usage
+    area1 = integrate(@sin, 0, pi, 1000);
+    area2 = integrate(@cos, 0, pi, 1000);
+    area3 = integrate(@exp, 0, 1, 1000);
+    
+    % Even better: Use built-in integration functions
+    area1 = integral(@sin, 0, pi);
+    ```
+    Use function handles to pass functions as arguments to other functions. This is more flexible and efficient than passing function names as strings and using conditional statements. Function handles also enable you to use anonymous functions for simple operations.
+  </Accordion>
+  
+  <Accordion title="Not Using Profiler for Performance Optimization" icon="warning">
+    ```matlab
+    % Anti-pattern: Guessing where performance bottlenecks are
+    % Adding random optimizations without measuring
+    
+    % Better approach: Use the MATLAB Profiler
+    % profile on;
+    % myFunction();  % Run the function you want to profile
+    % profile viewer;  % View the profiling results
+    ```
+    Don't guess where performance bottlenecks are in your code. Use the MATLAB Profiler to identify which parts of your code are taking the most time. The Profiler provides detailed information about execution time for each line and function call, helping you focus your optimization efforts where they'll have the most impact.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Comments and Documentation" icon="warning">
+    ```matlab
+    % Anti-pattern: Insufficient or excessive comments
+    % Insufficient
+    function y = f(x)
+        y = x.^2 + 2*x + 1;
+    end
+    
+    % Excessive
+    function y = f(x)
+        % Assign x squared to y
+        y = x.^2;
+        % Add 2 times x to y
+        y = y + 2*x;
+        % Add 1 to y
+        y = y + 1;
+    end
+    
+    % Better approach: Use appropriate comments and documentation
+    function y = f(x)
+        % f - Compute the quadratic function y = x^2 + 2x + 1
+        %
+        % Syntax:  y = f(x)
+        %
+        % Inputs:
+        %    x - Input value or array
+        %
+        % Outputs:
+        %    y - Result of the quadratic function
+        
+        y = x.^2 + 2*x + 1;
+    end
+    ```
+    Use appropriate comments and documentation in your code. Comments should explain why the code does something, not what it does (which should be clear from the code itself). Use MATLAB's help comment format for functions to provide documentation that can be accessed with the `help` command.
+  </Accordion>
+  
+  <Accordion title="Not Using Meaningful Variable Names" icon="warning">
+    ```matlab
+    % Anti-pattern: Using cryptic variable names
+    function r = c(a, b)
+        r = sqrt(a^2 + b^2);
+    end
+    
+    % Better approach: Use meaningful variable names
+    function hypotenuse = calculateHypotenuse(sideA, sideB)
+        hypotenuse = sqrt(sideA^2 + sideB^2);
+    end
+    ```
+    Use meaningful variable and function names that clearly indicate their purpose. This makes your code more readable and easier to maintain. Avoid single-letter variable names except for very common conventions (like `i` and `j` for loop indices, but even then, be careful as mentioned earlier).
+  </Accordion>
+</AccordionGroup>

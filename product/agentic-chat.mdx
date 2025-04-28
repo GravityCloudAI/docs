@@ -1,0 +1,192 @@
+---
+icon: messages-question
+title: 'Agentic Chat'
+description: 'Agentic Chat is a powerful feature that allows engineers to chat with their pull requests using Matter AI.'
+---
+
+<Frame>
+<img src="/images/product/agentic-chat.png" alt="Agentic Chat" />
+</Frame>
+
+## Overview
+
+Matter AI is an intelligent assistant embedded directly in your code review workflow that enables developers to interact with PRs through natural language. The agent lives inside your GitHub PR interface, eliminating context switching while providing deep insights into code changes. It parses PR context, understands code structure, and delivers targeted answers to technical questions without requiring you to leave your development environment.
+
+## Features
+
+### Code-Aware Conversations
+- **Contextual Code Understanding**: Parses PR diffs, file context, and repo structure to provide relevant answers
+- **Implementation Explanations**: Analyzes code changes and explains implementation decisions with technical precision
+- **Change Impact Analysis**: Identifies potential side effects and integration points affected by code modifications
+
+### Advanced Query Processing
+- **PR-Specific Context Window**: All responses consider the full PR context including diffs, comments, and CI results
+- **Code-Specific Commands**: Use `/matter` to initiate queries with automatic PR context inclusion
+- **Technical Response Calibration**: Responses tailored to engineering terminology and conceptual frameworks
+
+### Tool Calling Capabilities
+- **Web Search Integration**: Execute targeted web searches for libraries, APIs, or technical documentation
+- **Documentation Retrieval**: Search and retrieve content from:
+  - Repository markdown docs
+  - JIRA tickets with automatic cross-referencing
+  - Linear items and project workflows
+- **Knowledge Graph Connections**: Link code changes to related documentation and previous implementations
+
+### Engineering Workflow Integration
+- **GitHub Native Experience**: Functions within GitHub's PR interface with minimal UI disruption
+- **CI/CD Visibility**: Understands build processes and deployment configurations
+- **Branch Strategy Awareness**: Recognizes branching patterns and development workflows
+
+## Benefits
+
+### For Engineers
+- **Reduced Context Acquisition Time**: Quickly understand unfamiliar code without jumping through multiple files
+- **Technical Depth On-Demand**: Get implementation details and architectural context when needed
+- **Learning Acceleration**: Discover patterns and techniques used by other team members
+- **Dependency Insight**: Understand how changes impact dependent systems and services
+
+### For Engineering Teams
+- **Knowledge Distribution**: Critical implementation details are explained and preserved in PR conversations
+- **Consistent Review Quality**: All reviewers have access to the same level of context and explanation
+- **Code Standards Enforcement**: Consistent guidance on team coding standards and patterns
+- **Cross-Team Code Understanding**: Bridge knowledge gaps between frontend, backend, and infrastructure teams
+
+### For Engineering Organizations
+- **Technical Debt Visibility**: Better understand the implications of implementation decisions
+- **Architecture Coherence**: Maintain consistent patterns across multiple teams and services
+- **Deployment Risk Reduction**: More thorough reviews mean fewer production incidents
+- **Developer Productivity Optimization**: Faster review cycles and reduced time spent explaining changes
+
+## Usage Examples
+
+### Example 1: Technical Change Explanation
+
+```md
+User: `/matter can you explain the changes made in postDeployStep?`
+
+Matter AI: The changes in postDeployStep remove the branch-specific deployment filtering logic:
+
+Before:
+- Post-deployment would conditionally run based on branch name patterns
+- Used complex regex patterns to match wildcards like `feature.*`
+- Required explicit branch naming or pattern matching
+
+After:
+- `runCommand` is now unconditionally set to `true`
+- Branch name is no longer a factor in deployment execution
+- Matches PR title intent: "use PRs for CI/CD and not run on branch creation"
+
+Technical impact: Deployment decisions now rely entirely on PR creation rather than branch naming patterns, simplifying the deployment trigger model.
+```
+
+### Example 2: Implementation Technical Deep-Dive
+
+```md
+User: `/matter How does the wildcard pattern matching work in the old code?`
+
+Matter AI: Technical implementation of wildcard pattern matching in the old code:
+
+1. Entry point: `some()` method checks if any branch in `postDeployStep.branches` ends with `.*`
+2. Pattern extraction:
+   - Uses `find()` to get the matching branch string
+   - Extracts prefix via `slice(0, -2)` to remove the trailing `.*`
+   - Replaces regex special chars with `replace(/[.+*^${}()|\[\]\\]/g, '\\$&')`
+3. RegExp creation: 
+   - Creates pattern with `new RegExp('^${prefix}.*')`
+   - The `^` anchor ensures matching from string start
+4. Execution: 
+   - Calls `pattern.test(lastRunBranch)` to check if current branch matches
+   - Returns boolean that determines if deployment runs
+
+This implements a simplified glob-like pattern matching focused specifically on prefix wildcards.
+```
+
+### Example 3: Architectural Decision Analysis
+
+```md
+User: `/matter Why would we want to remove branch filtering for post-deployment steps?`
+
+Matter AI: Technical rationale for removing branch filtering:
+
+1. **Deployment Philosophy Shift**:
+   - From: Implicit deployment based on branch naming conventions
+   - To: Explicit deployment controlled via PR workflow
+
+2. **Architectural Simplification**:
+   - Eliminates complex regex-based pattern matching code
+   - Removes special case handling for different branch types
+   - Creates a single, consistent deployment trigger mechanism
+
+3. **CI/CD Best Practices Alignment**:
+   - Modern CI/CD favors explicit PR-based deployment gates
+   - Enables PR status checks as deployment prerequisites
+   - Aligns with GitOps principles where PRs are the unit of change
+
+4. **Risk Reduction**:
+   - Prevents accidental deployments from branch naming errors
+   - Makes deployment intentions explicit via PR creation
+   - Creates clear audit trail through PR history
+```
+
+### Example 4: Technical Risk Assessment
+
+```md
+User: `/matter What are potential issues with this change?`
+
+Matter AI: Technical risks and considerations:
+
+1. **CI Resource Consumption**:
+   - All branches now trigger post-deployment steps
+   - Potential CI runner capacity issues during high-volume development
+
+2. **Migration Concerns**:
+   - Teams with automation dependent on branch filtering will need updates
+   - CI configuration files may have outdated branch specifications
+   - Local development scripts expecting old behavior could break
+
+3. **Backward Compatibility**:
+   - No fallback mechanism for teams relying on previous behavior
+   - One-time codebase auditing needed for branch name references
+
+4. **Documentation Requirements**:
+   - CI/CD pipeline docs need updating
+   - Developer onboarding materials require revision
+   - Deployment runbooks should reflect new trigger mechanism
+
+5. **Implementation Considerations**:
+   - CI configurations may need corresponding updates
+   - Branch protection rules should be reviewed
+   - PR template updates recommended to clarify deployment implications
+```
+
+### Example 5: Tool-Assisted Investigation
+
+```md
+User: `/matter What are best practices for PR-based deployments?`
+
+Matter AI: [Using web search tool...]
+
+Based on current industry standards, here are PR-based deployment best practices:
+
+1. **Branch Protection Requirements**:
+   - Require minimum review count (typically 1-2)
+   - Enforce passing CI checks before merge
+   - Consider using CODEOWNERS for critical path changes
+
+2. **PR Workflow Automation**:
+   - Auto-deploy to staging/test environments
+   - Use deployment-specific labels to trigger environment promotion
+   - Create automatic preview environments for frontend changes
+
+3. **Deployment Safety Mechanisms**:
+   - Implement feature flags for risky changes
+   - Use canary deployments for incremental rollout
+   - Configure automatic rollbacks on error thresholds
+
+4. **Quality Validation**:
+   - Run integration tests against ephemeral environments
+   - Perform automated security scans
+   - Include performance testing for critical paths
+
+[Found documentation in your project about deployment practices that recommends using the PR deployment approach you're implementing]
+```

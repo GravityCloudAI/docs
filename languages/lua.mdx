@@ -1,0 +1,598 @@
+---
+title: 'Lua'
+description: 'Lua is a lightweight, high-level, multi-paradigm programming language designed primarily for embedded use in applications. It is cross-platform, as the interpreter of compiled bytecode is written in ANSI C.'
+---
+
+<AccordionGroup>
+  <Accordion title="Lua Anti-Patterns Overview" icon="lua">
+    Lua, despite being a lightweight and flexible language, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing Lua code.
+  </Accordion>
+  
+  <Accordion title="Global Variables by Default" icon="warning">
+    ```lua
+    -- Anti-pattern: Implicit global variables
+    function process_data()
+      result = 42  -- Implicitly global!
+      return result
+    end
+    
+    -- Better approach: Use local variables
+    function process_data()
+      local result = 42  -- Explicitly local
+      return result
+    end
+    ```
+    Always use the `local` keyword when declaring variables. In Lua, variables are global by default, which can lead to unexpected behavior and name collisions.
+  </Accordion>
+  
+  <Accordion title="Not Using Modules" icon="warning">
+    ```lua
+    -- Anti-pattern: Global functions and variables
+    function calculate_area(radius)
+      return math.pi * radius * radius
+    end
+    
+    function calculate_circumference(radius)
+      return 2 * math.pi * radius
+    end
+    
+    -- Better approach: Use modules
+    local Circle = {}
+    
+    function Circle.area(radius)
+      return math.pi * radius * radius
+    end
+    
+    function Circle.circumference(radius)
+      return 2 * math.pi * radius
+    end
+    
+    return Circle
+    ```
+    Organize your code into modules instead of using global functions and variables. This improves maintainability and reduces the risk of name collisions.
+  </Accordion>
+  
+  <Accordion title="Using Tables Inefficiently" icon="warning">
+    ```lua
+    -- Anti-pattern: Inefficient table usage
+    local list = {}
+    for i = 1, 1000 do
+      table.insert(list, i)  -- Inefficient for large lists
+    end
+    
+    -- Better approach: Pre-allocate indices
+    local list = {}
+    for i = 1, 1000 do
+      list[i] = i  -- More efficient direct assignment
+    end
+    ```
+    Use direct index assignment instead of `table.insert()` when you know the index in advance. This is more efficient, especially for large tables.
+  </Accordion>
+  
+  <Accordion title="String Concatenation in Loops" icon="warning">
+    ```lua
+    -- Anti-pattern: String concatenation in loops
+    local result = ""
+    for i = 1, 1000 do
+      result = result .. "item " .. i .. "\n"  -- Creates many intermediate strings
+    end
+    
+    -- Better approach: Use table.concat
+    local parts = {}
+    for i = 1, 1000 do
+      parts[i] = "item " .. i
+    end
+    local result = table.concat(parts, "\n")
+    ```
+    Avoid concatenating strings in loops with the `..` operator. Instead, collect strings in a table and use `table.concat()` at the end, which is much more efficient.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```lua
+    -- Anti-pattern: No error handling
+    function read_file(filename)
+      local file = io.open(filename, "r")  -- Might fail
+      local content = file:read("*all")
+      file:close()
+      return content
+    end
+    
+    -- Better approach: Proper error handling
+    function read_file(filename)
+      local file, err = io.open(filename, "r")
+      if not file then
+        return nil, "Failed to open file: " .. (err or "unknown error")
+      end
+      
+      local content, err = file:read("*all")
+      file:close()
+      
+      if not content then
+        return nil, "Failed to read file: " .. (err or "unknown error")
+      end
+      
+      return content
+    end
+    
+    -- Usage
+    local content, err = read_file("data.txt")
+    if not content then
+      print("Error: " .. err)
+    else
+      -- Process content
+    end
+    ```
+    Use proper error handling by checking return values and returning error messages. Lua functions often return `nil` plus an error message on failure.
+  </Accordion>
+  
+  <Accordion title="Using Numeric For-Loops Incorrectly" icon="warning">
+    ```lua
+    -- Anti-pattern: Incorrect numeric for-loop
+    local t = {10, 20, 30, 40, 50}
+    for i = 0, #t do  -- Starts at 0, but Lua tables are 1-indexed
+      print(t[i])  -- t[0] is nil
+    end
+    
+    -- Better approach: Correct indexing
+    local t = {10, 20, 30, 40, 50}
+    for i = 1, #t do  -- Lua tables are 1-indexed
+      print(t[i])
+    end
+    ```
+    Remember that Lua tables are 1-indexed by default. Start your numeric for-loops at 1 when iterating over sequential tables.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Scope" icon="warning">
+    ```lua
+    -- Anti-pattern: Variables with too broad scope
+    function process_data(items)
+      count = 0  -- Global variable
+      for i = 1, #items do
+        if is_valid(items[i]) then
+          count = count + 1
+        end
+      end
+      return count
+    end
+    
+    -- Better approach: Proper variable scoping
+    function process_data(items)
+      local count = 0  -- Local variable
+      for i = 1, #items do
+        if is_valid(items[i]) then
+          count = count + 1
+        end
+      end
+      return count
+    end
+    ```
+    Keep variables in the smallest possible scope. Use local variables instead of global ones whenever possible.
+  </Accordion>
+  
+  <Accordion title="Inefficient Table Clearing" icon="warning">
+    ```lua
+    -- Anti-pattern: Inefficient table clearing
+    function clear_table(t)
+      t = {}  -- This creates a new table, doesn't clear the original
+    end
+    
+    -- Better approach: Actually clear the table
+    function clear_table(t)
+      for k in pairs(t) do
+        t[k] = nil
+      end
+    end
+    ```
+    Assigning a new empty table to a variable doesn't clear the original table. Instead, set each key to `nil` to actually clear a table.
+  </Accordion>
+  
+  <Accordion title="Not Using Metatables Appropriately" icon="warning">
+    ```lua
+    -- Anti-pattern: Reinventing common patterns
+    local Point = {}
+    
+    function Point.new(x, y)
+      local self = {}
+      self.x = x or 0
+      self.y = y or 0
+      
+      function self.add(other)
+        return Point.new(self.x + other.x, self.y + other.y)
+      end
+      
+      return self
+    end
+    
+    -- Better approach: Use metatables
+    local Point = {}
+    Point.__index = Point
+    
+    function Point.new(x, y)
+      local self = setmetatable({}, Point)
+      self.x = x or 0
+      self.y = y or 0
+      return self
+    end
+    
+    function Point:add(other)
+      return Point.new(self.x + other.x, self.y + other.y)
+    end
+    
+    -- Even better: Operator overloading with metatables
+    function Point.__add(a, b)
+      return Point.new(a.x + b.x, a.y + b.y)
+    end
+    
+    -- Usage
+    local p1 = Point.new(1, 2)
+    local p2 = Point.new(3, 4)
+    local p3 = p1 + p2  -- Uses __add metamethod
+    ```
+    Use metatables to implement object-oriented patterns, operator overloading, and other advanced features in a clean and efficient way.
+  </Accordion>
+  
+  <Accordion title="Using Inefficient Patterns for OOP" icon="warning">
+    ```lua
+    -- Anti-pattern: Inefficient OOP pattern
+    function create_person(name, age)
+      local person = {}
+      
+      person.name = name
+      person.age = age
+      
+      person.greet = function(self)
+        return "Hello, I'm " .. self.name
+      end
+      
+      person.have_birthday = function(self)
+        self.age = self.age + 1
+      end
+      
+      return person
+    end
+    
+    -- Better approach: Prototype-based OOP
+    local Person = {}
+    Person.__index = Person
+    
+    function Person.new(name, age)
+      local self = setmetatable({}, Person)
+      self.name = name
+      self.age = age
+      return self
+    end
+    
+    function Person:greet()
+      return "Hello, I'm " .. self.name
+    end
+    
+    function Person:have_birthday()
+      self.age = self.age + 1
+    end
+    ```
+    Use prototype-based OOP with metatables instead of creating new function objects for each instance. This is more memory-efficient and performs better.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Closures" icon="warning">
+    ```lua
+    -- Anti-pattern: Not using closures effectively
+    function create_counter()
+      local counter = {count = 0}
+      
+      function counter.increment()
+        counter.count = counter.count + 1
+        return counter.count
+      end
+      
+      function counter.get()
+        return counter.count
+      end
+      
+      return counter
+    end
+    
+    -- Better approach: Use closures
+    function create_counter()
+      local count = 0
+      
+      return {
+        increment = function()
+          count = count + 1
+          return count
+        end,
+        
+        get = function()
+          return count
+        end
+      }
+    end
+    ```
+    Use closures to encapsulate state without exposing it directly. This provides better encapsulation and can be more memory-efficient.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Module Structure" icon="warning">
+    ```lua
+    -- Anti-pattern: Poor module structure
+    -- mymodule.lua
+    function hello()
+      print("Hello, World!")
+    end
+    
+    function goodbye()
+      print("Goodbye, World!")
+    end
+    
+    -- These are now global functions
+    
+    -- Better approach: Proper module structure
+    -- mymodule.lua
+    local M = {}
+    
+    function M.hello()
+      print("Hello, World!")
+    end
+    
+    function M.goodbye()
+      print("Goodbye, World!")
+    end
+    
+    return M
+    
+    -- Usage
+    -- local mymodule = require("mymodule")
+    -- mymodule.hello()
+    ```
+    Structure your modules properly by returning a table of functions and values. This prevents polluting the global namespace.
+  </Accordion>
+  
+  <Accordion title="Using Unnecessary Upvalues" icon="warning">
+    ```lua
+    -- Anti-pattern: Unnecessary upvalues
+    function create_functions()
+      local functions = {}
+      
+      for i = 1, 10 do
+        functions[i] = function() return i end  -- i is an upvalue
+      end
+      
+      return functions
+    end
+    
+    -- Better approach: Avoid unnecessary upvalues
+    function create_functions()
+      local functions = {}
+      
+      for i = 1, 10 do
+        local value = i  -- Create a new local variable
+        functions[i] = function() return value end
+      end
+      
+      return functions
+    end
+    ```
+    Be careful with upvalues in loops. Create a new local variable inside the loop to capture the current value, not the final value of the loop variable.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Propagation" icon="warning">
+    ```lua
+    -- Anti-pattern: Swallowing errors
+    function process_file(filename)
+      local file = io.open(filename, "r")
+      if not file then
+        print("Error opening file")
+        return
+      end
+      
+      -- Process file...
+      file:close()
+    end
+    
+    -- Better approach: Propagate errors
+    function process_file(filename)
+      local file, err = io.open(filename, "r")
+      if not file then
+        return nil, "Error opening file: " .. err
+      end
+      
+      -- Process file...
+      local result = file:read("*all")
+      file:close()
+      
+      return result
+    end
+    
+    -- Usage
+    local result, err = process_file("data.txt")
+    if not result then
+      -- Handle error
+      print(err)
+    else
+      -- Use result
+    end
+    ```
+    Propagate errors up the call stack instead of handling them locally or swallowing them. This allows the caller to decide how to handle errors.
+  </Accordion>
+  
+  <Accordion title="Using Inefficient Table Traversal" icon="warning">
+    ```lua
+    -- Anti-pattern: Inefficient table traversal
+    local t = {a = 1, b = 2, c = 3}
+    
+    for i = 1, #t do  -- This only works for array-like tables
+      print(t[i])
+    end
+    
+    -- Better approach: Use pairs for hash tables
+    local t = {a = 1, b = 2, c = 3}
+    
+    for k, v in pairs(t) do
+      print(k, v)
+    end
+    
+    -- Use ipairs for array-like tables
+    local arr = {10, 20, 30}
+    
+    for i, v in ipairs(arr) do
+      print(i, v)
+    end
+    ```
+    Use `pairs()` for traversing hash tables and `ipairs()` for traversing array-like tables. Don't use the length operator (`#`) for non-sequential tables.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```lua
+    -- Anti-pattern: Poor or no documentation
+    function process_data(data, options)
+      -- Implementation...
+    end
+    
+    -- Better approach: Proper documentation
+    ---Process data according to specified options
+    ---@param data table The data to process
+    ---@param options table|nil Optional settings with the following fields:
+    ---                         - verbose (boolean): Whether to output verbose logs
+    ---                         - max_items (number): Maximum number of items to process
+    ---@return table The processed data
+    ---@return string|nil Error message if an error occurred
+    function process_data(data, options)
+      -- Implementation...
+    end
+    ```
+    Document your functions and modules properly. Include parameter descriptions, return values, and usage examples. Consider using a documentation format like LuaDoc or EmmyLua annotations.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```lua
+    -- Anti-pattern: Manual testing or no testing
+    function add(a, b)
+      return a + b
+    end
+    
+    -- Manual test
+    print(add(2, 3) == 5 and "OK" or "FAIL")
+    
+    -- Better approach: Use a testing framework
+    local luaunit = require("luaunit")
+    
+    function add(a, b)
+      return a + b
+    end
+    
+    function test_add()
+      luaunit.assertEquals(add(2, 3), 5)
+      luaunit.assertEquals(add(-1, 1), 0)
+      luaunit.assertEquals(add(0, 0), 0)
+    end
+    
+    luaunit.run("test_add")
+    ```
+    Write proper tests for your code using a testing framework like LuaUnit, Busted, or luatest. This makes it easier to verify that your code works as expected and to catch regressions.
+  </Accordion>
+  
+  <Accordion title="Using Inefficient Algorithms" icon="warning">
+    ```lua
+    -- Anti-pattern: Inefficient algorithms
+    function find_element(t, value)
+      for i = 1, #t do
+        if t[i] == value then
+          return i
+        end
+      end
+      return nil
+    end
+    
+    -- Better approach: Use more efficient data structures
+    function create_lookup_table(t)
+      local lookup = {}
+      for i, v in ipairs(t) do
+        lookup[v] = i
+      end
+      return lookup
+    end
+    
+    -- Usage
+    local data = {10, 20, 30, 40, 50}
+    local lookup = create_lookup_table(data)
+    
+    -- O(1) lookup instead of O(n)
+    local index = lookup[30]  -- Returns 3
+    ```
+    Choose appropriate algorithms and data structures for your task. Consider time and space complexity, especially for operations that are performed frequently or with large data sets.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Resource Management" icon="warning">
+    ```lua
+    -- Anti-pattern: Poor resource management
+    function process_file(filename)
+      local file = io.open(filename, "r")
+      if not file then return nil end
+      
+      if some_condition() then
+        return early_result  -- File is never closed!
+      end
+      
+      -- Process file...
+      file:close()
+      return result
+    end
+    
+    -- Better approach: Ensure resources are released
+    function process_file(filename)
+      local file, err = io.open(filename, "r")
+      if not file then return nil, err end
+      
+      -- Use pcall to ensure file is closed even if an error occurs
+      local success, result = pcall(function()
+        if some_condition() then
+          return early_result
+        end
+        
+        -- Process file...
+        return final_result
+      end)
+      
+      file:close()  -- Always close the file
+      
+      if not success then
+        return nil, result  -- result contains the error message
+      end
+      return result
+    end
+    ```
+    Ensure that resources like files, network connections, and database connections are properly closed, even in error cases or early returns.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Configuration Management" icon="warning">
+    ```lua
+    -- Anti-pattern: Hardcoded configuration
+    function connect_to_database()
+      return db.connect("localhost", 5432, "mydb", "user", "password")
+    end
+    
+    -- Better approach: Externalize configuration
+    local config = require("config")
+    
+    function connect_to_database()
+      return db.connect(
+        config.db.host,
+        config.db.port,
+        config.db.name,
+        config.db.user,
+        config.db.password
+      )
+    end
+    
+    -- config.lua
+    return {
+      db = {
+        host = os.getenv("DB_HOST") or "localhost",
+        port = tonumber(os.getenv("DB_PORT")) or 5432,
+        name = os.getenv("DB_NAME") or "mydb",
+        user = os.getenv("DB_USER") or "user",
+        password = os.getenv("DB_PASSWORD") or "password"
+      }
+    }
+    ```
+    Externalize configuration instead of hardcoding values. This makes your code more flexible and easier to deploy in different environments.
+  </Accordion>
+</AccordionGroup>

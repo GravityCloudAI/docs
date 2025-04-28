@@ -1,0 +1,548 @@
+---
+title: 'Racket'
+description: 'Racket is a general-purpose, multi-paradigm programming language in the Lisp-Scheme family. It emphasizes the creation of programming languages and is known for its macro system, module system, and support for functional, imperative, and object-oriented programming.'
+---
+
+<AccordionGroup>
+  <Accordion title="Racket Anti-Patterns Overview" icon="racket">
+    Racket, despite being a well-designed language with powerful features, has several common anti-patterns that can lead to code that's difficult to maintain, inefficient, or doesn't follow the language's idioms. Here are the most important anti-patterns to avoid when writing Racket code.
+  </Accordion>
+  
+  <Accordion title="Excessive Mutation" icon="warning">
+    ```racket
+    ;; Anti-pattern: Excessive mutation
+    (define (sum-list lst)
+      (let ([total 0])
+        (for-each (lambda (x) (set! total (+ total x))) lst)
+        total))
+    
+    ;; Better approach: Use functional constructs
+    (define (sum-list lst)
+      (foldl + 0 lst))
+    ```
+    Avoid excessive use of mutation (`set!`, mutable variables, etc.) and imperative loops. Racket is primarily a functional language, so prefer immutable data and functional constructs like recursion, `map`, `filter`, and `foldl`.
+  </Accordion>
+  
+  <Accordion title="Not Using Contracts" icon="warning">
+    ```racket
+    ;; Anti-pattern: Not using contracts
+    (define (divide a b)
+      (/ a b))
+    
+    ;; Usage that might raise an exception
+    (divide 10 0) ; Division by zero
+    
+    ;; Better approach: Use contracts
+    (require racket/contract)
+    
+    (define/contract (divide a b)
+      (-> number? (and/c number? (not/c zero?)) number?)
+      (/ a b))
+    
+    ;; Now this will raise a contract violation, not a division by zero
+    (divide 10 0)
+    ```
+    Use Racket's contract system to specify and enforce the requirements and guarantees of your functions. Contracts provide better error messages and help catch bugs earlier.
+  </Accordion>
+  
+  <Accordion title="Not Using Pattern Matching" icon="warning">
+    ```racket
+    ;; Anti-pattern: Not using pattern matching
+    (define (factorial n)
+      (if (= n 0)
+          1
+          (* n (factorial (- n 1)))))
+    
+    (define (process-shape shape)
+      (cond
+        [(eq? (car shape) 'circle)
+         (let ([radius (cadr shape)])
+           (* pi radius radius))]
+        [(eq? (car shape) 'rectangle)
+         (let ([width (cadr shape)]
+               [height (caddr shape)])
+           (* width height))]
+        [else 0]))
+    
+    ;; Better approach: Use pattern matching
+    (require racket/match)
+    
+    (define (factorial n)
+      (match n
+        [0 1]
+        [_ (* n (factorial (- n 1)))]))
+    
+    (define (process-shape shape)
+      (match shape
+        [(list 'circle radius)
+         (* pi radius radius)]
+        [(list 'rectangle width height)
+         (* width height)]
+        [_ 0]))
+    ```
+    Use pattern matching to make your code more concise and readable. Racket's `match` form provides powerful pattern matching capabilities that can simplify complex conditional logic.
+  </Accordion>
+  
+  <Accordion title="Not Using Modules" icon="warning">
+    ```racket
+    ;; Anti-pattern: Everything in one file without modules
+    
+    ;; Better approach: Use modules to organize code
+    #lang racket
+    
+    (provide (all-defined-out))
+    
+    ;; Module for geometric calculations
+    (module geometry racket
+      (provide (all-defined-out))
+      
+      (define pi 3.14159)
+      
+      (define (circle-area radius)
+        (* pi radius radius))
+      
+      (define (rectangle-area width height)
+        (* width height)))
+    
+    ;; Module for user interface
+    (module ui racket
+      (provide display-result)
+      
+      (define (display-result shape area)
+        (printf "The area of the ~a is ~a\n" shape area)))
+    
+    ;; Main module
+    (require 'geometry)
+    (require 'ui)
+    
+    (define (process-shape shape)
+      (match shape
+        [(list 'circle radius)
+         (display-result 'circle (circle-area radius))]
+        [(list 'rectangle width height)
+         (display-result 'rectangle (rectangle-area width height))]))
+    ```
+    Organize your code into modules with well-defined interfaces. This improves maintainability, reduces naming conflicts, and allows for better encapsulation of implementation details.
+  </Accordion>
+  
+  <Accordion title="Not Using Racket's Data Structures" icon="warning">
+    ```racket
+    ;; Anti-pattern: Using lists for everything
+    (define (find-user users id)
+      (for/first ([user users] #:when (equal? (car user) id))
+        user))
+    
+    (define (user-exists? users id)
+      (for/or ([user users])
+        (equal? (car user) id)))
+    
+    ;; Better approach: Use appropriate data structures
+    (require racket/dict)
+    
+    ;; Using hash tables for key-based lookups
+    (define users (hash 'john (list "John Doe" "john@example.com")
+                       'jane (list "Jane Smith" "jane@example.com")))
+    
+    (define (find-user users id)
+      (dict-ref users id #f))
+    
+    (define (user-exists? users id)
+      (dict-has-key? users id))
+    
+    ;; Using structs for domain objects
+    (struct user (id name email) #:transparent)
+    
+    (define users
+      (list (user 'john "John Doe" "john@example.com")
+            (user 'jane "Jane Smith" "jane@example.com")))
+    
+    (define (find-user-by-id users id)
+      (for/first ([u users] #:when (eq? (user-id u) id))
+        u))
+    ```
+    Use appropriate data structures for your needs. Racket provides a rich set of data structures including hash tables, sets, vectors, and structs. Choose the right data structure for your use case instead of using lists for everything.
+  </Accordion>
+  
+  <Accordion title="Not Using Macros Effectively" icon="warning">
+    ```racket
+    ;; Anti-pattern: Duplicated code that could be abstracted with macros
+    (define-values (input-port output-port) (make-pipe))
+    
+    (with-handlers ([exn:fail? (lambda (e) (close-input-port input-port)
+                                       (close-output-port output-port)
+                                       (raise e))])
+      (process-data input-port output-port)
+      (close-input-port input-port)
+      (close-output-port output-port))
+    
+    ;; Another similar pattern elsewhere...
+    (define-values (in out) (make-pipe))
+    
+    (with-handlers ([exn:fail? (lambda (e) (close-input-port in)
+                                       (close-output-port out)
+                                       (raise e))])
+      (process-more-data in out)
+      (close-input-port in)
+      (close-output-port out))
+    
+    ;; Better approach: Define a macro
+    (define-syntax-rule (with-pipe (in out) body ...)
+      (define-values (in out) (make-pipe))
+      (dynamic-wind
+        (lambda () (void))
+        (lambda () body ...)
+        (lambda ()
+          (close-input-port in)
+          (close-output-port out))))
+    
+    ;; Usage
+    (with-pipe (input-port output-port)
+      (process-data input-port output-port))
+    
+    (with-pipe (in out)
+      (process-more-data in out))
+    ```
+    Use macros to abstract common patterns and eliminate boilerplate code. Racket's macro system is powerful and can help you create cleaner, more maintainable code.
+  </Accordion>
+  
+  <Accordion title="Not Using Higher-Order Functions" icon="warning">
+    ```racket
+    ;; Anti-pattern: Duplicated code for similar operations
+    (define (sum-list lst)
+      (if (null? lst)
+          0
+          (+ (car lst) (sum-list (cdr lst)))))
+    
+    (define (product-list lst)
+      (if (null? lst)
+          1
+          (* (car lst) (product-list (cdr lst)))))
+    
+    ;; Better approach: Use higher-order functions
+    (define (fold-list f init lst)
+      (if (null? lst)
+          init
+          (f (car lst) (fold-list f init (cdr lst)))))
+    
+    (define (sum-list lst)
+      (fold-list + 0 lst))
+    
+    (define (product-list lst)
+      (fold-list * 1 lst))
+    
+    ;; Or better yet, use built-in functions
+    (define (sum-list lst)
+      (foldl + 0 lst))
+    
+    (define (product-list lst)
+      (foldl * 1 lst))
+    ```
+    Use higher-order functions like `map`, `filter`, `foldl`, and `foldr` to abstract common patterns and reduce code duplication. Racket provides these functions in its standard library.
+  </Accordion>
+  
+  <Accordion title="Not Using Tail Recursion" icon="warning">
+    ```racket
+    ;; Anti-pattern: Recursion without tail calls
+    (define (factorial n)
+      (if (= n 0)
+          1
+          (* n (factorial (- n 1)))))
+    
+    ;; Better approach: Use tail recursion
+    (define (factorial n)
+      (let loop ([n n] [acc 1])
+        (if (= n 0)
+            acc
+            (loop (- n 1) (* n acc)))))
+    ```
+    When using recursion, make your functions tail-recursive to avoid stack overflow errors with large inputs. In a tail-recursive function, the recursive call is the last operation in the function.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```racket
+    ;; Anti-pattern: Poor error handling
+    (define (process-file filename)
+      (let ([in (open-input-file filename)])
+        (let ([data (read-all-data in)])
+          (close-input-port in)
+          (process-data data))))
+    
+    ;; Better approach: Use with-handlers or dynamic-wind
+    (define (process-file filename)
+      (with-handlers ([exn:fail:filesystem?
+                        (lambda (e)
+                          (printf "File error: ~a\n" (exn-message e))
+                          #f)])
+        (call-with-input-file filename
+          (lambda (in)
+            (let ([data (read-all-data in)])
+              (process-data data))))))
+    
+    ;; Or using dynamic-wind for cleanup
+    (define (process-file filename)
+      (let ([in #f])
+        (dynamic-wind
+          (lambda () (set! in (open-input-file filename)))
+          (lambda () (let ([data (read-all-data in)])
+                      (process-data data)))
+          (lambda () (when in (close-input-port in))))))
+    ```
+    Implement proper error handling in your code. Use `with-handlers` to catch and handle exceptions, and ensure resources are properly cleaned up using `dynamic-wind` or higher-level abstractions like `call-with-input-file`.
+  </Accordion>
+  
+  <Accordion title="Not Using Racket's Iteration Constructs" icon="warning">
+    ```racket
+    ;; Anti-pattern: Manual recursion for iteration
+    (define (sum-integers-up-to n)
+      (let loop ([i 1] [sum 0])
+        (if (> i n)
+            sum
+            (loop (+ i 1) (+ sum i)))))
+    
+    ;; Better approach: Use for/fold and other iteration forms
+    (define (sum-integers-up-to n)
+      (for/fold ([sum 0]) ([i (in-range 1 (+ n 1))])
+        (+ sum i)))
+    
+    ;; Or even simpler
+    (define (sum-integers-up-to n)
+      (for/sum ([i (in-range 1 (+ n 1))])
+        i))
+    ```
+    Use Racket's rich set of iteration constructs like `for/list`, `for/vector`, `for/sum`, `for/fold`, etc., instead of writing manual recursive loops. These forms are more concise and often more readable.
+  </Accordion>
+  
+  <Accordion title="Not Using Typed Racket" icon="warning">
+    ```racket
+    ;; Anti-pattern: Runtime type errors
+    #lang racket
+    
+    (define (add-numbers a b)
+      (+ a b))
+    
+    (add-numbers "not a number" 42) ; Runtime error
+    
+    ;; Better approach: Use Typed Racket
+    #lang typed/racket
+    
+    (: add-numbers (-> Number Number Number))
+    (define (add-numbers a b)
+      (+ a b))
+    
+    ;; This would be a type error at compile time
+    ;; (add-numbers "not a number" 42)
+    ```
+    Consider using Typed Racket for projects where type safety is important. Typed Racket adds static type checking to Racket, catching type errors at compile time rather than runtime.
+  </Accordion>
+  
+  <Accordion title="Not Using Documentation" icon="warning">
+    ```racket
+    ;; Anti-pattern: No documentation
+    (define (calculate-score player-stats opponent-stats)
+      (let ([attack (player-attack player-stats)]
+            [defense (opponent-defense opponent-stats)])
+        (* attack (/ 100 (+ 100 defense)))))
+    
+    ;; Better approach: Include documentation
+    (require scribble/srcdoc)
+    (require (for-doc racket/base scribble/manual))
+    
+    (provide
+      (proc-doc/names
+        calculate-score
+        (-> player? player? number?)
+        (player-stats opponent-stats)
+        @{Calculates the effective score of an attack based on player and opponent stats.
+          @argument[player-stats]{A player statistics object with at least an attack value.}
+          @argument[opponent-stats]{An opponent statistics object with at least a defense value.}
+          @returns{A number representing the effective damage.}}))
+    
+    (define (calculate-score player-stats opponent-stats)
+      (let ([attack (player-attack player-stats)]
+            [defense (opponent-defense opponent-stats)])
+        (* attack (/ 100 (+ 100 defense)))))
+    ```
+    Document your code using Racket's documentation tools. Good documentation helps users understand how to use your code correctly and can be integrated with Racket's help system.
+  </Accordion>
+  
+  <Accordion title="Not Writing Tests" icon="warning">
+    ```racket
+    ;; Anti-pattern: No tests
+    
+    ;; Better approach: Write tests
+    (require rackunit)
+    
+    (define (factorial n)
+      (if (= n 0)
+          1
+          (* n (factorial (- n 1)))))
+    
+    (module+ test
+      (check-equal? (factorial 0) 1 "factorial of 0")
+      (check-equal? (factorial 1) 1 "factorial of 1")
+      (check-equal? (factorial 5) 120 "factorial of 5")
+      
+      (check-exn exn:fail? (lambda () (factorial -1)) "factorial of negative"))
+    ```
+    Write tests for your Racket code. Testing helps ensure your code works correctly and continues to work as you make changes. Use testing frameworks like RackUnit to structure and run your tests.
+  </Accordion>
+  
+  <Accordion title="Not Using Racket's Class System Properly" icon="warning">
+    ```racket
+    ;; Anti-pattern: Using classes when simpler constructs would suffice
+    (define player%
+      (class object%
+        (init-field name health)
+        (define/public (get-name) name)
+        (define/public (get-health) health)
+        (define/public (set-health! new-health) (set! health new-health))
+        (super-new)))
+    
+    ;; Better approach: Use structs for simple data
+    (struct player (name health) #:mutable)
+    
+    ;; Use classes when you need inheritance, method overriding, etc.
+    (define entity%
+      (class object%
+        (init-field id position)
+        (define/public (move dx dy)
+          (set! position (list (+ (car position) dx)
+                               (+ (cadr position) dy))))
+        (super-new)))
+    
+    (define player%
+      (class entity%
+        (init-field name health)
+        (inherit-field position)
+        (define/public (heal amount)
+          (set! health (min 100 (+ health amount))))
+        (define/override (move dx dy)
+          (super move dx dy)
+          (when (< health 100)
+            (set! health (+ health 1))))
+        (super-new)))
+    ```
+    Use Racket's object system appropriately. For simple data structures, prefer structs. Use classes when you need features like inheritance, method overriding, or complex object behaviors.
+  </Accordion>
+  
+  <Accordion title="Not Using Contracts for Data Structures" icon="warning">
+    ```racket
+    ;; Anti-pattern: No contracts for data structures
+    (struct point (x y))
+    
+    (define (distance p1 p2)
+      (sqrt (+ (sqr (- (point-x p2) (point-x p1)))
+                (sqr (- (point-y p2) (point-y p1))))))
+    
+    ;; Usage with wrong type
+    (distance (point 0 0) "not a point") ; Runtime error
+    
+    ;; Better approach: Use contracts
+    (require racket/contract)
+    
+    (struct point (x y) #:transparent)
+    
+    (define point/c
+      (struct/c point real? real?))
+    
+    (define/contract (distance p1 p2)
+      (-> point/c point/c real?)
+      (sqrt (+ (sqr (- (point-x p2) (point-x p1)))
+                (sqr (- (point-y p2) (point-y p1))))))
+    ```
+    Use contracts not just for functions, but also for data structures. This helps ensure that your data structures contain the expected types of values.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Naming Conventions" icon="warning">
+    ```racket
+    ;; Anti-pattern: Inconsistent naming
+    (define (calc_score p o)
+      (let ([atk (get-attack p)]
+            [def (getDefense o)])
+        (* atk (/ 100 (+ 100 def)))))
+    
+    ;; Better approach: Follow Racket naming conventions
+    (define (calculate-score player opponent)
+      (let ([attack (player-attack player)]
+            [defense (opponent-defense opponent)])
+        (* attack (/ 100 (+ 100 defense)))))
+    
+    ;; Use ? suffix for predicates
+    (define (valid-player? player)
+      (and (player? player)
+           (> (player-health player) 0)))
+    
+    ;; Use ! suffix for mutators
+    (define (set-player-health! player health)
+      (set-player-health player health))
+    ```
+    Follow Racket naming conventions. Use kebab-case (words separated by hyphens) for function and variable names. Use a `?` suffix for predicates and a `!` suffix for functions that mutate state. Consistent naming makes your code more readable and idiomatic.
+  </Accordion>
+  
+  <Accordion title="Not Using Racket's GUI Framework Properly" icon="warning">
+    ```racket
+    ;; Anti-pattern: Manual event handling and state management
+    (define frame (new frame% [label "My App"]))
+    
+    (define counter 0)
+    
+    (define button
+      (new button% 
+           [parent frame]
+           [label "Click Me"]
+           [callback (lambda (button event) 
+                      (set! counter (+ counter 1))
+                      (send msg set-label (format "Clicks: ~a" counter)))]))
+    
+    (define msg
+      (new message% 
+           [parent frame]
+           [label "Clicks: 0"]))
+    
+    ;; Better approach: Use proper MVC pattern
+    (define counter-model%
+      (class object%
+        (init-field [value 0])
+        (define listeners null)
+        
+        (define/public (get-value) value)
+        
+        (define/public (increment!)
+          (set! value (+ value 1))
+          (notify-listeners))
+        
+        (define/public (add-listener listener)
+          (set! listeners (cons listener listeners)))
+        
+        (define/private (notify-listeners)
+          (for-each (lambda (listener) (listener value)) listeners))
+        
+        (super-new)))
+    
+    (define counter-view%
+      (class frame%
+        (init-field model)
+        
+        (super-new [label "My App"])
+        
+        (define msg (new message% [parent this] [label "Clicks: 0"]))
+        
+        (define button
+          (new button% 
+               [parent this]
+               [label "Click Me"]
+               [callback (lambda (button event) 
+                          (send model increment!))]))
+        
+        (define/public (update value)
+          (send msg set-label (format "Clicks: ~a" value)))
+        
+        (send model add-listener
+              (lambda (value) (send this update value)))))
+    
+    (define model (new counter-model%))
+    (define view (new counter-view% [model model]))
+    ```
+    When building GUI applications with Racket, follow proper design patterns like Model-View-Controller (MVC). This separates concerns and makes your code more maintainable.
+  </Accordion>
+</AccordionGroup>

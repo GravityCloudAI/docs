@@ -1,0 +1,612 @@
+---
+title: 'Scala'
+description: 'Scala is a high-level language that combines object-oriented and functional programming paradigms. It runs on the JVM and is designed to be concise, elegant, and type-safe.'
+---
+
+<AccordionGroup>
+  <Accordion title="Scala Anti-Patterns Overview" icon="scala">
+    Scala, with its blend of object-oriented and functional programming, has several common anti-patterns that can lead to performance issues, code maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing Scala code.
+  </Accordion>
+  
+  <Accordion title="Using Option.get Without Checking" icon="warning">
+    ```scala
+    // Anti-pattern: Calling .get without checking
+    def processUser(userId: String): String = {
+      val user = findUser(userId)
+      val name = user.get.name // Will throw NoSuchElementException if user is None
+      name
+    }
+    
+    // Better approach: Pattern matching or map/getOrElse
+    def processUser(userId: String): String = {
+      val user = findUser(userId)
+      user match {
+        case Some(u) => u.name
+        case None => "Unknown User"
+      }
+      
+      // Or more concisely:
+      // user.map(_.name).getOrElse("Unknown User")
+    }
+    ```
+    Never call `.get` on an `Option` without first checking if it contains a value, as it will throw a `NoSuchElementException` if the option is `None`.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Nulls" icon="warning">
+    ```scala
+    // Anti-pattern: Using nulls
+    def findUser(id: String): User = {
+      if (userExists(id)) {
+        loadUser(id)
+      } else {
+        null // Returning null
+      }
+    }
+    
+    // Usage leads to NullPointerException
+    val user = findUser("123")
+    println(user.name) // Boom if user is null
+    
+    // Better approach: Use Option
+    def findUser(id: String): Option[User] = {
+      if (userExists(id)) {
+        Some(loadUser(id))
+      } else {
+        None
+      }
+    }
+    
+    // Safe usage
+    val userName = findUser("123").map(_.name).getOrElse("Unknown")
+    ```
+    Avoid using `null` in Scala. Instead, use `Option[T]` to represent the presence or absence of a value.
+  </Accordion>
+  
+  <Accordion title="Ignoring Return Values" icon="warning">
+    ```scala
+    // Anti-pattern: Ignoring return values
+    def processData(): Unit = {
+      val result = calculateResult() // Result is ignored
+      println("Processing complete")
+    }
+    
+    // Better approach: Use the result or explicitly discard it
+    def processData(): Unit = {
+      val result = calculateResult()
+      println(s"Processing complete with result: $result")
+      
+      // Or if you really want to ignore it:
+      val _ = calculateResult() // Explicitly showing it's ignored
+    }
+    ```
+    Don't ignore return values, especially from pure functions. Either use them or explicitly discard them with `val _ = ...`.
+  </Accordion>
+  
+  <Accordion title="Overusing Var" icon="warning">
+    ```scala
+    // Anti-pattern: Overusing var
+    def calculateSum(numbers: List[Int]): Int = {
+      var sum = 0
+      for (num <- numbers) {
+        sum += num
+      }
+      sum
+    }
+    
+    // Better approach: Use immutable values and functional operations
+    def calculateSum(numbers: List[Int]): Int = {
+      numbers.sum
+      
+      // Or more explicitly:
+      // numbers.foldLeft(0)(_ + _)
+    }
+    ```
+    Minimize the use of `var` in favor of `val` and functional transformations to make code more predictable and easier to reason about.
+  </Accordion>
+  
+  <Accordion title="Returning Any" icon="warning">
+    ```scala
+    // Anti-pattern: Returning Any
+    def processValue(value: String): Any = {
+      if (value.isEmpty) {
+        false
+      } else if (value.forall(_.isDigit)) {
+        value.toInt
+      } else {
+        value
+      }
+    }
+    
+    // Usage requires unsafe casting
+    val result = processValue("123")
+    val intValue = result.asInstanceOf[Int] // Runtime error if result is not an Int
+    
+    // Better approach: Use sealed trait/ADT
+    sealed trait ProcessResult
+    case class StringResult(value: String) extends ProcessResult
+    case class IntResult(value: Int) extends ProcessResult
+    case object EmptyResult extends ProcessResult
+    
+    def processValue(value: String): ProcessResult = {
+      if (value.isEmpty) {
+        EmptyResult
+      } else if (value.forall(_.isDigit)) {
+        IntResult(value.toInt)
+      } else {
+        StringResult(value)
+      }
+    }
+    
+    // Safe usage with pattern matching
+    val result = processValue("123")
+    val output = result match {
+      case IntResult(n) => n * 2
+      case StringResult(s) => s.length
+      case EmptyResult => 0
+    }
+    ```
+    Avoid returning `Any` as it bypasses the type system. Use algebraic data types (ADTs) or sealed traits instead.
+  </Accordion>
+  
+  <Accordion title="Using Exceptions for Control Flow" icon="warning">
+    ```scala
+    // Anti-pattern: Using exceptions for control flow
+    def parseConfig(path: String): Config = {
+      try {
+        val source = Source.fromFile(path)
+        // Parse config...
+        source.close()
+        new Config(...)
+      } catch {
+        case _: FileNotFoundException => new Config() // Default config
+      }
+    }
+    
+    // Better approach: Use Option/Either for expected failure cases
+    def parseConfig(path: String): Either[String, Config] = {
+      val file = new File(path)
+      if (!file.exists()) {
+        Left(s"Config file not found: $path")
+      } else {
+        try {
+          val source = Source.fromFile(file)
+          try {
+            // Parse config...
+            Right(new Config(...))
+          } finally {
+            source.close()
+          }
+        } catch {
+          case e: Exception => Left(s"Error parsing config: ${e.getMessage}")
+        }
+      }
+    }
+    ```
+    Don't use exceptions for expected failure cases. Use `Option`, `Either`, or `Try` to represent operations that might fail.
+  </Accordion>
+  
+  <Accordion title="Not Using Case Classes for Data" icon="warning">
+    ```scala
+    // Anti-pattern: Regular class for data
+    class User(val name: String, val age: Int) {
+      // Have to manually implement equals, hashCode, toString
+      override def equals(obj: Any): Boolean = obj match {
+        case that: User => this.name == that.name && this.age == that.age
+        case _ => false
+      }
+      
+      override def hashCode(): Int = name.hashCode * 31 + age
+      
+      override def toString: String = s"User($name, $age)"
+    }
+    
+    // Better approach: Use case classes
+    case class User(name: String, age: Int)
+    // Automatically gets equals, hashCode, toString, copy, and pattern matching
+    ```
+    Use case classes for data objects to automatically get useful methods like `equals`, `hashCode`, `toString`, and `copy`.
+  </Accordion>
+  
+  <Accordion title="Not Using Pattern Matching" icon="warning">
+    ```scala
+    // Anti-pattern: Not using pattern matching
+    def describe(value: Any): String = {
+      if (value.isInstanceOf[Int]) {
+        val intValue = value.asInstanceOf[Int]
+        if (intValue == 0) "zero" else s"integer: $intValue"
+      } else if (value.isInstanceOf[String]) {
+        val stringValue = value.asInstanceOf[String]
+        if (stringValue.isEmpty) "empty string" else s"string: $stringValue"
+      } else {
+        "unknown"
+      }
+    }
+    
+    // Better approach: Use pattern matching
+    def describe(value: Any): String = value match {
+      case 0 => "zero"
+      case n: Int => s"integer: $n"
+      case "" => "empty string"
+      case s: String => s"string: $s"
+      case _ => "unknown"
+    }
+    ```
+    Use pattern matching instead of type checks and casts for more expressive and safer code.
+  </Accordion>
+  
+  <Accordion title="Overusing Implicits" icon="warning">
+    ```scala
+    // Anti-pattern: Overusing implicits
+    object Conversions {
+      implicit def stringToInt(s: String): Int = s.toInt
+      implicit def intToBoolean(i: Int): Boolean = i > 0
+      implicit def booleanToString(b: Boolean): String = if (b) "true" else "false"
+    }
+    
+    import Conversions._
+    
+    def processValue(value: String): String = {
+      // What's happening here? Multiple implicit conversions make it hard to follow
+      val result: String = value
+      result
+    }
+    
+    // Better approach: Explicit conversions or type classes
+    object TypeClasses {
+      trait Converter[A, B] {
+        def convert(a: A): B
+      }
+      
+      implicit val stringToInt: Converter[String, Int] = new Converter[String, Int] {
+        def convert(s: String): Int = s.toInt
+      }
+      
+      def convert[A, B](a: A)(implicit converter: Converter[A, B]): B = converter.convert(a)
+    }
+    
+    import TypeClasses._
+    
+    def processValue(value: String): Int = {
+      // Clear and explicit
+      convert[String, Int](value)
+    }
+    ```
+    Use implicits judiciously. They can make code harder to understand and debug when overused.
+  </Accordion>
+  
+  <Accordion title="Excessive Nesting" icon="warning">
+    ```scala
+    // Anti-pattern: Excessive nesting
+    def processData(data: Option[Data]): Option[Result] = {
+      data match {
+        case Some(d) => {
+          val processed = process(d)
+          processed match {
+            case Some(p) => {
+              val validated = validate(p)
+              validated match {
+                case Some(v) => Some(createResult(v))
+                case None => None
+              }
+            }
+            case None => None
+          }
+        }
+        case None => None
+      }
+    }
+    
+    // Better approach: Use flatMap/map or for-comprehensions
+    def processData(data: Option[Data]): Option[Result] = {
+      data.flatMap(d => 
+        process(d).flatMap(p => 
+          validate(p).map(v => 
+            createResult(v)
+          )
+        )
+      )
+      
+      // Or even better with for-comprehension:
+      for {
+        d <- data
+        p <- process(d)
+        v <- validate(p)
+      } yield createResult(v)
+    }
+    ```
+    Avoid excessive nesting. Use `flatMap`/`map` chains or for-comprehensions for more readable code.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Resource Management" icon="warning">
+    ```scala
+    // Anti-pattern: Not closing resources properly
+    def readFile(path: String): String = {
+      val source = Source.fromFile(path)
+      val content = source.mkString
+      source.close() // What if an exception occurs before this?
+      content
+    }
+    
+    // Better approach: Use try-finally or resource management utilities
+    def readFile(path: String): String = {
+      val source = Source.fromFile(path)
+      try {
+        source.mkString
+      } finally {
+        source.close()
+      }
+    }
+    
+    // Even better with Using (Scala 2.13+)
+    import scala.util.Using
+    
+    def readFile(path: String): Try[String] = {
+      Using(Source.fromFile(path)) { source =>
+        source.mkString
+      }
+    }
+    ```
+    Always properly close resources using try-finally blocks or utilities like `Using` (Scala 2.13+).
+  </Accordion>
+  
+  <Accordion title="Overusing Object-Oriented Features" icon="warning">
+    ```scala
+    // Anti-pattern: Overusing OO inheritance
+    abstract class Animal {
+      def speak(): String
+      def eat(): Unit
+      def sleep(): Unit
+    }
+    
+    class Dog extends Animal {
+      override def speak(): String = "Woof"
+      override def eat(): Unit = println("Dog eating")
+      override def sleep(): Unit = println("Dog sleeping")
+    }
+    
+    class Cat extends Animal {
+      override def speak(): String = "Meow"
+      override def eat(): Unit = println("Cat eating")
+      override def sleep(): Unit = println("Cat sleeping")
+    }
+    
+    // Better approach: Favor composition and type classes
+    trait Speaker[A] {
+      def speak(a: A): String
+    }
+    
+    trait Eater[A] {
+      def eat(a: A): Unit
+    }
+    
+    trait Sleeper[A] {
+      def sleep(a: A): Unit
+    }
+    
+    case class Dog(name: String)
+    case class Cat(name: String)
+    
+    object AnimalBehaviors {
+      implicit val dogSpeaker: Speaker[Dog] = new Speaker[Dog] {
+        def speak(dog: Dog): String = "Woof"
+      }
+      
+      implicit val catSpeaker: Speaker[Cat] = new Speaker[Cat] {
+        def speak(cat: Cat): String = "Meow"
+      }
+      
+      // Similar implementations for Eater and Sleeper
+      
+      def speak[A](a: A)(implicit speaker: Speaker[A]): String = speaker.speak(a)
+    }
+    ```
+    Favor composition over inheritance and consider functional programming approaches like type classes.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Immutability" icon="warning">
+    ```scala
+    // Anti-pattern: Mutable collections
+    def processItems(items: List[String]): List[String] = {
+      val result = new scala.collection.mutable.ListBuffer[String]()
+      for (item <- items) {
+        if (item.nonEmpty) {
+          result += item.toUpperCase
+        }
+      }
+      result.toList
+    }
+    
+    // Better approach: Use immutable collections and transformations
+    def processItems(items: List[String]): List[String] = {
+      items.filter(_.nonEmpty).map(_.toUpperCase)
+    }
+    ```
+    Prefer immutable collections and transformations over mutable state.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```scala
+    // Anti-pattern: Throwing exceptions
+    def divide(a: Int, b: Int): Int = {
+      if (b == 0) {
+        throw new ArithmeticException("Division by zero")
+      }
+      a / b
+    }
+    
+    // Better approach: Return Either or Try
+    def divide(a: Int, b: Int): Either[String, Int] = {
+      if (b == 0) {
+        Left("Division by zero")
+      } else {
+        Right(a / b)
+      }
+    }
+    
+    // Or using Try
+    import scala.util.Try
+    
+    def divide(a: Int, b: Int): Try[Int] = Try(a / b)
+    ```
+    Use `Either`, `Option`, or `Try` for error handling instead of throwing exceptions.
+  </Accordion>
+  
+  <Accordion title="Not Using Lazy Evaluation When Appropriate" icon="warning">
+    ```scala
+    // Anti-pattern: Eager evaluation when lazy would be better
+    def expensiveComputation(): BigInt = {
+      // Some very expensive computation
+      factorial(10000)
+    }
+    
+    val result = expensiveComputation() // Computed immediately, even if never used
+    
+    // Better approach: Use lazy val for expensive computations
+    lazy val result = expensiveComputation() // Only computed when first accessed
+    
+    // Or use def for repeated computations
+    def computeWhenNeeded() = expensiveComputation()
+    ```
+    Use `lazy val` for expensive computations that might not be needed, and consider using streams or views for lazy collection processing.
+  </Accordion>
+  
+  <Accordion title="Misusing Futures" icon="warning">
+    ```scala
+    // Anti-pattern: Blocking on futures
+    import scala.concurrent.{Future, Await}
+    import scala.concurrent.duration._
+    import scala.concurrent.ExecutionContext.Implicits.global
+    
+    def fetchData(): Future[Data] = Future { /* fetch data */ }
+    
+    def processData(): Result = {
+      val future = fetchData()
+      val data = Await.result(future, 10.seconds) // Blocking!
+      // Process data...
+    }
+    
+    // Better approach: Compose futures
+    def fetchData(): Future[Data] = Future { /* fetch data */ }
+    
+    def processData(): Future[Result] = {
+      fetchData().map { data =>
+        // Process data...
+      }
+    }
+    ```
+    Avoid blocking on futures. Compose them using `map`, `flatMap`, or for-comprehensions.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Functional Error Handling" icon="warning">
+    ```scala
+    // Anti-pattern: Mixing exceptions with functional code
+    def processItem(item: String): Option[Int] = {
+      try {
+        Some(item.toInt)
+      } catch {
+        case _: NumberFormatException => None
+      }
+    }
+    
+    def processItems(items: List[String]): List[Int] = {
+      items.flatMap(processItem)
+    }
+    
+    // Better approach: Use consistent functional error handling
+    import scala.util.{Try, Success, Failure}
+    
+    def processItem(item: String): Try[Int] = Try(item.toInt)
+    
+    def processItems(items: List[String]): List[Int] = {
+      items.map(processItem).collect { case Success(value) => value }
+      
+      // Or to get errors too:
+      // val (successes, failures) = items.map(processItem).partition(_.isSuccess)
+      // val values = successes.collect { case Success(value) => value }
+      // val errors = failures.collect { case Failure(ex) => ex.getMessage }
+    }
+    ```
+    Use consistent functional error handling with `Try`, `Either`, or `Option`.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Type Parameters" icon="warning">
+    ```scala
+    // Anti-pattern: Not using type parameters
+    class Box {
+      private var value: Any = _
+      
+      def put(x: Any): Unit = { value = x }
+      def get(): Any = value
+    }
+    
+    val box = new Box()
+    box.put("hello")
+    val value = box.get().asInstanceOf[String] // Runtime cast
+    
+    // Better approach: Use type parameters
+    class Box[A] {
+      private var value: A = _
+      
+      def put(x: A): Unit = { value = x }
+      def get(): A = value
+    }
+    
+    val box = new Box[String]()
+    box.put("hello")
+    val value = box.get() // No cast needed
+    ```
+    Use proper type parameters instead of `Any` to leverage the type system.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Collection Methods" icon="warning">
+    ```scala
+    // Anti-pattern: Reinventing collection operations
+    def findFirstEven(numbers: List[Int]): Option[Int] = {
+      for (num <- numbers) {
+        if (num % 2 == 0) {
+          return Some(num)
+        }
+      }
+      None
+    }
+    
+    // Better approach: Use collection methods
+    def findFirstEven(numbers: List[Int]): Option[Int] = {
+      numbers.find(_ % 2 == 0)
+    }
+    ```
+    Use the rich collection API instead of reinventing common operations.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper String Interpolation" icon="warning">
+    ```scala
+    // Anti-pattern: String concatenation
+    def greet(name: String, age: Int): String = {
+      "Hello, " + name + "! You are " + age + " years old."
+    }
+    
+    // Better approach: String interpolation
+    def greet(name: String, age: Int): String = {
+      s"Hello, $name! You are $age years old."
+    }
+    ```
+    Use string interpolation (`s""`, `f""`, `raw""`) instead of concatenation for better readability.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Case Class Patterns" icon="warning">
+    ```scala
+    // Anti-pattern: Mutable case classes
+    case class User(var name: String, var age: Int)
+    
+    val user = User("John", 30)
+    user.name = "Jane" // Mutation!
+    
+    // Better approach: Immutable case classes with copy
+    case class User(name: String, age: Int)
+    
+    val user = User("John", 30)
+    val updatedUser = user.copy(name = "Jane")
+    ```
+    Keep case classes immutable and use `copy` for creating modified instances.
+  </Accordion>
+</AccordionGroup>

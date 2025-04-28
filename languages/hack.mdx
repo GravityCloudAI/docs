@@ -1,0 +1,582 @@
+---
+title: 'Hack'
+description: 'Hack is a programming language for HHVM that interoperates seamlessly with PHP. It provides static typing with type inference, generics, nullable types, and other features while maintaining compatibility with existing PHP code.'
+---
+
+<AccordionGroup>
+  <Accordion title="Hack Anti-Patterns Overview" icon="hack">
+    Hack, despite being designed to improve upon PHP with static typing and other modern features, still has several anti-patterns that can lead to code quality issues, performance problems, and maintenance challenges. Here are the most important anti-patterns to avoid when writing Hack code.
+  </Accordion>
+  
+  <Accordion title="Ignoring Static Typing" icon="warning">
+    ```hack
+    // Anti-pattern: Ignoring static typing
+    function process(mixed $data): void {
+      // Using mixed and dynamic type checking
+      if (is_array($data)) {
+        foreach ($data as $item) {
+          echo $item; // $item is still mixed
+        }
+      } else if (is_string($data)) {
+        echo $data;
+      }
+    }
+    
+    // Better approach: Use proper static typing
+    function processArray(array<string> $data): void {
+      foreach ($data as $item) {
+        echo $item; // $item is string
+      }
+    }
+    
+    function processString(string $data): void {
+      echo $data;
+    }
+    
+    function process(mixed $data): void {
+      if (is_array($data)) {
+        $typed_data = TypeAssert\matches<array<string>>($data);
+        processArray($typed_data);
+      } else if (is_string($data)) {
+        processString($data);
+      }
+    }
+    ```
+    One of Hack's main advantages over PHP is its static typing system. Avoid using `mixed` types excessively or falling back to dynamic type checking with functions like `is_array()`. Instead, leverage Hack's type system to catch errors at compile time rather than runtime.
+  </Accordion>
+  
+  <Accordion title="Not Using Collections" icon="warning">
+    ```hack
+    // Anti-pattern: Using arrays instead of collections
+    function getUserNames(array<int, User> $users): array<int, string> {
+      $names = [];
+      foreach ($users as $id => $user) {
+        $names[$id] = $user->getName();
+      }
+      return $names;
+    }
+    
+    // Better approach: Use collections
+    function getUserNames(Map<int, User> $users): Map<int, string> {
+      return $users->map($user ==> $user->getName());
+    }
+    
+    // Or with Vector
+    function getUserNames(Vector<User> $users): Vector<string> {
+      return $users->map($user ==> $user->getName());
+    }
+    ```
+    Prefer Hack's collection classes (`Vector`, `Map`, `Set`, etc.) over PHP arrays. Collections provide type safety, better performance in many cases, and useful higher-order functions for transformations.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Nullable Types" icon="warning">
+    ```hack
+    // Anti-pattern: Excessive use of nullable types
+    function getUserName(?User $user): ?string {
+      if ($user === null) {
+        return null;
+      }
+      return $user->getName();
+    }
+    
+    // Usage that leads to null checking chains
+    $userName = getUserName($user);
+    if ($userName !== null) {
+      echo $userName;
+    } else {
+      echo "Unknown user";
+    }
+    
+    // Better approach: Use Option type pattern or provide defaults
+    function getUserName(User $user): string {
+      return $user->getName();
+    }
+    
+    function getDisplayName(?User $user): string {
+      return $user !== null ? getUserName($user) : "Unknown user";
+    }
+    ```
+    While nullable types (`?T`) are useful, excessive use can lead to null-checking chains and defensive programming. Consider using default values, the Option type pattern, or restructuring your code to minimize nullable types.
+  </Accordion>
+  
+  <Accordion title="Not Using Shapes and Structural Typing" icon="warning">
+    ```hack
+    // Anti-pattern: Not using shapes for structured data
+    function processUserData(array<string, mixed> $userData): void {
+      $name = $userData['name'] ?? '';
+      $email = $userData['email'] ?? '';
+      $age = $userData['age'] ?? 0;
+      
+      // Process data...
+    }
+    
+    // Better approach: Use shapes
+    type UserShape = shape(
+      'name' => string,
+      'email' => string,
+      ?'age' => int, // Optional field
+    );
+    
+    function processUserData(UserShape $userData): void {
+      $name = $userData['name'];
+      $email = $userData['email'];
+      $age = $userData['age'] ?? 0;
+      
+      // Process data...
+    }
+    ```
+    Use Hack's shape types to define the structure of your data instead of using untyped arrays. Shapes provide compile-time checking of field names and types, making your code more robust.
+  </Accordion>
+  
+  <Accordion title="Ignoring Async" icon="warning">
+    ```hack
+    // Anti-pattern: Blocking I/O operations
+    function fetchUserData(int $userId): array<string, mixed> {
+      $response = file_get_contents("https://api.example.com/users/{$userId}");
+      return json_decode($response, true);
+    }
+    
+    // Better approach: Use async/await
+    async function fetchUserDataAsync(int $userId): Awaitable<array<string, mixed>> {
+      $response = await HttpClient::requestAsync(
+        HttpMethod::GET,
+        "https://api.example.com/users/{$userId}"
+      );
+      return json_decode($response->getBody(), true);
+    }
+    
+    // Usage
+    async function processUsersAsync(): Awaitable<void> {
+      $userIds = vec[1, 2, 3, 4, 5];
+      $awaitables = $userIds->map(
+        $id ==> fetchUserDataAsync($id)
+      );
+      
+      // Process all requests concurrently
+      $results = await AwaitAllWaitHandle::fromVec($awaitables);
+      
+      // Process results...
+    }
+    ```
+    Take advantage of Hack's async/await features for I/O-bound operations. This allows your code to handle multiple operations concurrently without blocking, improving performance and scalability.
+  </Accordion>
+  
+  <Accordion title="Not Using XHP for HTML Generation" icon="warning">
+    ```hack
+    // Anti-pattern: String concatenation for HTML
+    function renderUserProfile(User $user): string {
+      $html = '<div class="user-profile">';
+      $html .= '<h1>' . htmlspecialchars($user->getName()) . '</h1>';
+      $html .= '<p>Email: ' . htmlspecialchars($user->getEmail()) . '</p>';
+      $html .= '</div>';
+      return $html;
+    }
+    
+    // Better approach: Use XHP
+    function renderUserProfile(User $user): XHPRoot {
+      return 
+        <div class="user-profile">
+          <h1>{$user->getName()}</h1>
+          <p>Email: {$user->getEmail()}</p>
+        </div>;
+    }
+    ```
+    Use XHP (XML in Hack) for generating HTML instead of string concatenation. XHP provides compile-time checking of HTML structure, automatic escaping of values, and a more readable syntax.
+  </Accordion>
+  
+  <Accordion title="Not Using Type Aliases and Newtype" icon="warning">
+    ```hack
+    // Anti-pattern: Using primitive types directly
+    function createUser(string $email, string $password): User {
+      // Validate email and password
+      // Create user...
+    }
+    
+    // Usage - easy to mix up parameters
+    $user = createUser($password, $email); // Oops, parameters swapped!
+    
+    // Better approach: Use type aliases and newtype
+    newtype Email = string;
+    newtype Password = string;
+    
+    function createUser(Email $email, Password $password): User {
+      // Validate email and password
+      // Create user...
+    }
+    
+    // Usage - now type-safe
+    $email = Email($emailString);
+    $password = Password($passwordString);
+    $user = createUser($email, $password); // Compile error if swapped
+    ```
+    Use `type` aliases and `newtype` to create more specific types for your domain concepts. This improves type safety, documentation, and prevents accidental misuse of values.
+  </Accordion>
+  
+  <Accordion title="Not Using Enums" icon="warning">
+    ```hack
+    // Anti-pattern: Using string constants
+    const string STATUS_PENDING = 'pending';
+    const string STATUS_ACTIVE = 'active';
+    const string STATUS_SUSPENDED = 'suspended';
+    
+    function updateUserStatus(User $user, string $status): void {
+      // No compile-time checking of status values
+      $user->setStatus($status);
+    }
+    
+    // Better approach: Use enums
+    enum UserStatus: string {
+      PENDING = 'pending';
+      ACTIVE = 'active';
+      SUSPENDED = 'suspended';
+    }
+    
+    function updateUserStatus(User $user, UserStatus $status): void {
+      $user->setStatus($status);
+    }
+    
+    // Usage
+    updateUserStatus($user, UserStatus::ACTIVE);
+    ```
+    Use enums to represent a fixed set of related values instead of string or integer constants. Enums provide type safety, better documentation, and prevent invalid values.
+  </Accordion>
+  
+  <Accordion title="Not Using Generics" icon="warning">
+    ```hack
+    // Anti-pattern: Not using generics
+    class Repository {
+      public function find(int $id): mixed {
+        // Find entity by ID
+        return $entity;
+      }
+      
+      public function findAll(): array<mixed> {
+        // Find all entities
+        return $entities;
+      }
+    }
+    
+    // Usage requires casting
+    $user = $userRepository->find(1) as User;
+    
+    // Better approach: Use generics
+    class Repository<T> {
+      public function find(int $id): ?T {
+        // Find entity by ID
+        return $entity;
+      }
+      
+      public function findAll(): vec<T> {
+        // Find all entities
+        return $entities;
+      }
+    }
+    
+    // Usage with type safety
+    $userRepository = new Repository<User>();
+    $user = $userRepository->find(1); // Returns ?User
+    ```
+    Use generics to create reusable components that work with different types while maintaining type safety. This reduces the need for type casting and makes your code more robust.
+  </Accordion>
+  
+  <Accordion title="Not Using Immutable Data Structures" icon="warning">
+    ```hack
+    // Anti-pattern: Mutable data structures
+    function processUserData(Map<string, mixed> $userData): void {
+      // Modify the map in-place
+      $userData['processed'] = true;
+      $userData['timestamp'] = time();
+      
+      // More processing...
+    }
+    
+    // Better approach: Use immutable data structures
+    function processUserData(ImmMap<string, mixed> $userData): ImmMap<string, mixed> {
+      // Create a new map with modifications
+      return $userData
+        ->toMap() // Convert to mutable
+        ->add('processed', true)
+        ->add('timestamp', time())
+        ->toImmMap(); // Convert back to immutable
+    }
+    ```
+    Prefer immutable data structures (`ImmVector`, `ImmMap`, `ImmSet`) over mutable ones when appropriate. Immutable data structures prevent unexpected modifications and make your code easier to reason about, especially in concurrent contexts.
+  </Accordion>
+  
+  <Accordion title="Not Using Traits for Code Reuse" icon="warning">
+    ```hack
+    // Anti-pattern: Duplicated code across classes
+    class UserController {
+      public function validateInput(array<string, mixed> $input): bool {
+        // Validation logic duplicated in multiple controllers
+        return $isValid;
+      }
+    }
+    
+    class ProductController {
+      public function validateInput(array<string, mixed> $input): bool {
+        // Same validation logic duplicated
+        return $isValid;
+      }
+    }
+    
+    // Better approach: Use traits for shared behavior
+    trait InputValidation {
+      public function validateInput(array<string, mixed> $input): bool {
+        // Common validation logic
+        return $isValid;
+      }
+    }
+    
+    class UserController {
+      use InputValidation;
+      
+      // User-specific methods...
+    }
+    
+    class ProductController {
+      use InputValidation;
+      
+      // Product-specific methods...
+    }
+    ```
+    Use traits to share behavior across classes without using inheritance. Traits provide a way to reuse code in a more flexible way than class inheritance.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```hack
+    // Anti-pattern: Poor error handling
+    function processFile(string $filename): array<string, mixed> {
+      $content = file_get_contents($filename); // Might fail
+      $data = json_decode($content, true); // Might fail
+      return $data;
+    }
+    
+    // Better approach: Use exceptions with try/catch
+    function processFile(string $filename): array<string, mixed> {
+      try {
+        $content = file_get_contents($filename);
+        if ($content === false) {
+          throw new Exception("Failed to read file: {$filename}");
+        }
+        
+        $data = json_decode($content, true);
+        if ($data === null) {
+          throw new Exception("Failed to parse JSON from file: {$filename}");
+        }
+        
+        return $data;
+      } catch (Exception $e) {
+        // Log the error
+        error_log($e->getMessage());
+        // Rethrow or return a default value
+        throw $e;
+      }
+    }
+    ```
+    Implement proper error handling in your code. Use exceptions for exceptional conditions and handle them appropriately. Avoid silently ignoring errors or returning null/false without proper documentation.
+  </Accordion>
+  
+  <Accordion title="Not Using Namespaces" icon="warning">
+    ```hack
+    // Anti-pattern: Not using namespaces
+    class User {}
+    class UserController {}
+    class UserRepository {}
+    class UserService {}
+    
+    // Better approach: Use namespaces
+    namespace App\Domain\User;
+    
+    class User {}
+    
+    namespace App\Controller;
+    
+    use App\Domain\User\User;
+    
+    class UserController {}
+    
+    namespace App\Repository;
+    
+    use App\Domain\User\User;
+    
+    class UserRepository {}
+    ```
+    Organize your code into namespaces based on functionality or domain concepts. This prevents naming conflicts and makes your codebase more maintainable as it grows.
+  </Accordion>
+  
+  <Accordion title="Not Using Dependency Injection" icon="warning">
+    ```hack
+    // Anti-pattern: Hard-coded dependencies
+    class UserService {
+      private UserRepository $repository;
+      
+      public function __construct() {
+        $this->repository = new UserRepository();
+      }
+      
+      public function getUser(int $id): ?User {
+        return $this->repository->find($id);
+      }
+    }
+    
+    // Better approach: Use dependency injection
+    class UserService {
+      private UserRepository $repository;
+      
+      public function __construct(UserRepository $repository) {
+        $this->repository = $repository;
+      }
+      
+      public function getUser(int $id): ?User {
+        return $this->repository->find($id);
+      }
+    }
+    ```
+    Use dependency injection to provide a class with its dependencies rather than having the class create them. This makes your code more testable, flexible, and loosely coupled.
+  </Accordion>
+  
+  <Accordion title="Not Using Interfaces" icon="warning">
+    ```hack
+    // Anti-pattern: Direct dependency on concrete classes
+    class UserService {
+      private MySQLUserRepository $repository;
+      
+      public function __construct(MySQLUserRepository $repository) {
+        $this->repository = $repository;
+      }
+    }
+    
+    // Better approach: Depend on interfaces
+    interface UserRepositoryInterface {
+      public function find(int $id): ?User;
+      public function findAll(): vec<User>;
+      public function save(User $user): void;
+    }
+    
+    class MySQLUserRepository implements UserRepositoryInterface {
+      // Implementation...
+    }
+    
+    class MongoUserRepository implements UserRepositoryInterface {
+      // Alternative implementation...
+    }
+    
+    class UserService {
+      private UserRepositoryInterface $repository;
+      
+      public function __construct(UserRepositoryInterface $repository) {
+        $this->repository = $repository;
+      }
+    }
+    ```
+    Define interfaces for your components and depend on those interfaces rather than concrete implementations. This allows for easier testing and more flexible architecture.
+  </Accordion>
+  
+  <Accordion title="Not Using Type Refinement" icon="warning">
+    ```hack
+    // Anti-pattern: Repeated type checking
+    function processValue(mixed $value): void {
+      if (is_int($value)) {
+        echo "Processing integer: {$value}";
+        // More code using $value as int
+        $result = $value * 2;
+        // $value is still mixed here
+      } else if (is_string($value)) {
+        echo "Processing string: {$value}";
+        // More code using $value as string
+        $length = strlen($value);
+        // $value is still mixed here
+      }
+    }
+    
+    // Better approach: Use type refinement
+    function processValue(mixed $value): void {
+      if (is_int($value)) {
+        // $value is refined to int in this block
+        echo "Processing integer: {$value}";
+        $result = $value * 2; // $value is known to be int
+      } else if (is_string($value)) {
+        // $value is refined to string in this block
+        echo "Processing string: {$value}";
+        $length = strlen($value); // $value is known to be string
+      }
+    }
+    ```
+    Take advantage of Hack's type refinement feature, which narrows the type of a variable within conditional blocks based on type checks. This reduces the need for type assertions and makes your code safer.
+  </Accordion>
+  
+  <Accordion title="Not Using Attributes" icon="warning">
+    ```hack
+    // Anti-pattern: Not using attributes for metadata
+    class UserController {
+      public function getUser(int $id): User {
+        // Method implementation
+      }
+      
+      public function createUser(string $name, string $email): User {
+        // Method implementation
+      }
+    }
+    
+    // Better approach: Use attributes
+    class UserController {
+      <<Route("/users/:id", "GET")>>
+      public function getUser(int $id): User {
+        // Method implementation
+      }
+      
+      <<Route("/users", "POST")>>
+      <<RequiresAuth>>
+      public function createUser(string $name, string $email): User {
+        // Method implementation
+      }
+    }
+    ```
+    Use attributes (annotations) to add metadata to your classes and methods. Attributes can be used for routing, validation, authorization, and other cross-cutting concerns.
+  </Accordion>
+  
+  <Accordion title="Not Writing Tests" icon="warning">
+    ```hack
+    // Anti-pattern: No tests
+    
+    // Better approach: Write unit tests
+    <<TestCase>>
+    class UserServiceTest extends HackTest {
+      <<Test>>
+      public function testGetUserReturnsNullForInvalidId(): void {
+        // Arrange
+        $repository = new MockUserRepository();
+        $repository->method('find')->willReturn(null);
+        
+        $service = new UserService($repository);
+        
+        // Act
+        $result = $service->getUser(999);
+        
+        // Assert
+        $this->assertNull($result);
+      }
+      
+      <<Test>>
+      public function testGetUserReturnsUserForValidId(): void {
+        // Arrange
+        $user = new User(1, 'Test User');
+        $repository = new MockUserRepository();
+        $repository->method('find')->willReturn($user);
+        
+        $service = new UserService($repository);
+        
+        // Act
+        $result = $service->getUser(1);
+        
+        // Assert
+        $this->assertNotNull($result);
+        $this->assertEquals(1, $result?->getId());
+        $this->assertEquals('Test User', $result?->getName());
+      }
+    }
+    ```
+    Write tests for your Hack code. Even with Hack's strong type system, tests are still important for verifying business logic, edge cases, and integration between components.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,477 @@
+---
+title: 'Lisp'
+description: 'Lisp is one of the oldest high-level programming languages, known for its distinctive fully parenthesized prefix notation and its treatment of code as data. It has influenced many languages and is still used in various dialects such as Common Lisp, Scheme, and Clojure.'
+---
+
+<AccordionGroup>
+  <Accordion title="Lisp Anti-Patterns Overview" icon="lisp">
+    Lisp, despite being a powerful and flexible language, has several common anti-patterns that can lead to code that's difficult to maintain, inefficient, or doesn't follow the language's idioms. Here are the most important anti-patterns to avoid when writing Lisp code.
+  </Accordion>
+  
+  <Accordion title="Excessive Global Variables" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Excessive use of global variables
+    (defvar *database-connection* nil)
+    (defvar *current-user* nil)
+    (defvar *configuration* nil)
+    
+    (defun process-user-data ()
+      (when (null *database-connection*)
+        (setf *database-connection* (connect-to-database)))
+      (let ((user-data (fetch-data *database-connection* *current-user*)))
+        (process-data user-data *configuration*)))
+    
+    ;; Better approach: Pass dependencies explicitly
+    (defun process-user-data (database-connection current-user configuration)
+      (let ((user-data (fetch-data database-connection current-user)))
+        (process-data user-data configuration)))
+    
+    ;; Or use lexical closures to create objects with state
+    (defun make-user-processor (database-connection configuration)
+      (lambda (user)
+        (let ((user-data (fetch-data database-connection user)))
+          (process-data user-data configuration))))
+    ```
+    Avoid excessive use of global variables (special variables in Common Lisp, denoted with asterisks). While they can be useful for truly global state, overusing them creates hidden dependencies, makes testing difficult, and can lead to unexpected behavior. Instead, pass dependencies explicitly through function parameters or use lexical closures.
+  </Accordion>
+  
+  <Accordion title="Improper Error Handling" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Ignoring errors or using too many handlers
+    (defun process-file (filename)
+      (ignore-errors
+        (with-open-file (stream filename)
+          (process-stream stream))))
+    
+    ;; Better approach: Handle specific conditions
+    (defun process-file (filename)
+      (handler-case
+          (with-open-file (stream filename)
+            (process-stream stream))
+        (file-error (e)
+          (format t "File error: ~A~%" e)
+          nil)
+        (error (e)
+          (format t "Unexpected error: ~A~%" e)
+          nil)))
+    
+    ;; Even better: Use restarts for recovery strategies
+    (defun process-file (filename)
+      (restart-case
+          (with-open-file (stream filename)
+            (process-stream stream))
+        (use-default ()
+          :report "Use default values instead."
+          (process-default-data))
+        (retry (new-filename)
+          :report "Try a different file."
+          :interactive (lambda ()
+                         (format t "Enter new filename: ")
+                         (list (read-line)))
+          (process-file new-filename))))
+    ```
+    Don't ignore errors with `ignore-errors` unless you have a good reason. Instead, use `handler-case` to catch specific conditions and handle them appropriately. For more complex error recovery, use Common Lisp's powerful condition system with `restart-case` to provide multiple recovery strategies.
+  </Accordion>
+  
+  <Accordion title="Reinventing Built-in Functions" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Reinventing built-in functions
+    (defun my-length (list)
+      (if (null list)
+          0
+          (1+ (my-length (cdr list)))))
+    
+    (defun my-reverse (list)
+      (let ((result nil))
+        (dolist (item list result)
+          (setf result (cons item result)))))
+    
+    ;; Better approach: Use built-in functions
+    ;; Just use length and reverse
+    
+    ;; If you need a custom version, document why
+    (defun my-specialized-reverse (list)
+      "Like reverse, but also applies a transformation to each element."
+      (let ((result nil))
+        (dolist (item list result)
+          (setf result (cons (transform-item item) result)))))
+    ```
+    Avoid reinventing functions that are already part of the language or standard libraries. Lisp has a rich set of built-in functions for list processing, sequence operations, and more. Using them makes your code more readable and often more efficient.
+  </Accordion>
+  
+  <Accordion title="Excessive Recursion Without Tail Calls" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Recursion without tail calls
+    (defun factorial (n)
+      (if (<= n 1)
+          1
+          (* n (factorial (- n 1)))))
+    
+    ;; Better approach: Use tail recursion
+    (defun factorial (n)
+      (labels ((fact-iter (n acc)
+                 (if (<= n 1)
+                     acc
+                     (fact-iter (- n 1) (* n acc)))))
+        (fact-iter n 1)))
+    
+    ;; Or use iteration
+    (defun factorial (n)
+      (let ((result 1))
+        (dotimes (i n result)
+          (setf result (* result (+ i 1))))))
+    ```
+    Be cautious with recursive functions that aren't tail-recursive, as they can lead to stack overflow with large inputs. Use tail recursion (where the recursive call is the last operation) or iteration for operations that might involve large numbers of steps.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of EVAL" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Excessive use of eval
+    (defun execute-operation (operation-name a b)
+      (eval `(,operation-name ,a ,b)))
+    
+    ;; Usage
+    (execute-operation '+ 2 3)  ; Returns 5
+    
+    ;; Better approach: Use funcall or apply
+    (defun execute-operation (operation a b)
+      (funcall operation a b))
+    
+    ;; Usage
+    (execute-operation #'+ 2 3)  ; Returns 5
+    
+    ;; Or with apply for variable arguments
+    (defun execute-operation (operation &rest args)
+      (apply operation args))
+    
+    ;; Usage
+    (execute-operation #'+ 2 3 4 5)  ; Returns 14
+    ```
+    Avoid using `eval` for runtime code execution. `eval` is powerful but dangerous, as it can execute arbitrary code and makes your program harder to analyze and optimize. Instead, use `funcall` or `apply` to call functions dynamically.
+  </Accordion>
+  
+  <Accordion title="Not Using CLOS Effectively" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Not using CLOS effectively
+    (defun make-person (name age)
+      (list name age))
+    
+    (defun person-name (person)
+      (first person))
+    
+    (defun person-age (person)
+      (second person))
+    
+    (defun birthday (person)
+      (list (person-name person) (1+ (person-age person))))
+    
+    ;; Better approach: Use CLOS
+    (defclass person ()
+      ((name :initarg :name :accessor name)
+       (age :initarg :age :accessor age)))
+    
+    (defmethod birthday ((p person))
+      (incf (age p)))
+    
+    ;; Usage
+    (defvar john (make-instance 'person :name "John" :age 30))
+    (birthday john)
+    (format t "~A is now ~D years old.~%" (name john) (age john))
+    ```
+    Make effective use of the Common Lisp Object System (CLOS) for object-oriented programming. CLOS provides powerful features like multiple inheritance, multiple dispatch, and method combinations that can make your code more modular and expressive.
+  </Accordion>
+  
+  <Accordion title="Improper Use of Macros" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Using macros when functions would suffice
+    (defmacro add-numbers (a b)
+      `(+ ,a ,b))
+    
+    ;; Anti-pattern: Macros with unintended variable capture
+    (defmacro with-doubled-value (var &body body)
+      `(let ((temp (* ,var 2)))
+         (setf ,var temp)
+         ,@body))
+    
+    ;; Better approach: Use functions when possible
+    (defun add-numbers (a b)
+      (+ a b))
+    
+    ;; Better macro: Avoid variable capture with gensyms
+    (defmacro with-doubled-value (var &body body)
+      (let ((temp-var (gensym "TEMP")))
+        `(let ((,temp-var (* ,var 2)))
+           (setf ,var ,temp-var)
+           ,@body)))
+    ```
+    Use macros judiciously. While Lisp's macro system is powerful, overusing macros can make code harder to understand and debug. Use functions when they suffice, and only use macros when you need to control evaluation or create new syntax. When writing macros, be careful to avoid variable capture by using `gensym` or `with-gensyms`.
+  </Accordion>
+  
+  <Accordion title="Not Using Loop Abstraction" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Low-level iteration
+    (defun sum-list (list)
+      (let ((sum 0))
+        (dolist (item list sum)
+          (setf sum (+ sum item)))))
+    
+    (defun find-max (list)
+      (let ((max (first list)))
+        (dolist (item (rest list) max)
+          (when (> item max)
+            (setf max item)))))
+    
+    ;; Better approach: Use higher-level abstractions
+    (defun sum-list (list)
+      (reduce #'+ list :initial-value 0))
+    
+    (defun find-max (list)
+      (reduce #'max list))
+    
+    ;; Or use the loop macro for more complex iterations
+    (defun process-data (data)
+      (loop for item in data
+            when (valid-p item)
+            collect (transform item) into results
+            and sum (item-value item) into total
+            finally (return (values results total))))
+    ```
+    Use higher-level loop abstractions like `map`, `reduce`, `remove-if`, or the `loop` macro instead of writing low-level iteration code. These abstractions make your code more declarative and often more concise.
+  </Accordion>
+  
+  <Accordion title="Excessive Side Effects" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Excessive side effects
+    (defun process-data (data)
+      (setf *last-processed* data)
+      (setf *result* nil)
+      (dolist (item data)
+        (when (valid-p item)
+          (process-item item)
+          (push item *result*)))
+      (setf *result* (nreverse *result*)))
+    
+    ;; Better approach: Minimize side effects
+    (defun process-data (data)
+      (let ((result nil))
+        (dolist (item data)
+          (when (valid-p item)
+            (push (process-item item) result)))
+        (nreverse result)))
+    ```
+    Minimize side effects in your functions. Functions with side effects are harder to test, reason about, and compose. Try to write pure functions that take inputs and return outputs without modifying global state.
+  </Accordion>
+  
+  <Accordion title="Not Using Packages Properly" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Everything in one package
+    (defpackage :my-app
+      (:use :cl)
+      (:export :main))
+    
+    (in-package :my-app)
+    
+    ;; Hundreds of functions and variables all in one package
+    
+    ;; Better approach: Organize code into packages
+    (defpackage :my-app.core
+      (:use :cl)
+      (:export :initialize :shutdown))
+    
+    (defpackage :my-app.database
+      (:use :cl :my-app.core)
+      (:export :connect :disconnect :query))
+    
+    (defpackage :my-app.ui
+      (:use :cl :my-app.core)
+      (:export :render :handle-event))
+    
+    (defpackage :my-app
+      (:use :cl :my-app.core :my-app.database :my-app.ui)
+      (:export :main))
+    ```
+    Organize your code into packages based on functionality. This improves maintainability, reduces naming conflicts, and allows for better encapsulation of implementation details.
+  </Accordion>
+  
+  <Accordion title="Improper List Manipulation" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Inefficient list manipulation
+    (defun add-to-end (list item)
+      (append list (list item)))
+    
+    (defun get-last-item (list)
+      (car (reverse list)))
+    
+    ;; Better approach: Use appropriate data structures
+    (defun add-to-end (list item)
+      (nconc list (list item)))  ; If list can be modified
+    
+    (defun get-last-item (list)
+      (car (last list)))
+    
+    ;; Or consider using vectors for random access
+    (defun make-item-store (size)
+      (make-array size :adjustable t :fill-pointer 0))
+    
+    (defun add-item (store item)
+      (vector-push-extend item store))
+    
+    (defun get-item (store index)
+      (aref store index))
+    ```
+    Use appropriate data structures and operations for your needs. Lists in Lisp are efficient for operations at the beginning (cons, car, cdr) but inefficient for random access or operations at the end. Consider using vectors, hash tables, or other data structures when appropriate.
+  </Accordion>
+  
+  <Accordion title="Not Using Format Properly" icon="warning">
+    ```lisp
+    ;; Anti-pattern: String concatenation for output
+    (defun print-user-info (user)
+      (let ((name (user-name user))
+            (age (user-age user))
+            (email (user-email user)))
+        (princ "User: ")
+        (princ name)
+        (princ ", Age: ")
+        (princ age)
+        (princ ", Email: ")
+        (princ email)
+        (terpri)))
+    
+    ;; Better approach: Use format
+    (defun print-user-info (user)
+      (format t "User: ~A, Age: ~D, Email: ~A~%"
+              (user-name user)
+              (user-age user)
+              (user-email user)))
+    ```
+    Use the `format` function for formatted output instead of concatenating strings or using multiple print statements. `format` provides a powerful mini-language for controlling output formatting.
+  </Accordion>
+  
+  <Accordion title="Not Using Loop Invariants" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Recomputing invariant values in loops
+    (defun process-items (items factor)
+      (let ((result nil))
+        (dolist (item items)
+          (let ((threshold (* factor (length items))))
+            (when (> item threshold)
+              (push item result))))
+        (nreverse result)))
+    
+    ;; Better approach: Compute invariants outside the loop
+    (defun process-items (items factor)
+      (let ((result nil)
+            (threshold (* factor (length items))))
+        (dolist (item items)
+          (when (> item threshold)
+            (push item result)))
+        (nreverse result)))
+    ```
+    Identify and compute loop invariants (values that don't change during the loop) outside the loop. This avoids unnecessary recomputation and makes your code more efficient.
+  </Accordion>
+  
+  <Accordion title="Not Using Destructuring" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Manual extraction of values
+    (defun process-point (point)
+      (let ((x (first point))
+            (y (second point))
+            (z (third point)))
+        (sqrt (+ (* x x) (* y y) (* z z)))))
+    
+    ;; Better approach: Use destructuring
+    (defun process-point (point)
+      (destructuring-bind (x y z) point
+        (sqrt (+ (* x x) (* y y) (* z z)))))
+    
+    ;; Works with complex structures too
+    (defun process-data (data)
+      (destructuring-bind ((name age) &key address ((:phone home-phone)) &allow-other-keys) data
+        (format t "Name: ~A, Age: ~D, Address: ~A, Phone: ~A~%"
+                name age address home-phone)))
+    ```
+    Use destructuring to extract values from complex data structures. Lisp provides powerful destructuring capabilities through `destructuring-bind`, `multiple-value-bind`, and pattern matching in macros like `loop` and `iterate`.
+  </Accordion>
+  
+  <Accordion title="Not Using Documentation Strings" icon="warning">
+    ```lisp
+    ;; Anti-pattern: No documentation
+    (defun calculate-score (player-stats opponent-stats)
+      (let ((attack (player-attack player-stats))
+            (defense (opponent-defense opponent-stats)))
+        (* attack (/ 100 (+ 100 defense)))))
+    
+    ;; Better approach: Include documentation strings
+    (defun calculate-score (player-stats opponent-stats)
+      "Calculate the effective score of an attack based on player and opponent stats.
+    PLAYER-STATS: A player statistics object with at least an ATTACK value.
+    OPPONENT-STATS: An opponent statistics object with at least a DEFENSE value.
+    Returns a number representing the effective damage."
+      (let ((attack (player-attack player-stats))
+            (defense (opponent-defense opponent-stats)))
+        (* attack (/ 100 (+ 100 defense)))))
+    ```
+    Include documentation strings for your functions, classes, and packages. Documentation strings provide valuable information to users of your code and can be accessed programmatically through functions like `documentation`.
+  </Accordion>
+  
+  <Accordion title="Not Writing Tests" icon="warning">
+    ```lisp
+    ;; Anti-pattern: No tests
+    
+    ;; Better approach: Write tests
+    (defpackage :my-app.tests
+      (:use :cl :my-app :fiveam))
+    
+    (in-package :my-app.tests)
+    
+    (def-suite my-app-tests
+      :description "Tests for my-app")
+    
+    (in-suite my-app-tests)
+    
+    (test factorial-test
+      "Test the factorial function"
+      (is (= 1 (factorial 0)))
+      (is (= 1 (factorial 1)))
+      (is (= 2 (factorial 2)))
+      (is (= 6 (factorial 3)))
+      (is (= 24 (factorial 4)))
+      (is (= 120 (factorial 5))))
+    
+    (test fibonacci-test
+      "Test the fibonacci function"
+      (is (= 0 (fibonacci 0)))
+      (is (= 1 (fibonacci 1)))
+      (is (= 1 (fibonacci 2)))
+      (is (= 2 (fibonacci 3)))
+      (is (= 3 (fibonacci 4)))
+      (is (= 5 (fibonacci 5))))
+    
+    (run! 'my-app-tests)
+    ```
+    Write tests for your Lisp code. Testing helps ensure your code works correctly and continues to work as you make changes. Use testing frameworks like FiveAM, Prove, or RT to structure and run your tests.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Naming Conventions" icon="warning">
+    ```lisp
+    ;; Anti-pattern: Inconsistent naming
+    (defun calc_score (p o)
+      (let ((atk (get-attack p))
+            (def (getDefense o)))
+        (* atk (/ 100 (+ 100 def)))))
+    
+    ;; Better approach: Follow Lisp naming conventions
+    (defun calculate-score (player opponent)
+      (let ((attack (player-attack player))
+            (defense (opponent-defense opponent)))
+        (* attack (/ 100 (+ 100 defense)))))
+    
+    ;; Use *earmuffs* for special variables
+    (defvar *default-attack-value* 10)
+    
+    ;; Use +plus-signs+ for constants
+    (defconstant +max-level+ 100)
+    ```
+    Follow Lisp naming conventions. Use kebab-case (words separated by hyphens) for function and variable names. Use `*earmuffs*` for special variables and `+plus-signs+` for constants. Consistent naming makes your code more readable and idiomatic.
+  </Accordion>
+</AccordionGroup>

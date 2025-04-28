@@ -1,0 +1,522 @@
+---
+title: 'Ruby'
+description: 'Ruby is a dynamic, open source programming language with a focus on simplicity and productivity. It has an elegant syntax that is natural to read and easy to write.'
+---
+
+<AccordionGroup>
+  <Accordion title="Ruby Anti-Patterns Overview" icon="ruby">
+    Ruby, despite its elegant design and focus on developer happiness, still has common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing Ruby code.
+  </Accordion>
+  
+  <Accordion title="Using eval Unnecessarily" icon="warning">
+    ```ruby
+    # Anti-pattern: Using eval
+    def calculate(formula)
+      eval(formula) # Security risk!
+    end
+    
+    # Usage
+    calculate("2 + 2") # Returns 4
+    calculate("system('rm -rf /')") # Disaster!
+    
+    # Better approach: Use safer alternatives
+    require 'dentaku'
+    
+    def calculate(formula)
+      calculator = Dentaku::Calculator.new
+      calculator.evaluate(formula)
+    end
+    ```
+    Using `eval` can lead to serious security vulnerabilities. Use safer alternatives like parsing libraries or DSLs.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Block Syntax" icon="warning">
+    ```ruby
+    # Anti-pattern: Not using blocks
+    file = File.open('file.txt', 'r')
+    content = file.read
+    file.close # What if an exception occurs before this line?
+    
+    # Better approach: Use blocks
+    content = File.open('file.txt', 'r') do |file|
+      file.read
+    end # File is automatically closed
+    ```
+    Ruby's block syntax ensures resources are properly cleaned up, even if exceptions occur.
+  </Accordion>
+  
+  <Accordion title="Using class variables (@@)" icon="warning">
+    ```ruby
+    # Anti-pattern: Using class variables
+    class User
+      @@count = 0
+      
+      def initialize
+        @@count += 1
+      end
+      
+      def self.count
+        @@count
+      end
+    end
+    
+    class Admin < User
+      # Inherits and modifies the same @@count variable
+    end
+    
+    # Better approach: Use class instance variables
+    class User
+      def initialize
+        self.class.count += 1
+      end
+      
+      def self.count
+        @count ||= 0
+      end
+      
+      def self.count=(value)
+        @count = value
+      end
+    end
+    ```
+    Class variables (`@@var`) are shared across the entire class hierarchy, which can lead to unexpected behavior. Use class instance variables (`@var` in class methods) instead.
+  </Accordion>
+  
+  <Accordion title="Monkey Patching Core Classes" icon="warning">
+    ```ruby
+    # Anti-pattern: Monkey patching core classes
+    class String
+      def to_boolean
+        self == 'true'
+      end
+    end
+    
+    # Better approach: Use refinements (Ruby 2.0+)
+    module StringExtensions
+      refine String do
+        def to_boolean
+          self == 'true'
+        end
+      end
+    end
+    
+    # Usage
+    using StringExtensions
+    
+    # Or create utility methods
+    module StringUtils
+      def self.to_boolean(str)
+        str == 'true'
+      end
+    end
+    ```
+    Monkey patching core classes can lead to conflicts with other libraries and unexpected behavior. Use refinements or utility modules instead.
+  </Accordion>
+  
+  <Accordion title="Using method_missing Without respond_to_missing?" icon="warning">
+    ```ruby
+    # Anti-pattern: method_missing without respond_to_missing?
+    class DynamicFinder
+      def method_missing(method_name, *args)
+        if method_name.to_s.start_with?('find_by_')
+          # Handle dynamic finder
+        else
+          super
+        end
+      end
+    end
+    
+    # Better approach: Implement respond_to_missing?
+    class DynamicFinder
+      def method_missing(method_name, *args)
+        if method_name.to_s.start_with?('find_by_')
+          # Handle dynamic finder
+        else
+          super
+        end
+      end
+      
+      def respond_to_missing?(method_name, include_private = false)
+        method_name.to_s.start_with?('find_by_') || super
+      end
+    end
+    ```
+    When using `method_missing`, always implement `respond_to_missing?` to ensure methods like `respond_to?` and `method` work correctly.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Enumerable Methods" icon="warning">
+    ```ruby
+    # Anti-pattern: Manual iteration
+    def find_adults(people)
+      adults = []
+      people.each do |person|
+        adults << person if person.age >= 18
+      end
+      adults
+    end
+    
+    # Better approach: Use Enumerable methods
+    def find_adults(people)
+      people.select { |person| person.age >= 18 }
+    end
+    
+    # More examples
+    people.map { |person| person.name } # Get all names
+    people.any? { |person| person.age < 18 } # Check if any minors
+    people.all? { |person| person.age >= 18 } # Check if all adults
+    people.reduce(0) { |sum, person| sum + person.age } # Sum ages
+    ```
+    Ruby's Enumerable module provides powerful methods for working with collections. Use them instead of manual iteration.
+  </Accordion>
+  
+  <Accordion title="Using Global Variables" icon="warning">
+    ```ruby
+    # Anti-pattern: Using global variables
+    $db_connection = Database.connect
+    
+    def fetch_user(id)
+      $db_connection.query("SELECT * FROM users WHERE id = #{id}")
+    end
+    
+    # Better approach: Dependency injection
+    class UserRepository
+      def initialize(db_connection)
+        @db_connection = db_connection
+      end
+      
+      def fetch_user(id)
+        @db_connection.query("SELECT * FROM users WHERE id = #{id}")
+      end
+    end
+    ```
+    Global variables make code hard to test and reason about. Use dependency injection or configuration objects instead.
+  </Accordion>
+  
+  <Accordion title="String Interpolation vs. Concatenation" icon="warning">
+    ```ruby
+    # Anti-pattern: String concatenation
+    def greeting(name)
+      "Hello, " + name + "! Welcome to " + SITE_NAME + "."
+    end
+    
+    # Better approach: String interpolation
+    def greeting(name)
+      "Hello, #{name}! Welcome to #{SITE_NAME}."
+    end
+    ```
+    String interpolation is more readable and often more efficient than string concatenation.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Keyword Arguments" icon="warning">
+    ```ruby
+    # Anti-pattern: Options hash
+    def create_user(name, email, options = {})
+      age = options[:age] || 18
+      admin = options[:admin] || false
+      # Create user
+    end
+    
+    # Usage
+    create_user("John", "john@example.com", { age: 25, admin: true })
+    
+    # Better approach: Keyword arguments
+    def create_user(name, email, age: 18, admin: false)
+      # Create user
+    end
+    
+    # Usage
+    create_user("John", "john@example.com", age: 25, admin: true)
+    ```
+    Keyword arguments are more explicit and provide better error messages than options hashes.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Exception Hierarchy" icon="warning">
+    ```ruby
+    # Anti-pattern: Raising generic exceptions
+    def process_data(data)
+      raise "Invalid data" if data.nil?
+      # Process data
+    end
+    
+    # Better approach: Use specific exceptions
+    class InvalidDataError < StandardError; end
+    
+    def process_data(data)
+      raise InvalidDataError, "Data cannot be nil" if data.nil?
+      # Process data
+    rescue JSON::ParserError => e
+      raise InvalidDataError, "Could not parse JSON: #{e.message}"
+    end
+    ```
+    Create a proper exception hierarchy and use specific exception types for better error handling.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Destructuring Assignment" icon="warning">
+    ```ruby
+    # Anti-pattern: Manual assignment
+    def process_coordinates(coords)
+      x = coords[0]
+      y = coords[1]
+      z = coords[2]
+      # Process coordinates
+    end
+    
+    # Better approach: Destructuring assignment
+    def process_coordinates(coords)
+      x, y, z = coords
+      # Process coordinates
+    end
+    
+    # Works with methods returning multiple values
+    def get_dimensions
+      [width, height, depth]
+    end
+    
+    width, height, depth = get_dimensions
+    ```
+    Use destructuring assignment to extract values from arrays and other enumerable objects.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Case Expressions" icon="warning">
+    ```ruby
+    # Anti-pattern: Nested if/elsif
+    def describe_status(status)
+      if status == :pending
+        "Pending approval"
+      elsif status == :approved
+        "Approved"
+      elsif status == :rejected
+        "Rejected"
+      else
+        "Unknown status"
+      end
+    end
+    
+    # Better approach: Case expression
+    def describe_status(status)
+      case status
+      when :pending then "Pending approval"
+      when :approved then "Approved"
+      when :rejected then "Rejected"
+      else "Unknown status"
+      end
+    end
+    ```
+    Use case expressions for cleaner, more readable code when comparing a value against multiple options.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Safe Navigation Operator" icon="warning">
+    ```ruby
+    # Anti-pattern: Nested nil checks
+    def get_city(user)
+      if user && user.address && user.address.city
+        user.address.city.name
+      else
+        "Unknown"
+      end
+    end
+    
+    # Better approach: Safe navigation operator (Ruby 2.3+)
+    def get_city(user)
+      user&.address&.city&.name || "Unknown"
+    end
+    ```
+    Use the safe navigation operator (`&.`) to simplify nil checks in method chains.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Freeze" icon="warning">
+    ```ruby
+    # Anti-pattern: Mutable constants
+    ALLOWED_ROLES = ['admin', 'editor', 'viewer']
+    
+    # Later in the code
+    ALLOWED_ROLES << 'guest' # Modifies the constant!
+    
+    # Better approach: Freeze constants
+    ALLOWED_ROLES = ['admin', 'editor', 'viewer'].freeze
+    
+    # Even better: Freeze nested objects too
+    ALLOWED_ROLES = ['admin'.freeze, 'editor'.freeze, 'viewer'.freeze].freeze
+    ```
+    Use `freeze` to prevent accidental modification of constants and other objects that should be immutable.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Splat Operators" icon="warning">
+    ```ruby
+    # Anti-pattern: Manual array handling
+    def sum(numbers)
+      total = 0
+      numbers.each { |n| total += n }
+      total
+    end
+    
+    # Usage
+    sum([1, 2, 3, 4, 5])
+    
+    # Better approach: Splat operator
+    def sum(*numbers)
+      numbers.sum
+    end
+    
+    # Usage
+    sum(1, 2, 3, 4, 5)
+    
+    # Double splat for keyword arguments
+    def configure(base_url:, **options)
+      # Use base_url and options
+    end
+    
+    # Usage
+    configure(base_url: "https://example.com", timeout: 30, retries: 3)
+    ```
+    Use splat operators (`*` and `**`) for more flexible method arguments.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Symbol to Proc" icon="warning">
+    ```ruby
+    # Anti-pattern: Verbose blocks
+    names = people.map { |person| person.name }
+    valid_users = users.select { |user| user.valid? }
+    
+    # Better approach: Symbol to proc
+    names = people.map(&:name)
+    valid_users = users.select(&:valid?)
+    ```
+    Use the symbol to proc shorthand (`&:method_name`) for cleaner code when calling a single method in a block.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Tap Method" icon="warning">
+    ```ruby
+    # Anti-pattern: Temporary variables
+    def create_user(attributes)
+      user = User.new
+      user.name = attributes[:name]
+      user.email = attributes[:email]
+      user.save
+      user
+    end
+    
+    # Better approach: Use tap
+    def create_user(attributes)
+      User.new.tap do |user|
+        user.name = attributes[:name]
+        user.email = attributes[:email]
+        user.save
+      end
+    end
+    ```
+    Use `tap` to perform operations on an object and return the object itself, avoiding temporary variables.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Modules for Composition" icon="warning">
+    ```ruby
+    # Anti-pattern: Deep inheritance
+    class Vehicle; end
+    class LandVehicle < Vehicle; end
+    class Car < LandVehicle; end
+    class SportsCar < Car; end
+    
+    # Better approach: Composition with modules
+    module Engine
+      def start_engine
+        # Start engine
+      end
+    end
+    
+    module Drivable
+      def drive
+        # Drive logic
+      end
+    end
+    
+    class Car
+      include Engine
+      include Drivable
+      
+      # Car-specific methods
+    end
+    
+    class Boat
+      include Engine
+      
+      # Boat-specific methods
+    end
+    ```
+    Prefer composition over inheritance by using modules to share behavior across classes.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Struct" icon="warning">
+    ```ruby
+    # Anti-pattern: Manual value objects
+    class Point
+      attr_reader :x, :y
+      
+      def initialize(x, y)
+        @x = x
+        @y = y
+      end
+      
+      def ==(other)
+        x == other.x && y == other.y
+      end
+    end
+    
+    # Better approach: Use Struct
+    Point = Struct.new(:x, :y) do
+      def distance_from_origin
+        Math.sqrt(x**2 + y**2)
+      end
+    end
+    ```
+    Use `Struct` for simple value objects to reduce boilerplate code.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Enumerator" icon="warning">
+    ```ruby
+    # Anti-pattern: Eager evaluation
+    def process_large_file(file_path)
+      lines = File.readlines(file_path) # Reads entire file into memory
+      lines.each do |line|
+        process_line(line)
+      end
+    end
+    
+    # Better approach: Lazy evaluation with Enumerator
+    def process_large_file(file_path)
+      File.open(file_path) do |file|
+        file.each_line do |line|
+          process_line(line)
+        end
+      end
+    end
+    
+    # Or using lazy enumerator
+    def find_first_match(file_path, pattern)
+      File.open(file_path).lazy.each_line
+        .map(&:chomp)
+        .find { |line| line.match?(pattern) }
+    end
+    ```
+    Use enumerators and lazy evaluation for more memory-efficient processing of large collections.
+  </Accordion>
+  
+  <Accordion title="Not Using Ruby's Memoization" icon="warning">
+    ```ruby
+    # Anti-pattern: Repeated expensive calculations
+    def fibonacci(n)
+      return n if n <= 1
+      fibonacci(n - 1) + fibonacci(n - 2)
+    end
+    
+    # Better approach: Memoization
+    def fibonacci(n)
+      @fibonacci ||= {}
+      @fibonacci[n] ||= begin
+        return n if n <= 1
+        fibonacci(n - 1) + fibonacci(n - 2)
+      end
+    end
+    ```
+    Use memoization to cache the results of expensive calculations.
+  </Accordion>
+</AccordionGroup>

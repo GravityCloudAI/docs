@@ -1,0 +1,570 @@
+---
+title: 'T-SQL'
+description: 'Transact-SQL (T-SQL) is Microsoft\'s proprietary extension to SQL that is used with Microsoft SQL Server and Azure SQL Database. T-SQL adds procedural programming, local variables, and various support functions to standard SQL.'
+---
+
+<AccordionGroup>
+  <Accordion title="T-SQL Anti-Patterns Overview" icon="tsql">
+    Transact-SQL (T-SQL), despite being a powerful extension to SQL for Microsoft SQL Server, has several common anti-patterns that can lead to performance issues, security vulnerabilities, and maintainability problems. Here are the most important anti-patterns to avoid when writing T-SQL code.
+  </Accordion>
+  
+  <Accordion title="Using SELECT *" icon="warning">
+    ```sql
+    -- Anti-pattern: Using SELECT *
+    SELECT * FROM Customers
+    JOIN Orders ON Customers.CustomerID = Orders.CustomerID;
+    
+    -- Better approach: Specify only needed columns
+    SELECT 
+        c.CustomerID,
+        c.CompanyName,
+        c.ContactName,
+        o.OrderID,
+        o.OrderDate,
+        o.TotalAmount
+    FROM Customers c
+    JOIN Orders o ON c.CustomerID = o.CustomerID;
+    ```
+    Avoid using `SELECT *` in production code. Instead, explicitly list the columns you need. This improves performance by reducing I/O and network traffic, prevents issues when table schemas change, and makes your code more maintainable by clearly showing which columns are being used.
+  </Accordion>
+  
+  <Accordion title="Not Using Parameterized Queries" icon="warning">
+    ```sql
+    -- Anti-pattern: String concatenation for dynamic SQL
+    -- (Pseudocode mixing application code and SQL)
+    DECLARE @sql NVARCHAR(1000);
+    DECLARE @username NVARCHAR(50) = 'user_input';
+    DECLARE @password NVARCHAR(50) = 'password_input';
+    
+    SET @sql = 'SELECT * FROM Users WHERE Username = ''' + @username + ''' AND Password = ''' + @password + '''';
+    EXEC(@sql);
+    
+    -- Better approach: Use parameterized queries
+    DECLARE @username NVARCHAR(50) = 'user_input';
+    DECLARE @password NVARCHAR(50) = 'password_input';
+    
+    -- Option 1: Use sp_executesql with parameters
+    DECLARE @sql NVARCHAR(1000);
+    SET @sql = 'SELECT * FROM Users WHERE Username = @Username AND Password = @Password';
+    EXEC sp_executesql @sql, N'@Username NVARCHAR(50), @Password NVARCHAR(50)', @Username = @username, @Password = @password;
+    
+    -- Option 2: Use a stored procedure
+    CREATE PROCEDURE dbo.AuthenticateUser
+        @Username NVARCHAR(50),
+        @Password NVARCHAR(50)
+    AS
+    BEGIN
+        SELECT * FROM Users WHERE Username = @Username AND Password = @Password;
+    END;
+    
+    EXEC dbo.AuthenticateUser @Username = @username, @Password = @password;
+    ```
+    Always use parameterized queries instead of concatenating strings to build SQL queries. This prevents SQL injection attacks and improves performance through query plan caching.
+  </Accordion>
+  
+  <Accordion title="Using NOLOCK Hint Inappropriately" icon="warning">
+    ```sql
+    -- Anti-pattern: Using NOLOCK hint indiscriminately
+    SELECT * FROM Orders WITH (NOLOCK)
+    JOIN OrderDetails WITH (NOLOCK) ON Orders.OrderID = OrderDetails.OrderID
+    WHERE Orders.CustomerID = 123;
+    
+    -- Better approach: Use appropriate isolation levels
+    -- Option 1: Set isolation level for the entire transaction
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    SELECT * FROM Orders
+    JOIN OrderDetails ON Orders.OrderID = OrderDetails.OrderID
+    WHERE Orders.CustomerID = 123;
+    
+    -- Option 2: Use snapshot isolation if available
+    -- First, enable it at the database level
+    ALTER DATABASE YourDatabase SET ALLOW_SNAPSHOT_ISOLATION ON;
+    
+    -- Then use it in your transaction
+    SET TRANSACTION ISOLATION LEVEL SNAPSHOT;
+    SELECT * FROM Orders
+    JOIN OrderDetails ON Orders.OrderID = OrderDetails.OrderID
+    WHERE Orders.CustomerID = 123;
+    ```
+    Avoid using the NOLOCK hint (or its equivalent, READUNCOMMITTED) indiscriminately. It can lead to dirty reads, non-repeatable reads, phantom reads, and even missing or duplicate rows due to reading data that is being modified. Use appropriate isolation levels based on your specific requirements.
+  </Accordion>
+  
+  <Accordion title="Using Cursors Instead of Set-Based Operations" icon="warning">
+    ```sql
+    -- Anti-pattern: Using cursors for row-by-row processing
+    DECLARE @CustomerID INT;
+    DECLARE @TotalSpent DECIMAL(10, 2);
+    
+    DECLARE customer_cursor CURSOR FOR
+    SELECT CustomerID FROM Customers;
+    
+    OPEN customer_cursor;
+    FETCH NEXT FROM customer_cursor INTO @CustomerID;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SELECT @TotalSpent = SUM(TotalAmount)
+        FROM Orders
+        WHERE CustomerID = @CustomerID;
+        
+        UPDATE Customers
+        SET TotalSpent = @TotalSpent
+        WHERE CustomerID = @CustomerID;
+        
+        FETCH NEXT FROM customer_cursor INTO @CustomerID;
+    END
+    
+    CLOSE customer_cursor;
+    DEALLOCATE customer_cursor;
+    
+    -- Better approach: Use set-based operations
+    UPDATE c
+    SET c.TotalSpent = o.TotalSpent
+    FROM Customers c
+    JOIN (
+        SELECT CustomerID, SUM(TotalAmount) AS TotalSpent
+        FROM Orders
+        GROUP BY CustomerID
+    ) o ON c.CustomerID = o.CustomerID;
+    ```
+    Avoid using cursors for row-by-row processing when set-based operations can accomplish the same task. Set-based operations are typically much faster and more efficient in SQL Server.
+  </Accordion>
+  
+  <Accordion title="Using Table Variables When Temporary Tables Would Be Better" icon="warning">
+    ```sql
+    -- Anti-pattern: Using table variables for large result sets
+    DECLARE @LargeResults TABLE (
+        ID INT,
+        Name NVARCHAR(100),
+        Value DECIMAL(10, 2)
+    );
+    
+    INSERT INTO @LargeResults
+    SELECT ID, Name, Value FROM SomeLargeTable;
+    
+    -- Join with the table variable
+    SELECT lr.*, o.OrderDate
+    FROM @LargeResults lr
+    JOIN Orders o ON lr.ID = o.CustomerID;
+    
+    -- Better approach: Use temporary tables for large result sets
+    CREATE TABLE #LargeResults (
+        ID INT,
+        Name NVARCHAR(100),
+        Value DECIMAL(10, 2)
+    );
+    
+    CREATE INDEX IX_LargeResults_ID ON #LargeResults(ID);
+    
+    INSERT INTO #LargeResults
+    SELECT ID, Name, Value FROM SomeLargeTable;
+    
+    -- Join with the temporary table
+    SELECT lr.*, o.OrderDate
+    FROM #LargeResults lr
+    JOIN Orders o ON lr.ID = o.CustomerID;
+    
+    -- Clean up
+    DROP TABLE #LargeResults;
+    ```
+    Use temporary tables (#temp) instead of table variables (@table) for large result sets or when you need indexes. Table variables store statistics only when they're created and don't support indexes (prior to SQL Server 2014), which can lead to poor query plans for large datasets.
+  </Accordion>
+  
+  <Accordion title="Using Dynamic SQL Unnecessarily" icon="warning">
+    ```sql
+    -- Anti-pattern: Using dynamic SQL unnecessarily
+    DECLARE @sql NVARCHAR(1000);
+    SET @sql = 'SELECT COUNT(*) FROM Employees WHERE DepartmentID = 10';
+    EXEC(@sql);
+    
+    -- Better approach: Use static SQL when possible
+    SELECT COUNT(*) FROM Employees WHERE DepartmentID = 10;
+    
+    -- When dynamic SQL is necessary, use sp_executesql with parameters
+    DECLARE @DeptID INT = 10;
+    DECLARE @sql NVARCHAR(1000);
+    SET @sql = 'SELECT COUNT(*) FROM Employees WHERE DepartmentID = @DeptID';
+    EXEC sp_executesql @sql, N'@DeptID INT', @DeptID = @DeptID;
+    ```
+    Avoid using dynamic SQL when static SQL would suffice. Dynamic SQL prevents the query optimizer from caching execution plans, can introduce security vulnerabilities if not properly parameterized, and makes code harder to read and maintain.
+  </Accordion>
+  
+  <Accordion title="Not Using SET-based UPDATE and DELETE" icon="warning">
+    ```sql
+    -- Anti-pattern: Using subqueries in WHERE clause for updates
+    UPDATE Orders
+    SET Status = 'Shipped'
+    WHERE OrderID IN (
+        SELECT OrderID FROM OrderDetails
+        WHERE ProductID = 123 AND Quantity > 10
+    );
+    
+    -- Better approach: Use JOIN in UPDATE
+    UPDATE o
+    SET o.Status = 'Shipped'
+    FROM Orders o
+    JOIN OrderDetails od ON o.OrderID = od.OrderID
+    WHERE od.ProductID = 123 AND od.Quantity > 10;
+    
+    -- Anti-pattern: Using subqueries in WHERE clause for deletes
+    DELETE FROM Orders
+    WHERE CustomerID IN (
+        SELECT CustomerID FROM Customers
+        WHERE Country = 'USA'
+    );
+    
+    -- Better approach: Use JOIN in DELETE
+    DELETE o
+    FROM Orders o
+    JOIN Customers c ON o.CustomerID = c.CustomerID
+    WHERE c.Country = 'USA';
+    ```
+    Use SET-based UPDATE and DELETE operations with JOIN syntax instead of subqueries in the WHERE clause. This is often more efficient and readable, especially for complex conditions.
+  </Accordion>
+  
+  <Accordion title="Using Functions in WHERE Clauses" icon="warning">
+    ```sql
+    -- Anti-pattern: Using functions on columns in WHERE clause
+    SELECT * FROM Employees
+    WHERE YEAR(HireDate) = 2020;
+    
+    -- Better approach: Rewrite to avoid functions on indexed columns
+    SELECT * FROM Employees
+    WHERE HireDate >= '2020-01-01' AND HireDate < '2021-01-01';
+    
+    -- Anti-pattern: Using scalar UDFs in WHERE clauses
+    CREATE FUNCTION dbo.GetFullName(@FirstName NVARCHAR(50), @LastName NVARCHAR(50))
+    RETURNS NVARCHAR(101)
+    AS
+    BEGIN
+        RETURN @FirstName + ' ' + @LastName;
+    END;
+    
+    SELECT * FROM Employees
+    WHERE dbo.GetFullName(FirstName, LastName) = 'John Doe';
+    
+    -- Better approach: Inline the function logic
+    SELECT * FROM Employees
+    WHERE FirstName + ' ' + LastName = 'John Doe';
+    ```
+    Avoid using functions on columns in WHERE clauses, especially on indexed columns. This prevents the query optimizer from using indexes effectively. Rewrite your queries to apply conditions directly to the columns.
+  </Accordion>
+  
+  <Accordion title="Not Using Schema Names" icon="warning">
+    ```sql
+    -- Anti-pattern: Not using schema names
+    SELECT * FROM Customers;
+    
+    -- Better approach: Always use schema names
+    SELECT * FROM dbo.Customers;
+    
+    -- When creating objects, always specify the schema
+    CREATE TABLE dbo.NewTable (
+        ID INT PRIMARY KEY,
+        Name NVARCHAR(100)
+    );
+    ```
+    Always use schema names when referencing database objects. This improves query plan caching, prevents ambiguity if multiple schemas have objects with the same name, and makes your code more maintainable.
+  </Accordion>
+  
+  <Accordion title="Using GUID as Clustered Index Key" icon="warning">
+    ```sql
+    -- Anti-pattern: Using GUID as clustered index key
+    CREATE TABLE dbo.Orders (
+        OrderID UNIQUEIDENTIFIER DEFAULT NEWID() PRIMARY KEY,
+        CustomerID INT,
+        OrderDate DATETIME,
+        -- Other columns
+    );
+    
+    -- Better approach: Use an identity or sequential GUID
+    -- Option 1: Use an identity column
+    CREATE TABLE dbo.Orders (
+        OrderID INT IDENTITY(1,1) PRIMARY KEY,
+        CustomerID INT,
+        OrderDate DATETIME,
+        -- Other columns
+    );
+    
+    -- Option 2: If you need GUIDs, use them as non-clustered index
+    CREATE TABLE dbo.Orders (
+        OrderID INT IDENTITY(1,1) PRIMARY KEY,
+        OrderGUID UNIQUEIDENTIFIER DEFAULT NEWID() UNIQUE,
+        CustomerID INT,
+        OrderDate DATETIME,
+        -- Other columns
+    );
+    
+    -- Option 3: Use NEWSEQUENTIALID() if you must have GUID as primary key
+    CREATE TABLE dbo.Orders (
+        OrderID UNIQUEIDENTIFIER DEFAULT NEWSEQUENTIALID() PRIMARY KEY,
+        CustomerID INT,
+        OrderDate DATETIME,
+        -- Other columns
+    );
+    ```
+    Avoid using randomly generated GUIDs (NEWID()) as clustered index keys. They cause index fragmentation and poor performance due to random inserts. Use identity columns, sequential GUIDs (NEWSEQUENTIALID()), or make the GUID a non-clustered index.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Data Types" icon="warning">
+    ```sql
+    -- Anti-pattern: Using inappropriate data types
+    CREATE TABLE dbo.Products (
+        ProductID VARCHAR(50),  -- Using VARCHAR for a numeric ID
+        Price VARCHAR(10),      -- Using VARCHAR for a numeric price
+        CreatedAt VARCHAR(20)   -- Using VARCHAR for a date/time
+    );
+    
+    -- Better approach: Use appropriate data types
+    CREATE TABLE dbo.Products (
+        ProductID INT PRIMARY KEY,
+        Price DECIMAL(10, 2),
+        CreatedAt DATETIME2
+    );
+    ```
+    Use appropriate data types for your columns. Using the wrong data type can lead to unexpected behavior, poor performance, and increased storage requirements. For example, use numeric types for numbers, date/time types for dates, and VARCHAR only for variable-length strings.
+  </Accordion>
+  
+  <Accordion title="Using DISTINCT Unnecessarily" icon="warning">
+    ```sql
+    -- Anti-pattern: Using DISTINCT to hide join problems
+    SELECT DISTINCT c.CustomerID, c.CompanyName
+    FROM Customers c
+    JOIN Orders o ON c.CustomerID = o.CustomerID;
+    
+    -- Better approach: Fix the join to avoid duplicates
+    SELECT c.CustomerID, c.CompanyName
+    FROM Customers c
+    JOIN (
+        SELECT DISTINCT CustomerID FROM Orders
+    ) o ON c.CustomerID = o.CustomerID;
+    
+    -- Or even better, if you just want customers who have orders:
+    SELECT c.CustomerID, c.CompanyName
+    FROM Customers c
+    WHERE EXISTS (
+        SELECT 1 FROM Orders WHERE CustomerID = c.CustomerID
+    );
+    ```
+    Avoid using DISTINCT as a quick fix for duplicate rows. It can hide join problems and hurt performance. Instead, fix the underlying issue by using the correct join type or restructuring your query.
+  </Accordion>
+  
+  <Accordion title="Not Using Common Table Expressions (CTEs)" icon="warning">
+    ```sql
+    -- Anti-pattern: Repeating complex subqueries
+    SELECT
+        c.CustomerID,
+        c.CompanyName,
+        (
+            SELECT COUNT(*) FROM Orders
+            WHERE CustomerID = c.CustomerID
+        ) AS OrderCount,
+        (
+            SELECT SUM(TotalAmount) FROM Orders
+            WHERE CustomerID = c.CustomerID
+        ) AS TotalSpent
+    FROM Customers c;
+    
+    -- Better approach: Use Common Table Expressions (CTEs)
+    WITH CustomerOrders AS (
+        SELECT
+            CustomerID,
+            COUNT(*) AS OrderCount,
+            SUM(TotalAmount) AS TotalSpent
+        FROM Orders
+        GROUP BY CustomerID
+    )
+    SELECT
+        c.CustomerID,
+        c.CompanyName,
+        co.OrderCount,
+        co.TotalSpent
+    FROM Customers c
+    LEFT JOIN CustomerOrders co ON c.CustomerID = co.CustomerID;
+    ```
+    Use Common Table Expressions (CTEs) to simplify complex queries, improve readability, and avoid repeating subqueries. CTEs can also be recursive, which is useful for hierarchical data.
+  </Accordion>
+  
+  <Accordion title="Using COUNT(*) to Check Existence" icon="warning">
+    ```sql
+    -- Anti-pattern: Using COUNT(*) to check existence
+    IF (SELECT COUNT(*) FROM Orders WHERE CustomerID = 123) > 0
+        PRINT 'Customer has orders'
+    ELSE
+        PRINT 'Customer has no orders'
+    
+    -- Better approach: Use EXISTS
+    IF EXISTS (SELECT 1 FROM Orders WHERE CustomerID = 123)
+        PRINT 'Customer has orders'
+    ELSE
+        PRINT 'Customer has no orders'
+    ```
+    Use EXISTS instead of COUNT(*) to check if records exist. EXISTS is more efficient because it stops scanning as soon as it finds a matching record, while COUNT(*) needs to scan all matching records.
+  </Accordion>
+  
+  <Accordion title="Using Inefficient Paging Methods" icon="warning">
+    ```sql
+    -- Anti-pattern: Inefficient paging with large offsets
+    SELECT * FROM Products
+    ORDER BY ProductID
+    OFFSET 10000 ROWS FETCH NEXT 10 ROWS ONLY;
+    
+    -- Better approach: Use keyset pagination
+    -- Assuming the last ProductID from the previous page was 10000
+    SELECT TOP 10 * FROM Products
+    WHERE ProductID > 10000
+    ORDER BY ProductID;
+    ```
+    Avoid using OFFSET/FETCH or ROW_NUMBER() for pagination with large offset values. These methods require the database to scan and discard all rows up to the offset, which becomes increasingly inefficient as the offset grows. Use keyset pagination instead, which uses a filter on the last seen value.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Constraints" icon="warning">
+    ```sql
+    -- Anti-pattern: Not using appropriate constraints
+    CREATE TABLE dbo.Orders (
+        OrderID INT,
+        CustomerID INT,
+        OrderDate DATETIME,
+        TotalAmount DECIMAL(10, 2)
+    );
+    
+    -- Better approach: Use appropriate constraints
+    CREATE TABLE dbo.Orders (
+        OrderID INT PRIMARY KEY,
+        CustomerID INT NOT NULL,
+        OrderDate DATETIME NOT NULL,
+        TotalAmount DECIMAL(10, 2) NOT NULL CHECK (TotalAmount >= 0),
+        FOREIGN KEY (CustomerID) REFERENCES dbo.Customers(CustomerID)
+    );
+    ```
+    Use appropriate constraints (PRIMARY KEY, FOREIGN KEY, NOT NULL, UNIQUE, CHECK) to enforce data integrity at the database level. This prevents invalid data from being inserted and makes your database more reliable.
+  </Accordion>
+  
+  <Accordion title="Using Implicit Conversions" icon="warning">
+    ```sql
+    -- Anti-pattern: Implicit conversions
+    SELECT * FROM Orders WHERE OrderID = '1000';
+    -- OrderID is an INT, but we're comparing it to a string
+    
+    -- Better approach: Use explicit conversions or correct types
+    SELECT * FROM Orders WHERE OrderID = 1000;
+    -- Or if you need to convert
+    SELECT * FROM Orders WHERE OrderID = CAST('1000' AS INT);
+    ```
+    Avoid implicit conversions between different data types. They can prevent the optimizer from using indexes and lead to unexpected results. Use the correct data type in your queries or explicit conversions when necessary.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Indexing Strategy" icon="warning">
+    ```sql
+    -- Anti-pattern: No indexing strategy
+    CREATE TABLE dbo.OrderDetails (
+        OrderID INT,
+        ProductID INT,
+        Quantity INT,
+        UnitPrice DECIMAL(10, 2)
+    );
+    
+    -- Queries that would benefit from indexes
+    SELECT * FROM OrderDetails WHERE OrderID = 1000;
+    SELECT * FROM OrderDetails WHERE ProductID = 50;
+    
+    -- Better approach: Create appropriate indexes
+    CREATE TABLE dbo.OrderDetails (
+        OrderID INT,
+        ProductID INT,
+        Quantity INT,
+        UnitPrice DECIMAL(10, 2),
+        PRIMARY KEY (OrderID, ProductID)
+    );
+    
+    -- Additional index for queries filtering by ProductID
+    CREATE INDEX IX_OrderDetails_ProductID ON dbo.OrderDetails(ProductID);
+    
+    -- For range queries on UnitPrice
+    CREATE INDEX IX_OrderDetails_UnitPrice ON dbo.OrderDetails(UnitPrice);
+    ```
+    Develop an appropriate indexing strategy based on your query patterns. Create indexes on columns used in WHERE clauses, JOIN conditions, and ORDER BY statements. Consider covering indexes for frequently used queries.
+  </Accordion>
+  
+  <Accordion title="Using MERGE Without Caution" icon="warning">
+    ```sql
+    -- Anti-pattern: Using MERGE without handling potential issues
+    MERGE INTO TargetTable AS target
+    USING SourceTable AS source
+    ON target.ID = source.ID
+    WHEN MATCHED THEN
+        UPDATE SET target.Value = source.Value
+    WHEN NOT MATCHED THEN
+        INSERT (ID, Value) VALUES (source.ID, source.Value);
+    
+    -- Better approach: Use MERGE with caution
+    MERGE INTO TargetTable AS target
+    USING SourceTable AS source
+    ON target.ID = source.ID
+    WHEN MATCHED AND target.Value <> source.Value THEN
+        UPDATE SET target.Value = source.Value
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT (ID, Value) VALUES (source.ID, source.Value)
+    WHEN NOT MATCHED BY SOURCE THEN
+        DELETE;
+    ```
+    Use the MERGE statement with caution. It has known issues in some versions of SQL Server and can lead to unexpected results if not carefully implemented. Always include explicit conditions for WHEN MATCHED clauses and consider using separate INSERT, UPDATE, and DELETE statements for complex operations.
+  </Accordion>
+  
+  <Accordion title="Not Using SET NOCOUNT ON in Stored Procedures" icon="warning">
+    ```sql
+    -- Anti-pattern: Not using SET NOCOUNT ON
+    CREATE PROCEDURE dbo.UpdateCustomer
+        @CustomerID INT,
+        @CompanyName NVARCHAR(100)
+    AS
+    BEGIN
+        UPDATE Customers
+        SET CompanyName = @CompanyName
+        WHERE CustomerID = @CustomerID;
+        
+        -- SQL Server sends a row count message
+    END;
+    
+    -- Better approach: Use SET NOCOUNT ON
+    CREATE PROCEDURE dbo.UpdateCustomer
+        @CustomerID INT,
+        @CompanyName NVARCHAR(100)
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        
+        UPDATE Customers
+        SET CompanyName = @CompanyName
+        WHERE CustomerID = @CustomerID;
+        
+        -- No row count message is sent
+    END;
+    ```
+    Use SET NOCOUNT ON in stored procedures and triggers to prevent sending row count messages to the client after each statement. This reduces network traffic and can improve performance, especially for procedures with multiple statements.
+  </Accordion>
+  
+  <Accordion title="Using LIKE with Leading Wildcards" icon="warning">
+    ```sql
+    -- Anti-pattern: Using LIKE with leading wildcards
+    SELECT * FROM Customers
+    WHERE CompanyName LIKE '%Computer%';
+    
+    -- Better approach: Consider full-text search
+    -- First, set up a full-text catalog and index
+    CREATE FULLTEXT CATALOG ftCatalog AS DEFAULT;
+    
+    CREATE FULLTEXT INDEX ON Customers(CompanyName)
+    KEY INDEX PK_Customers ON ftCatalog;
+    
+    -- Then use CONTAINS or FREETEXT
+    SELECT * FROM Customers
+    WHERE CONTAINS(CompanyName, 'Computer');
+    
+    -- Or for more flexible matching
+    SELECT * FROM Customers
+    WHERE FREETEXT(CompanyName, 'Computer');
+    ```
+    Avoid using LIKE with leading wildcards ('%text') in queries on large tables. This forces a full table scan and can't use indexes effectively. Consider using full-text search features for better performance with text searching.
+  </Accordion>
+</AccordionGroup>

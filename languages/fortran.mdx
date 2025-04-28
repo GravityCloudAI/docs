@@ -1,0 +1,709 @@
+---
+title: 'Fortran'
+description: 'Fortran is a general-purpose, compiled imperative programming language that is especially suited to numeric computation and scientific computing. It was originally developed by IBM in the 1950s for scientific and engineering applications.'
+---
+
+<AccordionGroup>
+  <Accordion title="Fortran Anti-Patterns Overview" icon="fortran">
+    Fortran, despite being one of the oldest programming languages still in active use, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing Fortran code.
+  </Accordion>
+  
+  <Accordion title="Using GOTO Statements" icon="warning">
+    ```fortran
+    ! Anti-pattern: Using GOTO statements
+    PROGRAM calculate
+      IMPLICIT NONE
+      INTEGER :: i
+      REAL :: sum = 0.0
+      
+      i = 1
+    10 IF (i <= 100) THEN
+         sum = sum + i
+         i = i + 1
+         GOTO 10
+      END IF
+      
+      PRINT *, "Sum:", sum
+    END PROGRAM calculate
+    
+    ! Better approach: Use structured control flow
+    PROGRAM calculate
+      IMPLICIT NONE
+      INTEGER :: i
+      REAL :: sum = 0.0
+      
+      DO i = 1, 100
+        sum = sum + i
+      END DO
+      
+      PRINT *, "Sum:", sum
+    END PROGRAM calculate
+    ```
+    Avoid using `GOTO` statements, which make code difficult to understand and maintain. Use structured control flow constructs like `DO` loops, `IF-THEN-ELSE`, and `SELECT CASE` instead.
+  </Accordion>
+  
+  <Accordion title="Not Using IMPLICIT NONE" icon="warning">
+    ```fortran
+    ! Anti-pattern: Not using IMPLICIT NONE
+    PROGRAM calculate
+      ! Variables i and sum are implicitly typed based on first letter
+      i = 1
+      sum = 0.0
+      
+      DO i = 1, 100
+        sum = sum + i
+      END DO
+      
+      PRINT *, "Sum:", sum
+    END PROGRAM calculate
+    
+    ! Better approach: Use IMPLICIT NONE
+    PROGRAM calculate
+      IMPLICIT NONE
+      INTEGER :: i
+      REAL :: sum = 0.0
+      
+      DO i = 1, 100
+        sum = sum + i
+      END DO
+      
+      PRINT *, "Sum:", sum
+    END PROGRAM calculate
+    ```
+    Always use `IMPLICIT NONE` to disable implicit typing. This helps catch typos and undeclared variables at compile time, making your code more robust.
+  </Accordion>
+  
+  <Accordion title="Using COMMON Blocks" icon="warning">
+    ```fortran
+    ! Anti-pattern: Using COMMON blocks
+    PROGRAM main
+      IMPLICIT NONE
+      COMMON /data/ x, y, z
+      REAL :: x, y, z
+      
+      x = 1.0
+      y = 2.0
+      z = 3.0
+      
+      CALL process_data()
+    END PROGRAM main
+    
+    SUBROUTINE process_data()
+      IMPLICIT NONE
+      COMMON /data/ x, y, z
+      REAL :: x, y, z
+      
+      PRINT *, "Data:", x, y, z
+    END SUBROUTINE process_data
+    
+    ! Better approach: Use modules
+    MODULE data_module
+      IMPLICIT NONE
+      REAL :: x, y, z
+    END MODULE data_module
+    
+    PROGRAM main
+      USE data_module
+      IMPLICIT NONE
+      
+      x = 1.0
+      y = 2.0
+      z = 3.0
+      
+      CALL process_data()
+    END PROGRAM main
+    
+    SUBROUTINE process_data()
+      USE data_module
+      IMPLICIT NONE
+      
+      PRINT *, "Data:", x, y, z
+    END SUBROUTINE process_data
+    ```
+    Avoid using `COMMON` blocks for sharing data between program units. Use modules instead, which provide better type checking, encapsulation, and maintainability.
+  </Accordion>
+  
+  <Accordion title="Using Fixed-Form Source" icon="warning">
+    ```fortran
+    ! Anti-pattern: Using fixed-form source format
+    C This is a comment in fixed-form Fortran
+          PROGRAM main
+          IMPLICIT NONE
+          INTEGER i, j
+          REAL*8 result
+    C Initialize variables
+          i = 10
+          j = 20
+          result = DBLE(i) + DBLE(j)
+          PRINT *, result
+          END PROGRAM main
+    
+    ! Better approach: Use free-form source format
+    ! This is a comment in free-form Fortran
+    PROGRAM main
+      IMPLICIT NONE
+      INTEGER :: i, j
+      REAL(KIND=8) :: result
+      
+      ! Initialize variables
+      i = 10
+      j = 20
+      result = REAL(i, KIND=8) + REAL(j, KIND=8)
+      PRINT *, result
+    END PROGRAM main
+    ```
+    Use free-form source format (introduced in Fortran 90) instead of the older fixed-form format. Free-form is more readable, flexible, and doesn't have column restrictions.
+  </Accordion>
+  
+  <Accordion title="Using Obsolete Features" icon="warning">
+    ```fortran
+    ! Anti-pattern: Using obsolete features
+    PROGRAM old_style
+      IMPLICIT NONE
+      INTEGER :: i
+      REAL :: arr(10)
+      
+      DO 10 i = 1, 10
+        arr(i) = i * 2.0
+    10 CONTINUE
+      
+      PRINT *, arr
+    END PROGRAM old_style
+    
+    ! Better approach: Use modern constructs
+    PROGRAM modern_style
+      IMPLICIT NONE
+      INTEGER :: i
+      REAL :: arr(10)
+      
+      DO i = 1, 10
+        arr(i) = i * 2.0
+      END DO
+      
+      PRINT *, arr
+    END PROGRAM modern_style
+    ```
+    Avoid using obsolete features like labeled DO loops, arithmetic IF statements, and computed GOTO. Use modern control structures that are more readable and maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Modules for Data Encapsulation" icon="warning">
+    ```fortran
+    ! Anti-pattern: Global variables without encapsulation
+    PROGRAM main
+      IMPLICIT NONE
+      REAL :: global_data(100)
+      
+      CALL initialize_data(global_data)
+      CALL process_data(global_data)
+      CALL output_results(global_data)
+    END PROGRAM main
+    
+    ! Better approach: Use modules for encapsulation
+    MODULE data_handling
+      IMPLICIT NONE
+      PRIVATE  ! All entities are private by default
+      PUBLIC :: initialize_data, process_data, output_results
+      
+      REAL, PRIVATE :: global_data(100)
+      
+      CONTAINS
+        SUBROUTINE initialize_data()
+          ! Implementation
+        END SUBROUTINE initialize_data
+        
+        SUBROUTINE process_data()
+          ! Implementation
+        END SUBROUTINE process_data
+        
+        SUBROUTINE output_results()
+          ! Implementation
+        END SUBROUTINE output_results
+    END MODULE data_handling
+    
+    PROGRAM main
+      USE data_handling
+      IMPLICIT NONE
+      
+      CALL initialize_data()
+      CALL process_data()
+      CALL output_results()
+    END PROGRAM main
+    ```
+    Use modules to encapsulate data and related procedures. This improves code organization, maintainability, and helps prevent unintended modifications to data.
+  </Accordion>
+  
+  <Accordion title="Using EQUIVALENCE Statement" icon="warning">
+    ```fortran
+    ! Anti-pattern: Using EQUIVALENCE
+    PROGRAM memory_sharing
+      IMPLICIT NONE
+      INTEGER :: int_array(10)
+      REAL :: real_array(10)
+      
+      EQUIVALENCE (int_array, real_array)
+      
+      int_array = 42
+      PRINT *, real_array  ! Undefined behavior
+    END PROGRAM memory_sharing
+    
+    ! Better approach: Use explicit type conversion
+    PROGRAM type_conversion
+      IMPLICIT NONE
+      INTEGER :: int_array(10)
+      REAL :: real_array(10)
+      INTEGER :: i
+      
+      int_array = 42
+      
+      DO i = 1, 10
+        real_array(i) = REAL(int_array(i))
+      END DO
+      
+      PRINT *, real_array
+    END PROGRAM type_conversion
+    ```
+    Avoid using the `EQUIVALENCE` statement, which can lead to undefined behavior and makes code hard to understand and maintain. Use explicit type conversions or derived types instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Array Operations" icon="warning">
+    ```fortran
+    ! Anti-pattern: Element-by-element operations in loops
+    PROGRAM array_ops
+      IMPLICIT NONE
+      INTEGER :: i
+      REAL :: a(100), b(100), c(100)
+      
+      ! Initialize arrays
+      DO i = 1, 100
+        a(i) = i * 1.0
+        b(i) = i * 2.0
+      END DO
+      
+      ! Element-by-element addition
+      DO i = 1, 100
+        c(i) = a(i) + b(i)
+      END DO
+      
+      PRINT *, SUM(c)
+    END PROGRAM array_ops
+    
+    ! Better approach: Use array operations
+    PROGRAM array_ops
+      IMPLICIT NONE
+      REAL :: a(100), b(100), c(100)
+      
+      ! Initialize arrays
+      a = [(i * 1.0, i = 1, 100)]
+      b = [(i * 2.0, i = 1, 100)]
+      
+      ! Array addition
+      c = a + b
+      
+      PRINT *, SUM(c)
+    END PROGRAM array_ops
+    ```
+    Use Fortran's array operations instead of explicit loops for element-by-element operations. Array operations are more concise, often more efficient, and can be automatically parallelized by the compiler.
+  </Accordion>
+  
+  <Accordion title="Not Using Allocatable Arrays" icon="warning">
+    ```fortran
+    ! Anti-pattern: Using fixed-size arrays
+    SUBROUTINE process_data(n, data)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: n
+      REAL, INTENT(INOUT) :: data(1000)  ! Fixed size, wasteful if n << 1000
+      
+      ! Process only the first n elements
+      data(1:n) = data(1:n) * 2.0
+    END SUBROUTINE process_data
+    
+    ! Better approach: Use allocatable arrays
+    SUBROUTINE process_data(n, data)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: n
+      REAL, ALLOCATABLE, INTENT(INOUT) :: data(:)
+      
+      ! Allocate only what's needed
+      IF (.NOT. ALLOCATED(data)) THEN
+        ALLOCATE(data(n))
+      ELSE IF (SIZE(data) /= n) THEN
+        DEALLOCATE(data)
+        ALLOCATE(data(n))
+      END IF
+      
+      ! Process all elements
+      data = data * 2.0
+    END SUBROUTINE process_data
+    ```
+    Use allocatable arrays instead of fixed-size arrays when the size is not known at compile time. This avoids wasting memory and potential buffer overflows.
+  </Accordion>
+  
+  <Accordion title="Not Using INTENT Attributes" icon="warning">
+    ```fortran
+    ! Anti-pattern: Not using INTENT attributes
+    SUBROUTINE calculate(a, b, result)
+      IMPLICIT NONE
+      REAL :: a, b, result
+      
+      result = a * b
+    END SUBROUTINE calculate
+    
+    ! Better approach: Use INTENT attributes
+    SUBROUTINE calculate(a, b, result)
+      IMPLICIT NONE
+      REAL, INTENT(IN) :: a, b
+      REAL, INTENT(OUT) :: result
+      
+      result = a * b
+    END SUBROUTINE calculate
+    ```
+    Always use `INTENT` attributes (`IN`, `OUT`, `INOUT`) for subroutine and function arguments. This documents how arguments are used, helps prevent bugs, and enables compiler optimizations.
+  </Accordion>
+  
+  <Accordion title="Using ENTRY Statement" icon="warning">
+    ```fortran
+    ! Anti-pattern: Using ENTRY statement
+    SUBROUTINE process_data(data, n)
+      IMPLICIT NONE
+      REAL, INTENT(INOUT) :: data(n)
+      INTEGER, INTENT(IN) :: n
+      INTEGER :: i
+      
+      ! Process data
+      DO i = 1, n
+        data(i) = data(i) * 2.0
+      END DO
+      
+      RETURN
+      
+      ENTRY normalize_data(data, n)
+      ! Normalize data
+      data = data / MAXVAL(data)
+      
+      RETURN
+    END SUBROUTINE process_data
+    
+    ! Better approach: Use separate subroutines
+    SUBROUTINE process_data(data, n)
+      IMPLICIT NONE
+      REAL, INTENT(INOUT) :: data(n)
+      INTEGER, INTENT(IN) :: n
+      INTEGER :: i
+      
+      ! Process data
+      DO i = 1, n
+        data(i) = data(i) * 2.0
+      END DO
+    END SUBROUTINE process_data
+    
+    SUBROUTINE normalize_data(data, n)
+      IMPLICIT NONE
+      REAL, INTENT(INOUT) :: data(n)
+      INTEGER, INTENT(IN) :: n
+      
+      ! Normalize data
+      data = data / MAXVAL(data)
+    END SUBROUTINE normalize_data
+    ```
+    Avoid using the `ENTRY` statement, which creates multiple entry points in a single subroutine or function. This makes code hard to understand and maintain. Use separate subroutines or functions instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```fortran
+    ! Anti-pattern: Poor error handling
+    PROGRAM file_reader
+      IMPLICIT NONE
+      INTEGER :: unit, ios
+      REAL :: data(100)
+      
+      OPEN(UNIT=10, FILE="data.txt", STATUS="OLD")
+      READ(10, *) data
+      CLOSE(10)
+      
+      PRINT *, "Data:", data
+    END PROGRAM file_reader
+    
+    ! Better approach: Proper error handling
+    PROGRAM file_reader
+      IMPLICIT NONE
+      INTEGER :: unit, ios
+      REAL :: data(100)
+      CHARACTER(LEN=100) :: error_msg
+      
+      OPEN(NEWUNIT=unit, FILE="data.txt", STATUS="OLD", IOSTAT=ios, IOMSG=error_msg)
+      IF (ios /= 0) THEN
+        PRINT *, "Error opening file: ", TRIM(error_msg)
+        STOP
+      END IF
+      
+      READ(unit, *, IOSTAT=ios, IOMSG=error_msg) data
+      IF (ios /= 0) THEN
+        PRINT *, "Error reading file: ", TRIM(error_msg)
+        CLOSE(unit)
+        STOP
+      END IF
+      
+      CLOSE(unit)
+      
+      PRINT *, "Data:", data
+    END PROGRAM file_reader
+    ```
+    Use proper error handling for I/O operations and other potential sources of errors. Check status codes (`IOSTAT`) and provide meaningful error messages (`IOMSG`).
+  </Accordion>
+  
+  <Accordion title="Not Using KIND Parameters" icon="warning">
+    ```fortran
+    ! Anti-pattern: Not using KIND parameters
+    PROGRAM precision_issues
+      IMPLICIT NONE
+      REAL :: x = 1.0 / 3.0
+      DOUBLE PRECISION :: y = 1.0D0 / 3.0D0
+      
+      PRINT *, "Single precision:", x
+      PRINT *, "Double precision:", y
+    END PROGRAM precision_issues
+    
+    ! Better approach: Use KIND parameters
+    PROGRAM precision_control
+      IMPLICIT NONE
+      INTEGER, PARAMETER :: sp = SELECTED_REAL_KIND(6, 37)
+      INTEGER, PARAMETER :: dp = SELECTED_REAL_KIND(15, 307)
+      
+      REAL(KIND=sp) :: x = 1.0_sp / 3.0_sp
+      REAL(KIND=dp) :: y = 1.0_dp / 3.0_dp
+      
+      PRINT *, "Single precision:", x
+      PRINT *, "Double precision:", y
+    END PROGRAM precision_control
+    ```
+    Use `KIND` parameters to specify precision requirements in a portable way. This makes your code more maintainable and portable across different platforms.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper File Handling" icon="warning">
+    ```fortran
+    ! Anti-pattern: Using hardcoded unit numbers
+    PROGRAM file_io
+      IMPLICIT NONE
+      REAL :: data(100)
+      
+      OPEN(UNIT=7, FILE="input.dat", STATUS="OLD")
+      READ(7, *) data
+      CLOSE(7)
+      
+      ! Process data...
+      
+      OPEN(UNIT=8, FILE="output.dat", STATUS="REPLACE")
+      WRITE(8, *) data
+      CLOSE(8)
+    END PROGRAM file_io
+    
+    ! Better approach: Use NEWUNIT and proper file handling
+    PROGRAM file_io
+      IMPLICIT NONE
+      INTEGER :: input_unit, output_unit, ios
+      REAL :: data(100)
+      CHARACTER(LEN=100) :: error_msg
+      
+      OPEN(NEWUNIT=input_unit, FILE="input.dat", STATUS="OLD", &
+           IOSTAT=ios, IOMSG=error_msg)
+      IF (ios /= 0) THEN
+        PRINT *, "Error opening input file: ", TRIM(error_msg)
+        STOP
+      END IF
+      
+      READ(input_unit, *, IOSTAT=ios, IOMSG=error_msg) data
+      IF (ios /= 0) THEN
+        PRINT *, "Error reading input file: ", TRIM(error_msg)
+        CLOSE(input_unit)
+        STOP
+      END IF
+      
+      CLOSE(input_unit)
+      
+      ! Process data...
+      
+      OPEN(NEWUNIT=output_unit, FILE="output.dat", STATUS="REPLACE", &
+           IOSTAT=ios, IOMSG=error_msg)
+      IF (ios /= 0) THEN
+        PRINT *, "Error opening output file: ", TRIM(error_msg)
+        STOP
+      END IF
+      
+      WRITE(output_unit, *, IOSTAT=ios, IOMSG=error_msg) data
+      IF (ios /= 0) THEN
+        PRINT *, "Error writing output file: ", TRIM(error_msg)
+        CLOSE(output_unit)
+        STOP
+      END IF
+      
+      CLOSE(output_unit)
+    END PROGRAM file_io
+    ```
+    Use `NEWUNIT` to get a unique unit number instead of hardcoding unit numbers. Also, always check for I/O errors and handle them appropriately.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Initialization" icon="warning">
+    ```fortran
+    ! Anti-pattern: Not initializing variables
+    PROGRAM uninitialized
+      IMPLICIT NONE
+      INTEGER :: i, sum
+      
+      DO i = 1, 10
+        sum = sum + i  ! sum is uninitialized on first use
+      END DO
+      
+      PRINT *, "Sum:", sum
+    END PROGRAM uninitialized
+    
+    ! Better approach: Initialize variables
+    PROGRAM initialized
+      IMPLICIT NONE
+      INTEGER :: i, sum = 0
+      
+      DO i = 1, 10
+        sum = sum + i
+      END DO
+      
+      PRINT *, "Sum:", sum
+    END PROGRAM initialized
+    ```
+    Always initialize variables before using them. Uninitialized variables can contain unpredictable values, leading to bugs that are hard to track down.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Derived Types" icon="warning">
+    ```fortran
+    ! Anti-pattern: Using separate arrays for related data
+    PROGRAM particle_simulation
+      IMPLICIT NONE
+      INTEGER, PARAMETER :: n = 1000
+      REAL :: pos_x(n), pos_y(n), pos_z(n)
+      REAL :: vel_x(n), vel_y(n), vel_z(n)
+      REAL :: mass(n)
+      INTEGER :: i
+      
+      ! Initialize particles
+      DO i = 1, n
+        pos_x(i) = RANDOM_NUMBER()
+        pos_y(i) = RANDOM_NUMBER()
+        pos_z(i) = RANDOM_NUMBER()
+        vel_x(i) = 0.0
+        vel_y(i) = 0.0
+        vel_z(i) = 0.0
+        mass(i) = 1.0
+      END DO
+      
+      ! Simulate particles...
+    END PROGRAM particle_simulation
+    
+    ! Better approach: Use derived types
+    PROGRAM particle_simulation
+      IMPLICIT NONE
+      
+      TYPE :: particle_t
+        REAL :: pos(3)  ! Position (x, y, z)
+        REAL :: vel(3)  ! Velocity (vx, vy, vz)
+        REAL :: mass    ! Mass
+      END TYPE particle_t
+      
+      INTEGER, PARAMETER :: n = 1000
+      TYPE(particle_t) :: particles(n)
+      INTEGER :: i
+      
+      ! Initialize particles
+      DO i = 1, n
+        particles(i)%pos = [RANDOM_NUMBER(), RANDOM_NUMBER(), RANDOM_NUMBER()]
+        particles(i)%vel = [0.0, 0.0, 0.0]
+        particles(i)%mass = 1.0
+      END DO
+      
+      ! Simulate particles...
+    END PROGRAM particle_simulation
+    ```
+    Use derived types to group related data together. This makes code more organized, readable, and maintainable, especially for complex data structures.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```fortran
+    ! Anti-pattern: Poor or no documentation
+    SUBROUTINE calculate_statistics(data, n, mean, stddev)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: n
+      REAL, INTENT(IN) :: data(n)
+      REAL, INTENT(OUT) :: mean, stddev
+      
+      mean = SUM(data) / n
+      stddev = SQRT(SUM((data - mean)**2) / n)
+    END SUBROUTINE calculate_statistics
+    
+    ! Better approach: Proper documentation
+    !> Calculate the mean and standard deviation of a dataset
+    !>
+    !> @param data   Input array of data points
+    !> @param n      Number of data points
+    !> @param mean   Output mean value
+    !> @param stddev Output standard deviation
+    !>
+    !> @note This calculates the population standard deviation,
+    !>       not the sample standard deviation.
+    SUBROUTINE calculate_statistics(data, n, mean, stddev)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: n          !< Number of data points
+      REAL, INTENT(IN) :: data(n)       !< Input data array
+      REAL, INTENT(OUT) :: mean         !< Mean of the data
+      REAL, INTENT(OUT) :: stddev       !< Standard deviation
+      
+      mean = SUM(data) / n
+      stddev = SQRT(SUM((data - mean)**2) / n)
+    END SUBROUTINE calculate_statistics
+    ```
+    Document your code with comments that explain the purpose, parameters, return values, and any important details or assumptions. This makes your code more maintainable and easier for others (including your future self) to understand.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```fortran
+    ! Anti-pattern: No testing or manual testing
+    PROGRAM main
+      IMPLICIT NONE
+      REAL :: result
+      
+      result = calculate_area(3.0, 4.0)
+      PRINT *, "Area:", result
+      ! Manual check: Is it close to 12.0?
+    END PROGRAM main
+    
+    ! Better approach: Automated testing
+    PROGRAM test_calculate_area
+      IMPLICIT NONE
+      REAL :: result, expected
+      REAL, PARAMETER :: tolerance = 1.0E-6
+      
+      ! Test case 1
+      result = calculate_area(3.0, 4.0)
+      expected = 12.0
+      CALL assert_close(result, expected, tolerance, "Rectangle 3x4")
+      
+      ! Test case 2
+      result = calculate_area(0.0, 5.0)
+      expected = 0.0
+      CALL assert_close(result, expected, tolerance, "Rectangle 0x5")
+      
+      PRINT *, "All tests passed!"
+      
+      CONTAINS
+        SUBROUTINE assert_close(actual, expected, tol, message)
+          REAL, INTENT(IN) :: actual, expected, tol
+          CHARACTER(LEN=*), INTENT(IN) :: message
+          
+          IF (ABS(actual - expected) > tol) THEN
+            PRINT *, "Test failed: ", message
+            PRINT *, "  Expected: ", expected
+            PRINT *, "  Actual:   ", actual
+            STOP 1
+          END IF
+        END SUBROUTINE assert_close
+    END PROGRAM test_calculate_area
+    ```
+    Write automated tests for your code to verify that it works correctly. This helps catch bugs early and ensures that your code continues to work as expected when you make changes.
+  </Accordion>
+</AccordionGroup>

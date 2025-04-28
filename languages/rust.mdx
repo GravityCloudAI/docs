@@ -1,0 +1,505 @@
+---
+title: 'Rust'
+description: 'Rust is a systems programming language focused on safety, speed, and concurrency. It enforces memory safety without using garbage collection, making it ideal for performance-critical applications.'
+---
+
+<AccordionGroup>
+  <Accordion title="Rust Anti-Patterns Overview" icon="rust">
+    Rust, despite its focus on safety and correctness, still has common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing Rust code.
+  </Accordion>
+  
+  <Accordion title="Using unwrap() and expect() in Production Code" icon="warning">
+    ```rust
+    // Anti-pattern: Using unwrap() in production code
+    fn get_config() -> Config {
+        let config_str = fs::read_to_string("config.json").unwrap();
+        let config: Config = serde_json::from_str(&config_str).unwrap();
+        config
+    }
+    
+    // Better approach: Proper error handling
+    fn get_config() -> Result<Config, Box<dyn Error>> {
+        let config_str = fs::read_to_string("config.json")?;
+        let config: Config = serde_json::from_str(&config_str)?;
+        Ok(config)
+    }
+    ```
+    Using `unwrap()` or `expect()` can cause your program to panic. Use proper error handling with `?` operator and `Result` types in production code.
+  </Accordion>
+  
+  <Accordion title="Overusing Clones" icon="warning">
+    ```rust
+    // Anti-pattern: Unnecessary clones
+    fn process_data(data: &Vec<String>) -> Vec<String> {
+        let mut result = Vec::new();
+        for item in data {
+            result.push(item.clone()); // Unnecessary clone
+        }
+        result
+    }
+    
+    // Better approach: Use references when possible
+    fn process_data(data: &[String]) -> Vec<String> {
+        data.iter()
+            .map(|item| format!("{} processed", item))
+            .collect()
+    }
+    ```
+    Unnecessary clones can hurt performance. Use references, slices, and ownership semantics to minimize cloning.
+  </Accordion>
+  
+  <Accordion title="Not Using Iterators" icon="warning">
+    ```rust
+    // Anti-pattern: Manual iteration
+    fn sum_even_numbers(numbers: &[i32]) -> i32 {
+        let mut sum = 0;
+        for i in 0..numbers.len() {
+            if numbers[i] % 2 == 0 {
+                sum += numbers[i];
+            }
+        }
+        sum
+    }
+    
+    // Better approach: Use iterators
+    fn sum_even_numbers(numbers: &[i32]) -> i32 {
+        numbers.iter()
+            .filter(|&&n| n % 2 == 0)
+            .sum()
+    }
+    ```
+    Rust's iterators are powerful, expressive, and often more efficient than manual loops. Use them whenever possible.
+  </Accordion>
+  
+  <Accordion title="Using String When &str Would Suffice" icon="warning">
+    ```rust
+    // Anti-pattern: Using String when &str would suffice
+    fn greet(name: String) {
+        println!("Hello, {}!", name);
+    }
+    
+    // Usage requires allocation
+    greet("World".to_string());
+    
+    // Better approach: Use &str for read-only string data
+    fn greet(name: &str) {
+        println!("Hello, {}!", name);
+    }
+    
+    // No allocation needed
+    greet("World");
+    ```
+    Use `&str` for function parameters when you only need to read the string data, not own or modify it.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Types" icon="warning">
+    ```rust
+    // Anti-pattern: Using string errors
+    fn parse_config(config_str: &str) -> Result<Config, String> {
+        if !config_str.contains("version") {
+            return Err("Missing version field".to_string());
+        }
+        // Parse config...
+        Ok(Config { /* ... */ })
+    }
+    
+    // Better approach: Define custom error types
+    #[derive(Debug)]
+    enum ConfigError {
+        MissingField(String),
+        ParseError(serde_json::Error),
+        IoError(std::io::Error),
+    }
+    
+    impl std::error::Error for ConfigError {}
+    
+    impl std::fmt::Display for ConfigError {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            match self {
+                ConfigError::MissingField(field) => write!(f, "Missing field: {}", field),
+                ConfigError::ParseError(e) => write!(f, "Parse error: {}", e),
+                ConfigError::IoError(e) => write!(f, "IO error: {}", e),
+            }
+        }
+    }
+    
+    impl From<serde_json::Error> for ConfigError {
+        fn from(err: serde_json::Error) -> Self {
+            ConfigError::ParseError(err)
+        }
+    }
+    
+    impl From<std::io::Error> for ConfigError {
+        fn from(err: std::io::Error) -> Self {
+            ConfigError::IoError(err)
+        }
+    }
+    
+    fn parse_config(config_str: &str) -> Result<Config, ConfigError> {
+        if !config_str.contains("version") {
+            return Err(ConfigError::MissingField("version".to_string()));
+        }
+        // Parse config...
+        Ok(Config { /* ... */ })
+    }
+    ```
+    Define custom error types that implement the `Error` trait for better error handling and more context.
+  </Accordion>
+  
+  <Accordion title="Premature Optimization" icon="warning">
+    ```rust
+    // Anti-pattern: Premature optimization
+    fn process_data(data: &[u8]) -> Vec<u8> {
+        // Manual optimization without profiling
+        let mut result = Vec::with_capacity(data.len());
+        unsafe {
+            // Unsafe code for performance
+            // ...
+        }
+        result
+    }
+    
+    // Better approach: Write clear code first, then optimize if needed
+    fn process_data(data: &[u8]) -> Vec<u8> {
+        data.iter()
+            .map(|&byte| byte * 2)
+            .collect()
+    }
+    ```
+    Write clear, idiomatic Rust code first, then optimize only after profiling identifies bottlenecks.
+  </Accordion>
+  
+  <Accordion title="Not Using Cargo Features" icon="warning">
+    ```rust
+    // Anti-pattern: Hardcoded configuration
+    fn initialize_logger() {
+        #[cfg(debug_assertions)]
+        let level = log::LevelFilter::Debug;
+        
+        #[cfg(not(debug_assertions))]
+        let level = log::LevelFilter::Info;
+        
+        // Initialize logger...
+    }
+    
+    // Better approach: Use Cargo features
+    // In Cargo.toml:
+    // [features]
+    // verbose-logging = []
+    
+    fn initialize_logger() {
+        #[cfg(feature = "verbose-logging")]
+        let level = log::LevelFilter::Debug;
+        
+        #[cfg(not(feature = "verbose-logging"))]
+        let level = log::LevelFilter::Info;
+        
+        // Initialize logger...
+    }
+    ```
+    Use Cargo features for optional functionality and configuration instead of hardcoding or using environment variables.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Unsafe" icon="warning">
+    ```rust
+    // Anti-pattern: Unnecessary unsafe code
+    fn get_slice(data: &[u8], start: usize, len: usize) -> &[u8] {
+        unsafe {
+            std::slice::from_raw_parts(data.as_ptr().add(start), len)
+        }
+    }
+    
+    // Better approach: Use safe abstractions
+    fn get_slice(data: &[u8], start: usize, len: usize) -> Option<&[u8]> {
+        if start + len <= data.len() {
+            Some(&data[start..start + len])
+        } else {
+            None
+        }
+    }
+    ```
+    Use `unsafe` only when necessary and document why it's needed. Prefer safe abstractions whenever possible.
+  </Accordion>
+  
+  <Accordion title="Not Using Lifetimes Correctly" icon="warning">
+    ```rust
+    // Anti-pattern: Incorrect lifetime annotations
+    struct Parser {
+        data: &str, // Missing lifetime annotation
+    }
+    
+    impl Parser {
+        fn parse(&self) -> &str { // Missing lifetime annotation
+            // Parse and return a substring of data
+            &self.data[0..5]
+        }
+    }
+    
+    // Better approach: Proper lifetime annotations
+    struct Parser<'a> {
+        data: &'a str,
+    }
+    
+    impl<'a> Parser<'a> {
+        fn parse(&self) -> &'a str {
+            // Parse and return a substring of data
+            &self.data[0..5]
+        }
+    }
+    ```
+    Use explicit lifetime annotations to express the relationship between references in your code.
+  </Accordion>
+  
+  <Accordion title="Not Using Rust's Type System" icon="warning">
+    ```rust
+    // Anti-pattern: Not using the type system
+    fn process_user(user_id: u64, is_admin: bool) {
+        if is_admin {
+            // Admin-specific logic
+        } else {
+            // Regular user logic
+        }
+    }
+    
+    // Better approach: Use enums and structs
+    enum User {
+        Admin { id: u64, permissions: Vec<Permission> },
+        Regular { id: u64 },
+    }
+    
+    fn process_user(user: &User) {
+        match user {
+            User::Admin { permissions, .. } => {
+                // Admin-specific logic with permissions
+            },
+            User::Regular { .. } => {
+                // Regular user logic
+            },
+        }
+    }
+    ```
+    Leverage Rust's rich type system with enums, structs, and pattern matching to make invalid states unrepresentable.
+  </Accordion>
+  
+  <Accordion title="Not Using Option and Result" icon="warning">
+    ```rust
+    // Anti-pattern: Using sentinel values
+    fn find_user(users: &[User], name: &str) -> User {
+        for user in users {
+            if user.name == name {
+                return user.clone();
+            }
+        }
+        // Return a "not found" sentinel
+        User { name: "", age: 0 }
+    }
+    
+    // Better approach: Use Option
+    fn find_user(users: &[User], name: &str) -> Option<User> {
+        users.iter()
+            .find(|user| user.name == name)
+            .cloned()
+    }
+    ```
+    Use `Option` for values that might be absent and `Result` for operations that might fail, rather than sentinel values or exceptions.
+  </Accordion>
+  
+  <Accordion title="Ignoring Clippy Warnings" icon="warning">
+    ```rust
+    // Anti-pattern: Ignoring clippy warnings
+    fn calculate_average(numbers: &[f64]) -> f64 {
+        let mut sum = 0.0;
+        for &num in numbers {
+            sum = sum + num; // Clippy warns about using += here
+        }
+        sum / numbers.len() as f64 // Potential division by zero
+    }
+    
+    // Better approach: Address clippy warnings
+    fn calculate_average(numbers: &[f64]) -> Option<f64> {
+        if numbers.is_empty() {
+            return None;
+        }
+        
+        let sum: f64 = numbers.iter().sum();
+        Some(sum / numbers.len() as f64)
+    }
+    ```
+    Run `cargo clippy` regularly and address its warnings. Clippy catches many common mistakes and anti-patterns.
+  </Accordion>
+  
+  <Accordion title="Not Using Rust's Module System" icon="warning">
+    ```rust
+    // Anti-pattern: Everything in one file
+    // main.rs with hundreds or thousands of lines
+    
+    // Better approach: Use modules to organize code
+    // lib.rs
+    pub mod config;
+    pub mod database;
+    pub mod models;
+    pub mod utils;
+    
+    // models/user.rs
+    pub struct User {
+        pub id: u64,
+        pub name: String,
+    }
+    
+    impl User {
+        pub fn new(id: u64, name: String) -> Self {
+            Self { id, name }
+        }
+    }
+    ```
+    Use Rust's module system to organize code into logical units with clear public interfaces.
+  </Accordion>
+  
+  <Accordion title="Not Using Rust's Testing Framework" icon="warning">
+    ```rust
+    // Anti-pattern: Manual testing
+    fn add(a: i32, b: i32) -> i32 {
+        a + b
+    }
+    
+    fn main() {
+        // Manual tests
+        assert_eq!(add(2, 3), 5);
+        assert_eq!(add(-1, 1), 0);
+    }
+    
+    // Better approach: Use Rust's testing framework
+    fn add(a: i32, b: i32) -> i32 {
+        a + b
+    }
+    
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        
+        #[test]
+        fn test_add_positive_numbers() {
+            assert_eq!(add(2, 3), 5);
+        }
+        
+        #[test]
+        fn test_add_negative_numbers() {
+            assert_eq!(add(-1, 1), 0);
+        }
+    }
+    ```
+    Use Rust's built-in testing framework with `#[test]` attributes for unit tests and integration tests.
+  </Accordion>
+  
+  <Accordion title="Not Using Cargo Workspaces" icon="warning">
+    ```rust
+    // Anti-pattern: Monolithic crate
+    // One large crate with everything
+    
+    // Better approach: Use cargo workspaces
+    // Cargo.toml in root directory
+    // [workspace]
+    // members = [
+    //     "core",
+    //     "cli",
+    //     "web",
+    //     "common",
+    // ]
+    ```
+    For larger projects, use Cargo workspaces to split your code into multiple crates with clear dependencies.
+  </Accordion>
+  
+  <Accordion title="Not Using Rust's Concurrency Features Correctly" icon="warning">
+    ```rust
+    // Anti-pattern: Incorrect concurrency
+    fn process_data(data: &mut Vec<i32>) {
+        let mut handles = vec![];
+        
+        for chunk in data.chunks_mut(100) {
+            let handle = std::thread::spawn(move || {
+                for item in chunk {
+                    *item *= 2;
+                }
+            });
+            handles.push(handle);
+        }
+        
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    }
+    
+    // Better approach: Use proper concurrency primitives
+    use rayon::prelude::*;
+    
+    fn process_data(data: &mut [i32]) {
+        data.par_chunks_mut(100)
+            .for_each(|chunk| {
+                for item in chunk {
+                    *item *= 2;
+                }
+            });
+    }
+    ```
+    Use Rust's concurrency features correctly, including channels, mutexes, and thread pools. Consider using the Rayon crate for parallel iterators.
+  </Accordion>
+  
+  <Accordion title="Not Using Cargo.lock Correctly" icon="warning">
+    ```rust
+    // Anti-pattern: Ignoring Cargo.lock
+    // .gitignore
+    # Ignore Cargo.lock for all projects
+    Cargo.lock
+    
+    // Better approach: Version Cargo.lock for binaries
+    // .gitignore
+    # Ignore Cargo.lock for libraries
+    # /path/to/library/Cargo.lock
+    
+    # Don't ignore Cargo.lock for binaries
+    # !/path/to/binary/Cargo.lock
+    ```
+    Version control Cargo.lock for binary projects to ensure reproducible builds, but ignore it for libraries.
+  </Accordion>
+  
+  <Accordion title="Not Using Rust's Documentation Features" icon="warning">
+    ```rust
+    // Anti-pattern: Poor or missing documentation
+    pub struct Config {
+        pub timeout: u64,
+        pub retries: u32,
+    }
+    
+    impl Config {
+        pub fn new(timeout: u64, retries: u32) -> Self {
+            Self { timeout, retries }
+        }
+    }
+    
+    // Better approach: Use documentation comments
+    /// Configuration for network requests.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let config = Config::new(30, 3);
+    /// assert_eq!(config.timeout, 30);
+    /// ```
+    pub struct Config {
+        /// Timeout in seconds for network requests.
+        pub timeout: u64,
+        
+        /// Number of retry attempts before giving up.
+        pub retries: u32,
+    }
+    
+    impl Config {
+        /// Creates a new configuration with the specified timeout and retry count.
+        pub fn new(timeout: u64, retries: u32) -> Self {
+            Self { timeout, retries }
+        }
+    }
+    ```
+    Use Rust's documentation comments (`///`) to document your code, including examples that can be tested with `cargo test --doc`.
+  </Accordion>
+</AccordionGroup>

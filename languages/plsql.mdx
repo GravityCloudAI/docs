@@ -1,0 +1,415 @@
+---
+title: 'PL/SQL'
+description: 'PL/SQL (Procedural Language for SQL) is Oracle\'s procedural extension for SQL and the Oracle relational database. It provides a combination of SQL with procedural features of programming languages.'
+---
+
+<AccordionGroup>
+  <Accordion title="PL/SQL Anti-Patterns Overview" icon="plsql">
+    PL/SQL, despite being a powerful procedural extension to SQL for Oracle databases, has several common anti-patterns that can lead to performance issues, security vulnerabilities, and maintainability problems. Here are the most important anti-patterns to avoid when writing PL/SQL code.
+  </Accordion>
+  
+  <Accordion title="Using SELECT INTO Without Exception Handling" icon="warning">
+    ```sql
+    -- Anti-pattern: No exception handling for SELECT INTO
+    DECLARE
+      v_customer_name VARCHAR2(100);
+    BEGIN
+      SELECT customer_name INTO v_customer_name
+      FROM customers
+      WHERE customer_id = 123;
+      
+      -- If no rows or multiple rows are found, an exception will be raised
+      -- and the rest of the code won't execute
+    END;
+    
+    -- Better approach: Use proper exception handling
+    DECLARE
+      v_customer_name VARCHAR2(100);
+    BEGIN
+      SELECT customer_name INTO v_customer_name
+      FROM customers
+      WHERE customer_id = 123;
+      
+      -- Process the data
+      DBMS_OUTPUT.PUT_LINE('Customer name: ' || v_customer_name);
+      
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('Customer not found');
+      WHEN TOO_MANY_ROWS THEN
+        DBMS_OUTPUT.PUT_LINE('Multiple customers found');
+      WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
+    END;
+    ```
+    Always include exception handling when using SELECT INTO statements. This helps your code handle situations where no rows or multiple rows are found, preventing unhandled exceptions.
+  </Accordion>
+  
+  <Accordion title="Using Dynamic SQL Unnecessarily" icon="warning">
+    ```sql
+    -- Anti-pattern: Using dynamic SQL unnecessarily
+    DECLARE
+      v_sql VARCHAR2(1000);
+      v_count NUMBER;
+    BEGIN
+      v_sql := 'SELECT COUNT(*) FROM employees WHERE department_id = 10';
+      EXECUTE IMMEDIATE v_sql INTO v_count;
+      DBMS_OUTPUT.PUT_LINE('Count: ' || v_count);
+    END;
+    
+    -- Better approach: Use static SQL when possible
+    DECLARE
+      v_count NUMBER;
+    BEGIN
+      SELECT COUNT(*) INTO v_count
+      FROM employees
+      WHERE department_id = 10;
+      DBMS_OUTPUT.PUT_LINE('Count: ' || v_count);
+    END;
+    ```
+    Avoid using dynamic SQL (EXECUTE IMMEDIATE) when static SQL would suffice. Dynamic SQL prevents the database from caching execution plans, can introduce security vulnerabilities if not properly parameterized, and makes code harder to read and maintain.
+  </Accordion>
+  
+  <Accordion title="Not Using Bind Variables" icon="warning">
+    ```sql
+    -- Anti-pattern: String concatenation in dynamic SQL
+    DECLARE
+      v_dept_id NUMBER := 10;
+      v_sql VARCHAR2(1000);
+      v_count NUMBER;
+    BEGIN
+      v_sql := 'SELECT COUNT(*) FROM employees WHERE department_id = ' || v_dept_id;
+      EXECUTE IMMEDIATE v_sql INTO v_count;
+    END;
+    
+    -- Better approach: Use bind variables
+    DECLARE
+      v_dept_id NUMBER := 10;
+      v_count NUMBER;
+    BEGIN
+      EXECUTE IMMEDIATE 'SELECT COUNT(*) FROM employees WHERE department_id = :dept_id'
+        INTO v_count
+        USING v_dept_id;
+    END;
+    ```
+    Always use bind variables (parameter binding) when working with dynamic SQL. This prevents SQL injection attacks, improves performance through plan reuse, and reduces the load on the shared pool.
+  </Accordion>
+  
+  <Accordion title="Using Autonomous Transactions Inappropriately" icon="warning">
+    ```sql
+    -- Anti-pattern: Using autonomous transactions unnecessarily
+    CREATE OR REPLACE PROCEDURE log_action (
+      p_action_type VARCHAR2,
+      p_description VARCHAR2
+    ) AS
+      PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+      INSERT INTO action_log (action_type, description, log_date)
+      VALUES (p_action_type, p_description, SYSDATE);
+      COMMIT;
+    END;
+    
+    -- Better approach: Consider if autonomous transaction is really needed
+    CREATE OR REPLACE PROCEDURE process_order (
+      p_order_id NUMBER
+    ) AS
+    BEGIN
+      -- Process the order
+      UPDATE orders SET status = 'PROCESSED' WHERE order_id = p_order_id;
+      
+      -- Log the action (without autonomous transaction)
+      INSERT INTO action_log (action_type, description, log_date)
+      VALUES ('ORDER_PROCESSED', 'Order ' || p_order_id || ' processed', SYSDATE);
+      
+      -- Single commit for both operations
+      COMMIT;
+    END;
+    ```
+    Use autonomous transactions only when necessary, such as for logging errors that should persist even if the main transaction is rolled back. Overusing autonomous transactions can lead to data inconsistency and make debugging more difficult.
+  </Accordion>
+  
+  <Accordion title="Using ROWID Directly" icon="warning">
+    ```sql
+    -- Anti-pattern: Using ROWID directly
+    DECLARE
+      v_rowid ROWID;
+    BEGIN
+      SELECT ROWID INTO v_rowid
+      FROM employees
+      WHERE employee_id = 100;
+      
+      -- Later in the code or in another session
+      UPDATE employees
+      SET salary = 5000
+      WHERE ROWID = v_rowid;
+    END;
+    
+    -- Better approach: Use primary keys or unique constraints
+    DECLARE
+      v_emp_id NUMBER;
+    BEGIN
+      SELECT employee_id INTO v_emp_id
+      FROM employees
+      WHERE employee_id = 100;
+      
+      -- Later in the code or in another session
+      UPDATE employees
+      SET salary = 5000
+      WHERE employee_id = v_emp_id;
+    END;
+    ```
+    Avoid using ROWID directly in your code. ROWIDs can change due to operations like export/import or table reorganization. Use primary keys or unique constraints instead for reliable row identification.
+  </Accordion>
+  
+  <Accordion title="Using Implicit Cursors for Bulk Operations" icon="warning">
+    ```sql
+    -- Anti-pattern: Row-by-row processing with implicit cursor
+    DECLARE
+      CURSOR c_emp IS
+        SELECT employee_id, salary
+        FROM employees
+        WHERE department_id = 10;
+      v_emp_rec c_emp%ROWTYPE;
+    BEGIN
+      OPEN c_emp;
+      LOOP
+        FETCH c_emp INTO v_emp_rec;
+        EXIT WHEN c_emp%NOTFOUND;
+        
+        UPDATE employee_stats
+        SET total_salary = total_salary + v_emp_rec.salary
+        WHERE dept_id = 10;
+      END LOOP;
+      CLOSE c_emp;
+    END;
+    
+    -- Better approach: Use BULK COLLECT and FORALL
+    DECLARE
+      TYPE emp_id_tab IS TABLE OF employees.employee_id%TYPE;
+      TYPE salary_tab IS TABLE OF employees.salary%TYPE;
+      
+      v_emp_ids emp_id_tab;
+      v_salaries salary_tab;
+    BEGIN
+      SELECT employee_id, salary
+      BULK COLLECT INTO v_emp_ids, v_salaries
+      FROM employees
+      WHERE department_id = 10;
+      
+      FORALL i IN 1..v_emp_ids.COUNT
+        UPDATE employee_stats
+        SET total_salary = total_salary + v_salaries(i)
+        WHERE dept_id = 10;
+    END;
+    ```
+    Use BULK COLLECT and FORALL for bulk operations instead of row-by-row processing with cursors. Bulk operations significantly reduce context switching between SQL and PL/SQL engines, improving performance for operations on multiple rows.
+  </Accordion>
+  
+  <Accordion title="Not Using Package Variables Appropriately" icon="warning">
+    ```sql
+    -- Anti-pattern: Using package variables inappropriately
+    CREATE OR REPLACE PACKAGE global_data AS
+      g_user_id NUMBER;
+      g_department_id NUMBER;
+      
+      PROCEDURE set_context(p_user_id NUMBER, p_dept_id NUMBER);
+    END global_data;
+    
+    CREATE OR REPLACE PACKAGE BODY global_data AS
+      PROCEDURE set_context(p_user_id NUMBER, p_dept_id NUMBER) IS
+      BEGIN
+        g_user_id := p_user_id;
+        g_department_id := p_dept_id;
+      END set_context;
+    END global_data;
+    
+    -- Better approach: Use Oracle's built-in context
+    CREATE OR REPLACE PACKAGE app_context AS
+      PROCEDURE set_context(p_user_id NUMBER, p_dept_id NUMBER);
+      FUNCTION get_user_id RETURN NUMBER;
+      FUNCTION get_department_id RETURN NUMBER;
+    END app_context;
+    
+    CREATE OR REPLACE PACKAGE BODY app_context AS
+      PROCEDURE set_context(p_user_id NUMBER, p_dept_id NUMBER) IS
+      BEGIN
+        DBMS_SESSION.SET_CONTEXT('APP_CTX', 'USER_ID', p_user_id);
+        DBMS_SESSION.SET_CONTEXT('APP_CTX', 'DEPT_ID', p_dept_id);
+      END set_context;
+      
+      FUNCTION get_user_id RETURN NUMBER IS
+      BEGIN
+        RETURN TO_NUMBER(SYS_CONTEXT('APP_CTX', 'USER_ID'));
+      END get_user_id;
+      
+      FUNCTION get_department_id RETURN NUMBER IS
+      BEGIN
+        RETURN TO_NUMBER(SYS_CONTEXT('APP_CTX', 'DEPT_ID'));
+      END get_department_id;
+    END app_context;
+    ```
+    Be cautious with package variables. They persist for the duration of a session and can lead to unexpected behavior in multi-user environments. Use Oracle's built-in context (SYS_CONTEXT) for session-specific information, and consider package state carefully.
+  </Accordion>
+  
+  <Accordion title="Using DBMS_OUTPUT for Production Logging" icon="warning">
+    ```sql
+    -- Anti-pattern: Using DBMS_OUTPUT for production logging
+    CREATE OR REPLACE PROCEDURE process_order(p_order_id NUMBER) AS
+    BEGIN
+      DBMS_OUTPUT.PUT_LINE('Processing order ' || p_order_id);
+      
+      -- Process the order
+      
+      DBMS_OUTPUT.PUT_LINE('Order ' || p_order_id || ' processed successfully');
+    EXCEPTION
+      WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error processing order: ' || SQLERRM);
+        RAISE;
+    END;
+    
+    -- Better approach: Use a proper logging mechanism
+    CREATE OR REPLACE PROCEDURE process_order(p_order_id NUMBER) AS
+    BEGIN
+      INSERT INTO application_log (log_level, message, log_date)
+      VALUES ('INFO', 'Processing order ' || p_order_id, SYSDATE);
+      
+      -- Process the order
+      
+      INSERT INTO application_log (log_level, message, log_date)
+      VALUES ('INFO', 'Order ' || p_order_id || ' processed successfully', SYSDATE);
+      COMMIT;
+    EXCEPTION
+      WHEN OTHERS THEN
+        INSERT INTO application_log (log_level, message, log_date)
+        VALUES ('ERROR', 'Error processing order: ' || SQLERRM, SYSDATE);
+        COMMIT; -- Commit the log entry even if the main transaction is rolled back
+        RAISE;
+    END;
+    ```
+    Don't use DBMS_OUTPUT for production logging. It's only visible when explicitly enabled by the client and has limited buffer size. Use a proper logging table or Oracle's built-in logging mechanisms like DBMS_APPLICATION_INFO or DBMS_TRACE.
+  </Accordion>
+  
+  <Accordion title="Not Using Named Notation for Parameters" icon="warning">
+    ```sql
+    -- Anti-pattern: Using positional notation for parameters
+    CREATE OR REPLACE PROCEDURE create_employee(
+      p_first_name VARCHAR2,
+      p_last_name VARCHAR2,
+      p_email VARCHAR2,
+      p_phone VARCHAR2,
+      p_hire_date DATE,
+      p_job_id VARCHAR2,
+      p_salary NUMBER,
+      p_commission_pct NUMBER,
+      p_manager_id NUMBER,
+      p_department_id NUMBER
+    ) AS
+    BEGIN
+      -- Procedure body
+    END;
+    
+    -- Calling with positional notation
+    BEGIN
+      create_employee('John', 'Doe', 'JDOE', '555-1234', SYSDATE, 'IT_PROG', 5000, NULL, 100, 90);
+    END;
+    
+    -- Better approach: Use named notation for parameters
+    BEGIN
+      create_employee(
+        p_first_name => 'John',
+        p_last_name => 'Doe',
+        p_email => 'JDOE',
+        p_phone => '555-1234',
+        p_hire_date => SYSDATE,
+        p_job_id => 'IT_PROG',
+        p_salary => 5000,
+        p_commission_pct => NULL,
+        p_manager_id => 100,
+        p_department_id => 90
+      );
+    END;
+    ```
+    Use named notation for parameters, especially when calling procedures with many parameters. This improves code readability, makes the code less prone to errors when parameter order changes, and allows you to skip optional parameters.
+  </Accordion>
+  
+  <Accordion title="Not Using %TYPE and %ROWTYPE" icon="warning">
+    ```sql
+    -- Anti-pattern: Hardcoding data types
+    DECLARE
+      v_employee_id NUMBER(6);
+      v_first_name VARCHAR2(20);
+      v_last_name VARCHAR2(25);
+      v_email VARCHAR2(25);
+      v_phone_number VARCHAR2(20);
+      v_hire_date DATE;
+    BEGIN
+      SELECT employee_id, first_name, last_name, email, phone_number, hire_date
+      INTO v_employee_id, v_first_name, v_last_name, v_email, v_phone_number, v_hire_date
+      FROM employees
+      WHERE employee_id = 100;
+    END;
+    
+    -- Better approach: Use %TYPE and %ROWTYPE
+    DECLARE
+      v_employee_id employees.employee_id%TYPE;
+      v_first_name employees.first_name%TYPE;
+      v_last_name employees.last_name%TYPE;
+      v_email employees.email%TYPE;
+      v_phone_number employees.phone_number%TYPE;
+      v_hire_date employees.hire_date%TYPE;
+    BEGIN
+      SELECT employee_id, first_name, last_name, email, phone_number, hire_date
+      INTO v_employee_id, v_first_name, v_last_name, v_email, v_phone_number, v_hire_date
+      FROM employees
+      WHERE employee_id = 100;
+    END;
+    
+    -- Even better: Use %ROWTYPE
+    DECLARE
+      v_emp_rec employees%ROWTYPE;
+    BEGIN
+      SELECT *
+      INTO v_emp_rec
+      FROM employees
+      WHERE employee_id = 100;
+    END;
+    ```
+    Use %TYPE and %ROWTYPE to declare variables based on database column and row definitions. This ensures that your variables automatically match the database schema, making your code more maintainable when the schema changes.
+  </Accordion>
+  
+  <Accordion title="Not Using RETURNING Clause" icon="warning">
+    ```sql
+    -- Anti-pattern: Separate DML and query
+    DECLARE
+      v_order_id orders.order_id%TYPE := 1001;
+      v_new_status orders.status%TYPE := 'SHIPPED';
+      v_timestamp orders.last_update_date%TYPE;
+    BEGIN
+      UPDATE orders
+      SET status = v_new_status,
+          last_update_date = SYSDATE
+      WHERE order_id = v_order_id;
+      
+      -- Separate query to get the timestamp
+      SELECT last_update_date
+      INTO v_timestamp
+      FROM orders
+      WHERE order_id = v_order_id;
+    END;
+    
+    -- Better approach: Use RETURNING clause
+    DECLARE
+      v_order_id orders.order_id%TYPE := 1001;
+      v_new_status orders.status%TYPE := 'SHIPPED';
+      v_timestamp orders.last_update_date%TYPE;
+    BEGIN
+      UPDATE orders
+      SET status = v_new_status,
+          last_update_date = SYSDATE
+      WHERE order_id = v_order_id
+      RETURNING last_update_date INTO v_timestamp;
+    END;
+    ```
+    Use the RETURNING clause with DML statements (INSERT, UPDATE, DELETE) to retrieve values in a single operation. This improves performance by eliminating the need for a separate query and ensures that you get the exact values that were modified.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,590 @@
+---
+title: 'OCaml'
+description: 'OCaml is a general-purpose, multi-paradigm programming language which extends the Caml dialect of ML with object-oriented features. It emphasizes expressiveness and safety through a strong static type system with type inference.'
+---
+
+<AccordionGroup>
+  <Accordion title="OCaml Anti-Patterns Overview" icon="ocaml">
+    OCaml, despite being a powerful and expressive language with a strong type system, has several common anti-patterns that can lead to code that's difficult to maintain, inefficient, or doesn't follow the language's idioms. Here are the most important anti-patterns to avoid when writing OCaml code.
+  </Accordion>
+  
+  <Accordion title="Excessive Mutation" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Excessive mutation *)
+    let sum_list lst =
+      let total = ref 0 in
+      List.iter (fun x -> total := !total + x) lst;
+      !total
+    
+    (* Better approach: Use functional constructs *)
+    let sum_list lst =
+      List.fold_left (+) 0 lst
+    ```
+    Avoid excessive use of mutable references (`ref`) and imperative loops. OCaml is primarily a functional language, so prefer immutable data and functional constructs like pattern matching, recursion, and higher-order functions.
+  </Accordion>
+  
+  <Accordion title="Not Leveraging the Type System" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Not leveraging the type system *)
+    type user = {
+      name: string;
+      email: string;
+      status: string; (* Could be "active", "inactive", "pending" *)
+    }
+    
+    let is_user_active user =
+      user.status = "active"
+    
+    (* Better approach: Use variant types *)
+    type status = Active | Inactive | Pending
+    
+    type user = {
+      name: string;
+      email: string;
+      status: status;
+    }
+    
+    let is_user_active user =
+      match user.status with
+      | Active -> true
+      | _ -> false
+    ```
+    Leverage OCaml's powerful type system, especially variant types (sum types), to model your domain accurately. This provides compile-time safety and makes your code more expressive and self-documenting.
+  </Accordion>
+  
+  <Accordion title="Ignoring Option Types" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Ignoring option types *)
+    let find_user users id =
+      List.find (fun u -> u.id = id) users (* Raises Not_found if not found *)
+    
+    (* Usage that might raise an exception *)
+    let user = find_user users "123" in
+    Printf.printf "Found user: %s\n" user.name
+    
+    (* Better approach: Use option types *)
+    let find_user users id =
+      try Some (List.find (fun u -> u.id = id) users)
+      with Not_found -> None
+    
+    (* Or better yet, use built-in functions *)
+    let find_user users id =
+      List.find_opt (fun u -> u.id = id) users
+    
+    (* Safe usage with pattern matching *)
+    match find_user users "123" with
+    | Some user -> Printf.printf "Found user: %s\n" user.name
+    | None -> Printf.printf "User not found\n"
+    ```
+    Use option types (`'a option`) to represent values that might not exist, rather than raising exceptions or using sentinel values. This makes the possibility of missing values explicit in your type signatures and forces clients to handle both cases.
+  </Accordion>
+  
+  <Accordion title="Excessive Object-Oriented Style" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Excessive OO style *)
+    class customer name email =
+      object (self)
+        val mutable _name = name
+        val mutable _email = email
+        
+        method name = _name
+        method set_name n = _name <- n
+        
+        method email = _email
+        method set_email e = _email <- e
+        
+        method is_valid =
+          String.length _name > 0 && String.contains _email '@'
+      end
+    
+    (* Usage *)
+    let c = new customer "John" "john@example.com" in
+    c#set_name "John Doe";
+    if c#is_valid then
+      Printf.printf "Valid customer: %s\n" c#name
+    
+    (* Better approach: Use records and functions *)
+    type customer = {
+      name: string;
+      email: string;
+    }
+    
+    let is_valid customer =
+      String.length customer.name > 0 && String.contains customer.email '@'
+    
+    (* Usage *)
+    let c = { name = "John"; email = "john@example.com" } in
+    let c = { c with name = "John Doe" } in
+    if is_valid c then
+      Printf.printf "Valid customer: %s\n" c.name
+    ```
+    Avoid excessive object-oriented style with mutable objects and methods. Instead, prefer immutable records and standalone functions. This leads to code that's easier to reason about and test.
+  </Accordion>
+  
+  <Accordion title="Not Using Pattern Matching" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Not using pattern matching *)
+    let describe x =
+      if x = 0 then
+        "Zero"
+      else if x > 0 then
+        "Positive"
+      else
+        "Negative"
+    
+    let process_shape shape =
+      if shape.kind = "circle" then
+        let radius = shape.radius in
+        Float.pi *. radius *. radius
+      else if shape.kind = "rectangle" then
+        let width = shape.width in
+        let height = shape.height in
+        width *. height
+      else
+        0.0
+    
+    (* Better approach: Use pattern matching *)
+    let describe x =
+      match x with
+      | 0 -> "Zero"
+      | x when x > 0 -> "Positive"
+      | _ -> "Negative"
+    
+    (* With variant types *)
+    type shape =
+      | Circle of float (* radius *)
+      | Rectangle of float * float (* width * height *)
+      | Triangle of float * float (* base * height *)
+    
+    let area shape =
+      match shape with
+      | Circle radius -> Float.pi *. radius *. radius
+      | Rectangle (width, height) -> width *. height
+      | Triangle (base, height) -> base *. height /. 2.0
+    ```
+    Use pattern matching extensively, especially with variant types. Pattern matching makes your code more concise, readable, and helps ensure you handle all possible cases.
+  </Accordion>
+  
+  <Accordion title="Excessive Type Annotations" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Excessive type annotations *)
+    let add (x : int) (y : int) : int =
+      x + y
+    
+    let process (items : int list) : float =
+      let sum : int = List.fold_left (+) 0 items in
+      let count : int = List.length items in
+      float_of_int sum /. float_of_int count
+    
+    (* Better approach: Let type inference work *)
+    let add x y = x + y
+    
+    let process items =
+      let sum = List.fold_left (+) 0 items in
+      let count = List.length items in
+      float_of_int sum /. float_of_int count
+    ```
+    Avoid excessive type annotations. OCaml has powerful type inference, so you usually don't need to specify types explicitly. Add type annotations only when necessary for clarity, to resolve ambiguities, or at API boundaries.
+  </Accordion>
+  
+  <Accordion title="Not Using the Pipeline Operator" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Not using the pipeline operator *)
+    let result = List.map (fun x -> x * 2) (List.filter (fun x -> x mod 2 = 0) [1; 2; 3; 4; 5])
+    
+    (* Better approach: Use the pipeline operator *)
+    let result =
+      [1; 2; 3; 4; 5]
+      |> List.filter (fun x -> x mod 2 = 0)
+      |> List.map (fun x -> x * 2)
+    ```
+    Use the pipeline operator (`|>`) to create readable data processing pipelines. The pipeline operator makes the flow of data through transformations clear and reduces the need for nested function calls or intermediate variables.
+  </Accordion>
+  
+  <Accordion title="Ignoring Partial Application" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Ignoring partial application *)
+    let filter predicate list =
+      List.filter predicate list
+    
+    let map mapper list =
+      List.map mapper list
+    
+    (* Better approach: Leverage partial application *)
+    let filter predicate =
+      List.filter predicate
+    
+    let map mapper =
+      List.map mapper
+    
+    (* Usage *)
+    let even_numbers =
+      [1; 2; 3; 4; 5; 6; 7; 8; 9; 10]
+      |> filter (fun x -> x mod 2 = 0)
+      |> map (fun x -> x * 2)
+    ```
+    Leverage partial application to create specialized functions from more general ones. This allows for more concise and composable code.
+  </Accordion>
+  
+  <Accordion title="Not Using Modules and Functors" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Everything in one file without modules *)
+    
+    (* Better approach: Use modules to organize code *)
+    module User = struct
+      type t = {
+        id: string;
+        name: string;
+        email: string;
+      }
+      
+      let create id name email =
+        { id; name; email }
+      
+      let is_valid user =
+        String.length user.name > 0 && String.contains user.email '@'
+    end
+    
+    module UserRepository = struct
+      let users = ref []
+      
+      let add user =
+        users := user :: !users
+      
+      let find_by_id id =
+        List.find_opt (fun user -> user.User.id = id) !users
+      
+      let find_all () =
+        !users
+    end
+    
+    (* Even better: Use functors for parameterized modules *)
+    module type Repository = sig
+      type t
+      val add : t -> unit
+      val find_by_id : string -> t option
+      val find_all : unit -> t list
+    end
+    
+    module MakeRepository (Entity : sig type t val id : t -> string end) : Repository with type t = Entity.t = struct
+      type t = Entity.t
+      let items = ref []
+      
+      let add item =
+        items := item :: !items
+      
+      let find_by_id id =
+        List.find_opt (fun item -> Entity.id item = id) !items
+      
+      let find_all () =
+        !items
+    end
+    
+    module UserRepo = MakeRepository(struct type t = User.t let id user = user.User.id end)
+    ```
+    Use modules to organize your code into logical units with clear interfaces. For more advanced abstractions, use functors (module functions) to create parameterized modules.
+  </Accordion>
+  
+  <Accordion title="Not Using Result for Error Handling" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Exception-based error handling *)
+    let divide a b =
+      if b = 0 then
+        failwith "Division by zero"
+      else
+        a / b
+    
+    (* Usage that might raise an exception *)
+    let result =
+      try
+        let x = divide 10 0 in
+        Printf.printf "Result: %d\n" x
+      with
+        Failure msg -> Printf.printf "Error: %s\n" msg
+    
+    (* Better approach: Use Result type *)
+    type error = DivisionByZero | InvalidInput of string
+    
+    let divide a b =
+      if b = 0 then
+        Error DivisionByZero
+      else
+        Ok (a / b)
+    
+    (* Usage with pattern matching *)
+    match divide 10 0 with
+    | Ok result -> Printf.printf "Result: %d\n" result
+    | Error DivisionByZero -> Printf.printf "Error: Division by zero\n"
+    | Error (InvalidInput msg) -> Printf.printf "Error: %s\n" msg
+    
+    (* With the Result module (from Base, Containers, etc.) *)
+    let compute_value a b c =
+      divide a b
+      |> Result.map (fun result -> result * c)
+      |> Result.map_error (function
+          | DivisionByZero -> "Cannot divide by zero"
+          | InvalidInput msg -> msg)
+    ```
+    Use the `Result` type for operations that might fail, rather than raising exceptions. This makes error paths explicit in your code and allows for better composition of functions that might fail.
+  </Accordion>
+  
+  <Accordion title="Not Using Labeled and Optional Arguments" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Functions with many positional arguments *)
+    let create_user id name email age is_admin is_active =
+      { id; name; email; age; is_admin; is_active }
+    
+    (* Usage - unclear what each argument means *)
+    let user = create_user "123" "John Doe" "john@example.com" 30 true false
+    
+    (* Better approach: Use labeled arguments *)
+    let create_user ~id ~name ~email ~age ~is_admin ~is_active =
+      { id; name; email; age; is_admin; is_active }
+    
+    (* Usage - much clearer *)
+    let user = create_user
+      ~id:"123"
+      ~name:"John Doe"
+      ~email:"john@example.com"
+      ~age:30
+      ~is_admin:true
+      ~is_active:false
+    
+    (* Even better: Use optional arguments with defaults *)
+    let create_user ~id ~name ~email ~age ?(is_admin=false) ?(is_active=true) () =
+      { id; name; email; age; is_admin; is_active }
+    
+    (* Usage with defaults *)
+    let user = create_user
+      ~id:"123"
+      ~name:"John Doe"
+      ~email:"john@example.com"
+      ~age:30
+      ~is_admin:true
+      ()
+    ```
+    Use labeled and optional arguments for functions with many parameters. Labeled arguments make function calls more readable by clarifying the purpose of each argument. Optional arguments with defaults reduce the need for multiple function variants.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Data Structures" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Using lists for everything *)
+    let find_user users id =
+      List.find_opt (fun user -> user.id = id) users (* O(n) lookup *)
+    
+    let user_exists users id =
+      List.exists (fun user -> user.id = id) users (* O(n) lookup *)
+    
+    (* Better approach: Use appropriate data structures *)
+    module UserMap = Map.Make(String) (* For O(log n) lookups by ID *)
+    
+    let find_user users id =
+      UserMap.find_opt id users
+    
+    let user_exists users id =
+      UserMap.mem id users
+    
+    (* For sets of values *)
+    module StringSet = Set.Make(String)
+    
+    let tags = StringSet.empty
+      |> StringSet.add "ocaml"
+      |> StringSet.add "functional"
+      |> StringSet.add "programming"
+    
+    let has_tag tags tag =
+      StringSet.mem tag tags
+    ```
+    Use appropriate data structures for your needs. Lists are good for sequential access and small collections, but use maps for key-based lookups, sets for unique collections, and arrays for random access and performance-critical code.
+  </Accordion>
+  
+  <Accordion title="Not Using Tail Recursion" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Recursion without tail calls *)
+    let rec factorial n =
+      if n <= 1 then 1
+      else n * factorial (n - 1) (* Not tail-recursive *)
+    
+    (* Better approach: Use tail recursion *)
+    let factorial n =
+      let rec aux n acc =
+        if n <= 1 then acc
+        else aux (n - 1) (n * acc) (* Tail-recursive *)
+      in
+      aux n 1
+    ```
+    When using recursion, make your functions tail-recursive to avoid stack overflow errors with large inputs. In a tail-recursive function, the recursive call is the last operation in the function.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```ocaml
+    (* Anti-pattern: No documentation *)
+    let calculate_score player_stats opponent_stats =
+      let attack = player_stats.attack in
+      let defense = opponent_stats.defense in
+      attack *. (100.0 /. (100.0 +. defense))
+    
+    (* Better approach: Include documentation comments *)
+    (** [calculate_score player opponent] calculates the effective score of an attack.
+        @param player_stats The player's statistics record with at least an [attack] field.
+        @param opponent_stats The opponent's statistics record with at least a [defense] field.
+        @return A float representing the effective damage. *)
+    let calculate_score player_stats opponent_stats =
+      let attack = player_stats.attack in
+      let defense = opponent_stats.defense in
+      attack *. (100.0 /. (100.0 +. defense))
+    ```
+    Include documentation comments for your functions, modules, and types. OCaml's documentation tool, ocamldoc, can extract these comments to generate documentation.
+  </Accordion>
+  
+  <Accordion title="Not Writing Tests" icon="warning">
+    ```ocaml
+    (* Anti-pattern: No tests *)
+    
+    (* Better approach: Write tests *)
+    (* Using a testing framework like Alcotest *)
+    
+    let test_factorial () =
+      Alcotest.(check int) "factorial 0" 1 (factorial 0);
+      Alcotest.(check int) "factorial 1" 1 (factorial 1);
+      Alcotest.(check int) "factorial 5" 120 (factorial 5)
+    
+    let test_fibonacci () =
+      Alcotest.(check int) "fibonacci 0" 0 (fibonacci 0);
+      Alcotest.(check int) "fibonacci 1" 1 (fibonacci 1);
+      Alcotest.(check int) "fibonacci 5" 5 (fibonacci 5)
+    
+    let () =
+      Alcotest.run "My tests" [
+        "factorial", [
+          Alcotest.test_case "factorial function" `Quick test_factorial;
+        ];
+        "fibonacci", [
+          Alcotest.test_case "fibonacci function" `Quick test_fibonacci;
+        ];
+      ]
+    ```
+    Write tests for your OCaml code. Testing helps ensure your code works correctly and continues to work as you make changes. Use testing frameworks like Alcotest, OUnit, or QCheck to structure and run your tests.
+  </Accordion>
+  
+  <Accordion title="Not Using Abstract Types" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Exposing implementation details *)
+    module Counter : sig
+      type t = { mutable value : int }
+      val create : int -> t
+      val increment : t -> unit
+      val get : t -> int
+    end = struct
+      type t = { mutable value : int }
+      let create initial = { value = initial }
+      let increment counter = counter.value <- counter.value + 1
+      let get counter = counter.value
+    end
+    
+    (* Usage that depends on implementation details *)
+    let c = Counter.create 0
+    c.value <- 10 (* Directly modifying the implementation *)
+    
+    (* Better approach: Use abstract types *)
+    module Counter : sig
+      type t (* Abstract type, implementation hidden *)
+      val create : int -> t
+      val increment : t -> unit
+      val get : t -> int
+    end = struct
+      type t = { mutable value : int }
+      let create initial = { value = initial }
+      let increment counter = counter.value <- counter.value + 1
+      let get counter = counter.value
+    end
+    
+    (* Usage that respects the abstraction *)
+    let c = Counter.create 0
+    Counter.increment c
+    let value = Counter.get c
+    ```
+    Use abstract types in module signatures to hide implementation details. This allows you to change the implementation without affecting client code and enforces the use of your module's API.
+  </Accordion>
+  
+  <Accordion title="Not Using GADTs and Phantom Types" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Runtime type checking *)
+    type value =
+      | Int of int
+      | String of string
+      | Bool of bool
+    
+    let add a b =
+      match (a, b) with
+      | (Int x, Int y) -> Int (x + y)
+      | _ -> failwith "Type error: can only add integers"
+    
+    (* Better approach: Use GADTs for type safety *)
+    type _ value =
+      | Int : int -> int value
+      | String : string -> string value
+      | Bool : bool -> bool value
+    
+    let add (Int a) (Int b) = Int (a + b)
+    
+    (* Usage *)
+    let x = Int 5
+    let y = Int 10
+    let z = add x y (* Type-safe *)
+    
+    (* Using phantom types for additional type safety *)
+    type 'a validated
+    
+    let validate_email email : string validated option =
+      if String.contains email '@' then
+        Some (Obj.magic email) (* Using Obj.magic for demonstration only *)
+      else
+        None
+    
+    let send_email : string validated -> unit = fun email ->
+      (* Implementation that can assume email is valid *)
+      ()
+    
+    (* Usage *)
+    match validate_email "user@example.com" with
+    | Some validated_email -> send_email validated_email
+    | None -> Printf.printf "Invalid email\n"
+    ```
+    Use Generalized Algebraic Data Types (GADTs) and phantom types to encode more type information and catch more errors at compile time. These advanced type system features can help you create more type-safe APIs.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Messages" icon="warning">
+    ```ocaml
+    (* Anti-pattern: Poor error messages *)
+    let parse_config filename =
+      try
+        let ic = open_in filename in
+        let config = parse_from_channel ic in
+        close_in ic;
+        config
+      with
+        | _ -> failwith "Error"
+    
+    (* Better approach: Provide detailed error messages *)
+    let parse_config filename =
+      try
+        let ic = open_in filename in
+        try
+          let config = parse_from_channel ic in
+          close_in ic;
+          Ok config
+        with
+          | Parse_error pos ->
+              close_in ic;
+              Error (Printf.sprintf "Parse error at line %d, column %d" pos.line pos.column)
+          | e ->
+              close_in ic;
+              Error (Printf.sprintf "Unexpected error: %s" (Printexc.to_string e))
+      with
+        | Sys_error msg ->
+            Error (Printf.sprintf "Could not open file '%s': %s" filename msg)
+    ```
+    Provide detailed and helpful error messages. Good error messages include context about what went wrong and how to fix it, making your code more user-friendly.
+  </Accordion>
+</AccordionGroup>

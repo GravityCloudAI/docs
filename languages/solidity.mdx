@@ -1,0 +1,713 @@
+---
+title: 'Solidity'
+description: 'Solidity is an object-oriented, high-level programming language for implementing smart contracts on various blockchain platforms, most notably Ethereum. It was influenced by C++, Python, and JavaScript and is designed to target the Ethereum Virtual Machine (EVM).'
+---
+
+<AccordionGroup>
+  <Accordion title="Solidity Anti-Patterns Overview" icon="solidity">
+    Solidity, as the primary language for Ethereum smart contracts, has several common anti-patterns that can lead to security vulnerabilities, excessive gas costs, and maintenance issues. Here are the most important anti-patterns to avoid when writing Solidity code.
+  </Accordion>
+  
+  <Accordion title="Reentrancy Vulnerabilities" icon="warning">
+    ```solidity
+    // Anti-pattern: Vulnerable to reentrancy attacks
+    contract VulnerableWallet {
+        mapping(address => uint256) public balances;
+        
+        function withdraw(uint256 amount) public {
+            require(balances[msg.sender] >= amount, "Insufficient balance");
+            
+            // This external call happens before the balance update
+            (bool success, ) = msg.sender.call{value: amount}("");
+            require(success, "Transfer failed");
+            
+            // Balance is updated after the external call
+            balances[msg.sender] -= amount;
+        }
+        
+        function deposit() public payable {
+            balances[msg.sender] += msg.value;
+        }
+    }
+    
+    // Better approach: Use the Checks-Effects-Interactions pattern
+    contract SecureWallet {
+        mapping(address => uint256) public balances;
+        
+        function withdraw(uint256 amount) public {
+            // Checks
+            require(balances[msg.sender] >= amount, "Insufficient balance");
+            
+            // Effects (update state)
+            balances[msg.sender] -= amount;
+            
+            // Interactions (external calls)
+            (bool success, ) = msg.sender.call{value: amount}("");
+            require(success, "Transfer failed");
+        }
+        
+        function deposit() public payable {
+            balances[msg.sender] += msg.value;
+        }
+    }
+    ```
+    Always follow the Checks-Effects-Interactions pattern to prevent reentrancy attacks. Update all internal state before making external calls, and consider using reentrancy guards for complex functions.
+  </Accordion>
+  
+  <Accordion title="Unchecked External Calls" icon="warning">
+    ```solidity
+    // Anti-pattern: Not checking return values of external calls
+    contract UncheckedCalls {
+        function sendEther(address payable recipient, uint256 amount) public {
+            // The return value is not checked
+            recipient.send(amount);
+        }
+        
+        function callContract(address target, bytes memory data) public {
+            // The return value is not checked
+            target.call(data);
+        }
+    }
+    
+    // Better approach: Check return values and handle errors
+    contract CheckedCalls {
+        function sendEther(address payable recipient, uint256 amount) public {
+            bool success = recipient.send(amount);
+            require(success, "Send failed");
+        }
+        
+        function callContract(address target, bytes memory data) public {
+            (bool success, bytes memory returnData) = target.call(data);
+            require(success, "Call failed");
+        }
+    }
+    ```
+    Always check the return values of low-level calls like `send()`, `call()`, and `delegatecall()`. These functions return a boolean indicating success or failure, and ignoring this value can lead to silent failures.
+  </Accordion>
+  
+  <Accordion title="Integer Overflow and Underflow" icon="warning">
+    ```solidity
+    // Anti-pattern: Vulnerable to integer overflow/underflow (pre-Solidity 0.8.0)
+    contract VulnerableToOverflow {
+        mapping(address => uint256) public balances;
+        
+        function transfer(address to, uint256 amount) public {
+            // No check for underflow
+            balances[msg.sender] -= amount;
+            // No check for overflow
+            balances[to] += amount;
+        }
+    }
+    
+    // Better approach for Solidity < 0.8.0: Use SafeMath
+    import "@openzeppelin/contracts/math/SafeMath.sol";
+    
+    contract SafeFromOverflow {
+        using SafeMath for uint256;
+        mapping(address => uint256) public balances;
+        
+        function transfer(address to, uint256 amount) public {
+            balances[msg.sender] = balances[msg.sender].sub(amount, "Insufficient balance");
+            balances[to] = balances[to].add(amount);
+        }
+    }
+    
+    // In Solidity 0.8.0+, arithmetic operations revert on overflow/underflow by default
+    // But you can still use unchecked blocks for gas optimization when safe
+    contract Solidity8Contract {
+        mapping(address => uint256) public balances;
+        
+        function transfer(address to, uint256 amount) public {
+            require(balances[msg.sender] >= amount, "Insufficient balance");
+            
+            unchecked {
+                // Only use unchecked when you're sure overflow/underflow can't happen
+                balances[msg.sender] -= amount;
+                balances[to] += amount;
+            }
+        }
+    }
+    ```
+    In Solidity versions before 0.8.0, always use SafeMath or similar libraries to prevent integer overflow and underflow. In Solidity 0.8.0 and later, arithmetic operations revert on overflow/underflow by default, but use `unchecked` blocks carefully for gas optimization.
+  </Accordion>
+  
+  <Accordion title="Improper Access Control" icon="warning">
+    ```solidity
+    // Anti-pattern: Missing or improper access control
+    contract VulnerableContract {
+        address public owner;
+        uint256 public fee;
+        
+        constructor() {
+            owner = msg.sender;
+        }
+        
+        // No access control
+        function setFee(uint256 _fee) public {
+            fee = _fee;
+        }
+        
+        // Function can be called by anyone
+        function withdrawFunds() public {
+            payable(msg.sender).transfer(address(this).balance);
+        }
+    }
+    
+    // Better approach: Implement proper access control
+    contract SecureContract {
+        address public owner;
+        uint256 public fee;
+        
+        constructor() {
+            owner = msg.sender;
+        }
+        
+        modifier onlyOwner() {
+            require(msg.sender == owner, "Not authorized");
+            _;
+        }
+        
+        function setFee(uint256 _fee) public onlyOwner {
+            fee = _fee;
+        }
+        
+        function withdrawFunds() public onlyOwner {
+            payable(owner).transfer(address(this).balance);
+        }
+        
+        function transferOwnership(address newOwner) public onlyOwner {
+            require(newOwner != address(0), "Invalid address");
+            owner = newOwner;
+        }
+    }
+    ```
+    Implement proper access control for sensitive functions. Use modifiers to restrict access to authorized users, and consider using role-based access control for more complex applications.
+  </Accordion>
+  
+  <Accordion title="Timestamp Dependence" icon="warning">
+    ```solidity
+    // Anti-pattern: Relying on block timestamp for critical logic
+    contract TimestampDependent {
+        uint256 public constant LOCK_PERIOD = 24 hours;
+        mapping(address => uint256) public lockTime;
+        
+        function lock() public payable {
+            lockTime[msg.sender] = block.timestamp + LOCK_PERIOD;
+        }
+        
+        function withdraw() public {
+            require(block.timestamp >= lockTime[msg.sender], "Funds are locked");
+            payable(msg.sender).transfer(address(this).balance);
+        }
+    }
+    
+    // Better approach: Use block numbers or be aware of miner manipulation
+    contract TimestampAware {
+        uint256 public constant LOCK_PERIOD = 24 hours;
+        mapping(address => uint256) public lockTime;
+        
+        function lock() public payable {
+            lockTime[msg.sender] = block.timestamp + LOCK_PERIOD;
+        }
+        
+        function withdraw() public {
+            // Add a margin of error (miners can manipulate timestamps slightly)
+            require(block.timestamp >= lockTime[msg.sender], "Funds are locked");
+            payable(msg.sender).transfer(address(this).balance);
+        }
+        
+        // For high-value applications, consider using block numbers
+        // Approximately: 1 day = 7200 blocks (assuming 12-second block time)
+        uint256 public constant LOCK_BLOCKS = 7200;
+        mapping(address => uint256) public lockBlock;
+        
+        function lockByBlock() public payable {
+            lockBlock[msg.sender] = block.number + LOCK_BLOCKS;
+        }
+        
+        function withdrawByBlock() public {
+            require(block.number >= lockBlock[msg.sender], "Funds are locked");
+            payable(msg.sender).transfer(address(this).balance);
+        }
+    }
+    ```
+    Be cautious when using `block.timestamp` for critical logic, as miners can manipulate it slightly. For applications requiring precise timing, consider using block numbers instead or be aware of the potential for small timestamp manipulations.
+  </Accordion>
+  
+  <Accordion title="Improper Use of tx.origin" icon="warning">
+    ```solidity
+    // Anti-pattern: Using tx.origin for authorization
+    contract VulnerableWallet {
+        address public owner;
+        
+        constructor() {
+            owner = msg.sender;
+        }
+        
+        function transfer(address payable to, uint256 amount) public {
+            // Using tx.origin instead of msg.sender
+            require(tx.origin == owner, "Not authorized");
+            to.transfer(amount);
+        }
+    }
+    
+    // Attack contract that exploits tx.origin
+    contract AttackContract {
+        address payable public attacker;
+        VulnerableWallet public wallet;
+        
+        constructor(address walletAddress) {
+            attacker = payable(msg.sender);
+            wallet = VulnerableWallet(walletAddress);
+        }
+        
+        function attack(address payable to, uint256 amount) public {
+            // This will succeed if the owner calls this function
+            // because tx.origin will be the owner's address
+            wallet.transfer(to, amount);
+        }
+    }
+    
+    // Better approach: Use msg.sender for authorization
+    contract SecureWallet {
+        address public owner;
+        
+        constructor() {
+            owner = msg.sender;
+        }
+        
+        function transfer(address payable to, uint256 amount) public {
+            // Using msg.sender instead of tx.origin
+            require(msg.sender == owner, "Not authorized");
+            to.transfer(amount);
+        }
+    }
+    ```
+    Avoid using `tx.origin` for authorization, as it makes your contract vulnerable to phishing attacks. Use `msg.sender` instead to verify the immediate caller of your contract.
+  </Accordion>
+  
+  <Accordion title="Unbounded Loops" icon="warning">
+    ```solidity
+    // Anti-pattern: Unbounded loops that can cause out-of-gas errors
+    contract UnboundedLoop {
+        address[] public users;
+        mapping(address => uint256) public balances;
+        
+        function addUser(address user) public {
+            users.push(user);
+        }
+        
+        function distributeRewards(uint256 amount) public {
+            // This loop could run out of gas if users array becomes too large
+            for (uint256 i = 0; i < users.length; i++) {
+                balances[users[i]] += amount;
+            }
+        }
+    }
+    
+    // Better approach: Use bounded loops or allow pagination
+    contract BoundedLoop {
+        address[] public users;
+        mapping(address => uint256) public balances;
+        
+        function addUser(address user) public {
+            users.push(user);
+        }
+        
+        // Distribute rewards to a limited number of users at a time
+        function distributeRewards(uint256 amount, uint256 startIndex, uint256 count) public {
+            require(startIndex < users.length, "Start index out of bounds");
+            uint256 endIndex = startIndex + count;
+            if (endIndex > users.length) {
+                endIndex = users.length;
+            }
+            
+            for (uint256 i = startIndex; i < endIndex; i++) {
+                balances[users[i]] += amount;
+            }
+        }
+    }
+    ```
+    Avoid unbounded loops that iterate over arrays of unknown size. Use bounded loops with pagination to prevent out-of-gas errors, especially when the array size can grow indefinitely.
+  </Accordion>
+  
+  <Accordion title="Incorrect Inheritance Order" icon="warning">
+    ```solidity
+    // Anti-pattern: Incorrect inheritance order
+    contract Base1 {
+        function foo() public virtual returns (string memory) {
+            return "Base1";
+        }
+    }
+    
+    contract Base2 {
+        function foo() public virtual returns (string memory) {
+            return "Base2";
+        }
+    }
+    
+    // Incorrect: Base2 will override Base1's implementation
+    contract Derived is Base1, Base2 {
+        function foo() public override(Base1, Base2) returns (string memory) {
+            return super.foo(); // Returns "Base2"
+        }
+    }
+    
+    // Better approach: Use the correct inheritance order (most derived to most base)
+    contract CorrectDerived is Base2, Base1 {
+        function foo() public override(Base2, Base1) returns (string memory) {
+            return super.foo(); // Returns "Base1"
+        }
+    }
+    ```
+    Pay attention to the order of inheritance in Solidity. The order is from most derived (right) to most base (left), and `super` calls are resolved from right to left. Incorrect inheritance order can lead to unexpected behavior.
+  </Accordion>
+  
+  <Accordion title="Excessive Gas Consumption" icon="warning">
+    ```solidity
+    // Anti-pattern: Gas-inefficient code
+    contract Inefficient {
+        uint256[] public values;
+        
+        // Inefficient: Copying the array to memory
+        function sumValues() public view returns (uint256) {
+            uint256[] memory vals = values;
+            uint256 sum = 0;
+            for (uint256 i = 0; i < vals.length; i++) {
+                sum += vals[i];
+            }
+            return sum;
+        }
+        
+        // Inefficient: Growing array one by one
+        function addValues(uint256 count) public {
+            for (uint256 i = 0; i < count; i++) {
+                values.push(i);
+            }
+        }
+    }
+    
+    // Better approach: Optimize for gas efficiency
+    contract Efficient {
+        uint256[] public values;
+        
+        // More efficient: Reading directly from storage
+        function sumValues() public view returns (uint256) {
+            uint256 sum = 0;
+            for (uint256 i = 0; i < values.length; i++) {
+                sum += values[i];
+            }
+            return sum;
+        }
+        
+        // More efficient: Pre-allocating array space
+        function addValues(uint256 count) public {
+            uint256 currentLength = values.length;
+            for (uint256 i = 0; i < count; i++) {
+                values.push(currentLength + i);
+            }
+        }
+        
+        // Most efficient: Using unchecked for simple arithmetic (Solidity 0.8.0+)
+        function sumValuesUnchecked() public view returns (uint256) {
+            uint256 sum = 0;
+            uint256 length = values.length;
+            for (uint256 i = 0; i < length;) {
+                sum += values[i];
+                unchecked { i++; }
+            }
+            return sum;
+        }
+    }
+    ```
+    Optimize your code for gas efficiency. Avoid unnecessary storage operations, minimize copying data to memory, and use gas-efficient patterns like pre-allocating array space. In Solidity 0.8.0+, use `unchecked` blocks for simple arithmetic operations when overflow/underflow is not a concern.
+  </Accordion>
+  
+  <Accordion title="Hardcoded Addresses" icon="warning">
+    ```solidity
+    // Anti-pattern: Hardcoded addresses
+    contract HardcodedContract {
+        address public constant WALLET = 0x123456789abcdef123456789abcdef123456789a;
+        address public constant TOKEN = 0xabcdef123456789abcdef123456789abcdef1234;
+        
+        function withdraw() public {
+            payable(WALLET).transfer(address(this).balance);
+        }
+    }
+    
+    // Better approach: Use constructor parameters and allow updates
+    contract ConfigurableContract {
+        address public wallet;
+        address public token;
+        address public owner;
+        
+        constructor(address _wallet, address _token) {
+            wallet = _wallet;
+            token = _token;
+            owner = msg.sender;
+        }
+        
+        modifier onlyOwner() {
+            require(msg.sender == owner, "Not authorized");
+            _;
+        }
+        
+        function setWallet(address _wallet) public onlyOwner {
+            wallet = _wallet;
+        }
+        
+        function setToken(address _token) public onlyOwner {
+            token = _token;
+        }
+        
+        function withdraw() public onlyOwner {
+            payable(wallet).transfer(address(this).balance);
+        }
+    }
+    ```
+    Avoid hardcoding addresses in your contracts. Use constructor parameters to initialize addresses and provide functions to update them if needed. This makes your contracts more flexible and easier to deploy to different environments.
+  </Accordion>
+  
+  <Accordion title="Lack of Event Emissions" icon="warning">
+    ```solidity
+    // Anti-pattern: Not emitting events for state changes
+    contract NoEvents {
+        address public owner;
+        uint256 public fee;
+        
+        function setFee(uint256 _fee) public {
+            require(msg.sender == owner, "Not authorized");
+            fee = _fee;
+            // No event emitted
+        }
+        
+        function transferOwnership(address newOwner) public {
+            require(msg.sender == owner, "Not authorized");
+            owner = newOwner;
+            // No event emitted
+        }
+    }
+    
+    // Better approach: Emit events for important state changes
+    contract WithEvents {
+        address public owner;
+        uint256 public fee;
+        
+        event FeeChanged(uint256 oldFee, uint256 newFee);
+        event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+        
+        constructor() {
+            owner = msg.sender;
+            emit OwnershipTransferred(address(0), msg.sender);
+        }
+        
+        function setFee(uint256 _fee) public {
+            require(msg.sender == owner, "Not authorized");
+            uint256 oldFee = fee;
+            fee = _fee;
+            emit FeeChanged(oldFee, _fee);
+        }
+        
+        function transferOwnership(address newOwner) public {
+            require(msg.sender == owner, "Not authorized");
+            require(newOwner != address(0), "Invalid address");
+            address oldOwner = owner;
+            owner = newOwner;
+            emit OwnershipTransferred(oldOwner, newOwner);
+        }
+    }
+    ```
+    Emit events for important state changes in your contract. Events provide an audit trail and allow off-chain applications to track what's happening on the blockchain. They are essential for building user interfaces and monitoring contract activity.
+  </Accordion>
+  
+  <Accordion title="Improper Decimals Handling" icon="warning">
+    ```solidity
+    // Anti-pattern: Improper decimals handling
+    contract TokenSale {
+        uint256 public tokenPrice = 0.1 ether; // 0.1 ETH per token
+        
+        function buyTokens() public payable {
+            uint256 tokenAmount = msg.value / tokenPrice;
+            // Issue tokenAmount to msg.sender
+        }
+    }
+    
+    // Better approach: Use integer math and avoid decimals
+    contract ImprovedTokenSale {
+        // Price expressed as tokens per ETH to avoid division
+        uint256 public tokensPerEth = 10; // 10 tokens per ETH
+        
+        function buyTokens() public payable {
+            uint256 tokenAmount = msg.value * tokensPerEth / 1 ether;
+            // Issue tokenAmount to msg.sender
+        }
+        
+        // Alternative: Use fixed-point math with explicit scaling
+        uint256 public tokenPriceInWei = 100000000000000000; // 0.1 ETH in wei
+        
+        function buyTokensAlternative() public payable {
+            uint256 tokenAmount = msg.value / tokenPriceInWei;
+            // Issue tokenAmount to msg.sender
+        }
+    }
+    ```
+    Handle decimals properly in your contracts. Solidity doesn't support floating-point numbers, so use integer math with appropriate scaling factors. Consider expressing rates as "X per Y" to avoid division, which can lead to rounding errors.
+  </Accordion>
+  
+  <Accordion title="Unprotected Self-Destruct" icon="warning">
+    ```solidity
+    // Anti-pattern: Unprotected self-destruct
+    contract VulnerableContract {
+        function destroy() public {
+            selfdestruct(payable(msg.sender));
+        }
+    }
+    
+    // Better approach: Protect self-destruct with access control
+    contract SecureContract {
+        address public owner;
+        
+        constructor() {
+            owner = msg.sender;
+        }
+        
+        modifier onlyOwner() {
+            require(msg.sender == owner, "Not authorized");
+            _;
+        }
+        
+        function destroy() public onlyOwner {
+            selfdestruct(payable(owner));
+        }
+    }
+    ```
+    Protect the `selfdestruct` function with proper access control. An unprotected `selfdestruct` can allow anyone to destroy your contract and steal its funds.
+  </Accordion>
+  
+  <Accordion title="Incorrect Use of Cryptography" icon="warning">
+    ```solidity
+    // Anti-pattern: Incorrect use of cryptography
+    contract WeakRandomness {
+        function getRandomNumber() public view returns (uint256) {
+            // Predictable "randomness"
+            return uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)));
+        }
+    }
+    
+    // Better approach: Use a commit-reveal scheme or oracles
+    contract CommitReveal {
+        struct Commitment {
+            bytes32 commitment;
+            uint256 blockNumber;
+            bool revealed;
+            uint256 value;
+        }
+        
+        mapping(address => Commitment) public commitments;
+        
+        // User commits a hash of their secret value and a nonce
+        function commit(bytes32 commitment) public {
+            commitments[msg.sender] = Commitment({
+                commitment: commitment,
+                blockNumber: block.number,
+                revealed: false,
+                value: 0
+            });
+        }
+        
+        // User reveals their secret value and nonce
+        function reveal(uint256 value, bytes32 nonce) public {
+            Commitment storage commitment = commitments[msg.sender];
+            require(commitment.blockNumber > 0, "No commitment found");
+            require(!commitment.revealed, "Already revealed");
+            require(commitment.commitment == keccak256(abi.encodePacked(value, nonce)), "Invalid revelation");
+            
+            commitment.revealed = true;
+            commitment.value = value;
+        }
+    }
+    ```
+    Don't rely on block variables like `block.timestamp` or `block.difficulty` for randomness, as they can be manipulated by miners. For applications requiring randomness, use a commit-reveal scheme, oracles, or VRF (Verifiable Random Function) services like Chainlink VRF.
+  </Accordion>
+  
+  <Accordion title="Lack of Input Validation" icon="warning">
+    ```solidity
+    // Anti-pattern: Lack of input validation
+    contract Unvalidated {
+        mapping(address => uint256) public balances;
+        
+        function transfer(address to, uint256 amount) public {
+            // No validation of 'to' address
+            balances[msg.sender] -= amount;
+            balances[to] += amount;
+        }
+    }
+    
+    // Better approach: Validate all inputs
+    contract Validated {
+        mapping(address => uint256) public balances;
+        
+        function transfer(address to, uint256 amount) public {
+            require(to != address(0), "Invalid recipient");
+            require(amount > 0, "Amount must be positive");
+            require(balances[msg.sender] >= amount, "Insufficient balance");
+            
+            balances[msg.sender] -= amount;
+            balances[to] += amount;
+        }
+    }
+    ```
+    Validate all inputs to your functions. Check for zero addresses, valid ranges for numeric values, and other constraints specific to your application. Proper input validation prevents many common errors and vulnerabilities.
+  </Accordion>
+  
+  <Accordion title="Not Using SafeERC20" icon="warning">
+    ```solidity
+    // Anti-pattern: Not using SafeERC20
+    import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+    
+    contract UnsafeERC20Handler {
+        IERC20 public token;
+        
+        constructor(address tokenAddress) {
+            token = IERC20(tokenAddress);
+        }
+        
+        function transferTokens(address to, uint256 amount) public {
+            // Some tokens don't return a boolean, causing this to fail
+            token.transfer(to, amount);
+        }
+        
+        function approveAndCall(address spender, uint256 amount) public {
+            // Some tokens don't return a boolean, causing this to fail
+            token.approve(spender, amount);
+            // Call some function on the spender
+        }
+    }
+    
+    // Better approach: Use SafeERC20
+    import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+    import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+    
+    contract SafeERC20Handler {
+        using SafeERC20 for IERC20;
+        IERC20 public token;
+        
+        constructor(address tokenAddress) {
+            token = IERC20(tokenAddress);
+        }
+        
+        function transferTokens(address to, uint256 amount) public {
+            // Works with all ERC20 tokens, even non-compliant ones
+            token.safeTransfer(to, amount);
+        }
+        
+        function approveAndCall(address spender, uint256 amount) public {
+            // Works with all ERC20 tokens, even non-compliant ones
+            token.safeApprove(spender, amount);
+            // Call some function on the spender
+        }
+    }
+    ```
+    Use the SafeERC20 library when interacting with ERC20 tokens. Some tokens don't follow the standard correctly and might not return a boolean on `transfer()` or `approve()` calls, which can cause your transactions to revert unexpectedly.
+  </Accordion>
+</AccordionGroup>

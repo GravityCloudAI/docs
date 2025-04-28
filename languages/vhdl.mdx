@@ -1,0 +1,820 @@
+---
+title: 'VHDL'
+description: 'VHDL (VHSIC Hardware Description Language) is a hardware description language used in electronic design automation to describe digital and mixed-signal systems such as field-programmable gate arrays and integrated circuits.'
+---
+
+<AccordionGroup>
+  <Accordion title="VHDL Anti-Patterns Overview" icon="vhdl">
+    VHDL, as a hardware description language, has several common anti-patterns that can lead to simulation-synthesis mismatches, timing issues, and hard-to-debug hardware designs. Here are the most important anti-patterns to avoid when writing VHDL code.
+  </Accordion>
+  
+  <Accordion title="Using Variables Instead of Signals" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Using variables in sequential processes
+    architecture bad of counter is
+      signal count : integer range 0 to 15;
+    begin
+      process(clk, reset)
+        variable temp : integer range 0 to 15;
+      begin
+        if reset = '1' then
+          temp := 0;
+        elsif rising_edge(clk) then
+          temp := temp + 1;
+          if temp = 15 then
+            temp := 0;
+          end if;
+        end if;
+        count <= temp; -- Assigning variable to signal
+      end process;
+    end architecture;
+    
+    -- Better approach: Use signals for sequential logic
+    architecture good of counter is
+      signal count : integer range 0 to 15;
+    begin
+      process(clk, reset)
+      begin
+        if reset = '1' then
+          count <= 0;
+        elsif rising_edge(clk) then
+          if count = 14 then
+            count <= 0;
+          else
+            count <= count + 1;
+          end if;
+        end if;
+      end process;
+    end architecture;
+    ```
+    Avoid using variables for sequential logic. Variables update immediately when assigned, which can lead to unexpected behavior and simulation-synthesis mismatches. Use signals for sequential logic, as they update at the end of the process, modeling hardware behavior more accurately.
+  </Accordion>
+  
+  <Accordion title="Multiple Signal Assignments" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Multiple assignments to the same signal
+    architecture bad of mux is
+      signal output : std_logic;
+    begin
+      process(sel, a, b)
+      begin
+        if sel = '0' then
+          output <= a;
+        end if;
+        
+        if sel = '1' then
+          output <= b;
+        end if;
+      end process;
+    end architecture;
+    
+    -- Better approach: Single assignment with conditional logic
+    architecture good of mux is
+      signal output : std_logic;
+    begin
+      process(sel, a, b)
+      begin
+        if sel = '0' then
+          output <= a;
+        else
+          output <= b;
+        end if;
+      end process;
+    end architecture;
+    ```
+    Avoid multiple assignments to the same signal within a process. This can lead to race conditions and simulation-synthesis mismatches. Use a single assignment with conditional logic to ensure deterministic behavior.
+  </Accordion>
+  
+  <Accordion title="Incomplete Sensitivity Lists" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Incomplete sensitivity list
+    architecture bad of alu is
+      signal result : std_logic_vector(7 downto 0);
+    begin
+      process(a, b) -- Missing 'op' in sensitivity list
+      begin
+        case op is
+          when "00" => result <= a + b;
+          when "01" => result <= a - b;
+          when "10" => result <= a and b;
+          when "11" => result <= a or b;
+          when others => result <= (others => '0');
+        end case;
+      end process;
+    end architecture;
+    
+    -- Better approach: Complete sensitivity list
+    architecture good of alu is
+      signal result : std_logic_vector(7 downto 0);
+    begin
+      process(a, b, op) -- Complete sensitivity list
+      begin
+        case op is
+          when "00" => result <= a + b;
+          when "01" => result <= a - b;
+          when "10" => result <= a and b;
+          when "11" => result <= a or b;
+          when others => result <= (others => '0');
+        end case;
+      end process;
+    end architecture;
+    
+    -- Even better: Use VHDL-2008 process(all) for automatic sensitivity list
+    architecture best of alu is
+      signal result : std_logic_vector(7 downto 0);
+    begin
+      process(all) -- Automatic sensitivity list (VHDL-2008)
+      begin
+        case op is
+          when "00" => result <= a + b;
+          when "01" => result <= a - b;
+          when "10" => result <= a and b;
+          when "11" => result <= a or b;
+          when others => result <= (others => '0');
+        end case;
+      end process;
+    end architecture;
+    ```
+    Always use complete sensitivity lists for combinational processes. Incomplete sensitivity lists can lead to simulation-synthesis mismatches and incorrect behavior. In VHDL-2008, you can use `process(all)` for an automatic sensitivity list.
+  </Accordion>
+  
+  <Accordion title="Latches Due to Incomplete Assignments" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Incomplete assignments creating latches
+    architecture bad of fsm is
+      type state_type is (S0, S1, S2);
+      signal state, next_state : state_type;
+      signal output : std_logic;
+    begin
+      -- Next state logic
+      process(state, input)
+      begin
+        case state is
+          when S0 =>
+            if input = '1' then
+              next_state <= S1;
+              -- Missing else clause creates a latch for next_state
+            end if;
+          when S1 =>
+            next_state <= S2;
+            output <= '1'; -- Missing assignment in other states creates a latch for output
+          when S2 =>
+            next_state <= S0;
+        end case;
+      end process;
+      
+      -- State register
+      process(clk, reset)
+      begin
+        if reset = '1' then
+          state <= S0;
+        elsif rising_edge(clk) then
+          state <= next_state;
+        end if;
+      end process;
+    end architecture;
+    
+    -- Better approach: Complete assignments to avoid latches
+    architecture good of fsm is
+      type state_type is (S0, S1, S2);
+      signal state, next_state : state_type;
+      signal output : std_logic;
+    begin
+      -- Next state logic
+      process(state, input)
+      begin
+        -- Default assignments to avoid latches
+        next_state <= state;
+        output <= '0';
+        
+        case state is
+          when S0 =>
+            if input = '1' then
+              next_state <= S1;
+            end if;
+          when S1 =>
+            next_state <= S2;
+            output <= '1';
+          when S2 =>
+            next_state <= S0;
+        end case;
+      end process;
+      
+      -- State register
+      process(clk, reset)
+      begin
+        if reset = '1' then
+          state <= S0;
+        elsif rising_edge(clk) then
+          state <= next_state;
+        end if;
+      end process;
+    end architecture;
+    ```
+    Always provide default assignments to all signals at the beginning of combinational processes. Incomplete assignments can create unintended latches in your design, leading to unexpected behavior and timing issues.
+  </Accordion>
+  
+  <Accordion title="Mixing Blocking and Non-Blocking Assignments" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Mixing signal and variable assignments
+    architecture bad of mixed_assignments is
+      signal count : integer range 0 to 15;
+    begin
+      process(clk, reset)
+        variable temp : integer range 0 to 15;
+      begin
+        if reset = '1' then
+          temp := 0;
+          count <= 0;
+        elsif rising_edge(clk) then
+          temp := count + 1; -- Variable assignment
+          count <= temp;     -- Signal assignment
+        end if;
+      end process;
+    end architecture;
+    
+    -- Better approach: Consistent assignment types
+    architecture good of mixed_assignments is
+      signal count : integer range 0 to 15;
+    begin
+      process(clk, reset)
+      begin
+        if reset = '1' then
+          count <= 0;
+        elsif rising_edge(clk) then
+          count <= count + 1;
+        end if;
+      end process;
+    end architecture;
+    ```
+    Avoid mixing signal assignments (non-blocking, using `<=`) and variable assignments (blocking, using `:=`) within the same process. This can lead to confusion and potential simulation-synthesis mismatches. Use signals consistently for sequential logic.
+  </Accordion>
+  
+  <Accordion title="Asynchronous Reset Release" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Asynchronous reset release
+    architecture bad of counter is
+      signal count : std_logic_vector(3 downto 0);
+    begin
+      process(clk, reset)
+      begin
+        if reset = '1' then -- Asynchronous reset
+          count <= (others => '0');
+        elsif rising_edge(clk) then
+          count <= count + 1;
+        end if;
+      end process;
+    end architecture;
+    
+    -- Better approach: Synchronous reset release
+    architecture good of counter is
+      signal count : std_logic_vector(3 downto 0);
+      signal reset_sync1, reset_sync2 : std_logic;
+    begin
+      -- Synchronize reset release
+      process(clk, reset)
+      begin
+        if reset = '1' then
+          reset_sync1 <= '1';
+          reset_sync2 <= '1';
+        elsif rising_edge(clk) then
+          reset_sync1 <= '0';
+          reset_sync2 <= reset_sync1;
+        end if;
+      end process;
+      
+      -- Use synchronized reset
+      process(clk, reset)
+      begin
+        if reset = '1' then
+          count <= (others => '0');
+        elsif rising_edge(clk) then
+          if reset_sync2 = '0' then
+            count <= count + 1;
+          end if;
+        end if;
+      end process;
+    end architecture;
+    ```
+    Synchronize asynchronous reset release to avoid metastability issues. While asynchronous reset assertion is often used for reliable system initialization, the release should be synchronized to the clock to prevent timing violations.
+  </Accordion>
+  
+  <Accordion title="Combinational Loops" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Combinational loop
+    architecture bad of comb_loop is
+      signal a, b, c : std_logic;
+    begin
+      a <= b and c; -- c depends on a, and a depends on c
+      b <= input;
+      c <= a or d;
+    end architecture;
+    
+    -- Better approach: Break the combinational loop
+    architecture good of comb_loop is
+      signal a, b, c : std_logic;
+    begin
+      -- Use a register to break the loop
+      process(clk)
+      begin
+        if rising_edge(clk) then
+          a <= b and c;
+        end if;
+      end process;
+      
+      b <= input;
+      c <= a or d;
+    end architecture;
+    ```
+    Avoid creating combinational loops in your design. Combinational loops can lead to oscillations, unstable behavior, and synthesis issues. Break loops using registers or redesign your logic.
+  </Accordion>
+  
+  <Accordion title="Using Wait Statements in Synthesizable Code" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Using wait statements in synthesizable code
+    architecture bad of delay is
+      signal data_out : std_logic_vector(7 downto 0);
+    begin
+      process
+      begin
+        wait until rising_edge(clk);
+        data_out <= data_in;
+        wait for 10 ns; -- Not synthesizable
+        flag <= '1';
+      end process;
+    end architecture;
+    
+    -- Better approach: Use process sensitivity list
+    architecture good of delay is
+      signal data_out : std_logic_vector(7 downto 0);
+      signal flag : std_logic;
+      signal flag_delay : std_logic;
+    begin
+      process(clk)
+      begin
+        if rising_edge(clk) then
+          data_out <= data_in;
+          flag_delay <= '1';
+          flag <= flag_delay; -- Creates a one-cycle delay
+        end if;
+      end process;
+    end architecture;
+    ```
+    Avoid using `wait` statements in synthesizable code. `wait` statements are generally not synthesizable (except for some specific forms like `wait until rising_edge(clk)` in some tools). Use process sensitivity lists and additional registers to implement delays.
+  </Accordion>
+  
+  <Accordion title="Using Shared Variables Without Protected Types" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Using shared variables without protected types
+    architecture bad of shared_var is
+      shared variable counter : integer := 0; -- Unprotected shared variable
+    begin
+      process(clk1)
+      begin
+        if rising_edge(clk1) then
+          counter := counter + 1; -- Potential race condition
+        end if;
+      end process;
+      
+      process(clk2)
+      begin
+        if rising_edge(clk2) then
+          if counter > 10 then
+            counter := 0; -- Potential race condition
+          end if;
+        end if;
+      end process;
+    end architecture;
+    
+    -- Better approach: Use protected types for shared variables (VHDL-2002 and later)
+    architecture good of shared_var is
+      -- Define a protected type
+      package counter_pkg is
+        type protected_counter is protected
+          procedure increment;
+          procedure reset;
+          impure function get_value return integer;
+        end protected;
+      end package;
+      
+      package body counter_pkg is
+        type protected_counter is protected body
+          variable value : integer := 0;
+          
+          procedure increment is
+          begin
+            value := value + 1;
+          end procedure;
+          
+          procedure reset is
+          begin
+            value := 0;
+          end procedure;
+          
+          impure function get_value return integer is
+          begin
+            return value;
+          end function;
+        end protected body;
+      end package body;
+      
+      -- Use the protected type
+      shared variable counter : protected_counter;
+    begin
+      process(clk1)
+      begin
+        if rising_edge(clk1) then
+          counter.increment; -- Thread-safe access
+        end if;
+      end process;
+      
+      process(clk2)
+      begin
+        if rising_edge(clk2) then
+          if counter.get_value > 10 then
+            counter.reset; -- Thread-safe access
+          end if;
+        end if;
+      end process;
+    end architecture;
+    ```
+    Avoid using unprotected shared variables, as they can lead to race conditions and undefined behavior. Use protected types (available in VHDL-2002 and later) to ensure thread-safe access to shared variables.
+  </Accordion>
+  
+  <Accordion title="Using Inferred Latches for Memory" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Using inferred latches for memory
+    architecture bad of memory is
+      signal addr : std_logic_vector(3 downto 0);
+      signal data_out : std_logic_vector(7 downto 0);
+      type mem_type is array(0 to 15) of std_logic_vector(7 downto 0);
+      signal memory : mem_type;
+    begin
+      process(addr, wr_en, data_in)
+      begin
+        if wr_en = '1' then
+          memory(to_integer(unsigned(addr))) <= data_in;
+        end if;
+        
+        data_out <= memory(to_integer(unsigned(addr)));
+      end process;
+    end architecture;
+    
+    -- Better approach: Separate read and write processes
+    architecture good of memory is
+      signal addr : std_logic_vector(3 downto 0);
+      signal data_out : std_logic_vector(7 downto 0);
+      type mem_type is array(0 to 15) of std_logic_vector(7 downto 0);
+      signal memory : mem_type;
+    begin
+      -- Write process (sequential)
+      process(clk)
+      begin
+        if rising_edge(clk) then
+          if wr_en = '1' then
+            memory(to_integer(unsigned(addr))) <= data_in;
+          end if;
+        end if;
+      end process;
+      
+      -- Read process (combinational)
+      process(addr, memory)
+      begin
+        data_out <= memory(to_integer(unsigned(addr)));
+      end process;
+    end architecture;
+    ```
+    Avoid using inferred latches for memory. Instead, use a clocked process for writes and a separate combinational process for reads. This ensures that your memory is implemented using proper memory resources (like block RAM) rather than latches.
+  </Accordion>
+  
+  <Accordion title="Not Using Records for Related Signals" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Not using records for related signals
+    architecture bad of data_path is
+      signal data_valid : std_logic;
+      signal data : std_logic_vector(7 downto 0);
+      signal data_last : std_logic;
+      signal data_id : std_logic_vector(3 downto 0);
+    begin
+      process(clk)
+      begin
+        if rising_edge(clk) then
+          reg_data_valid <= data_valid;
+          reg_data <= data;
+          reg_data_last <= data_last;
+          reg_data_id <= data_id;
+        end if;
+      end process;
+    end architecture;
+    
+    -- Better approach: Use records for related signals
+    architecture good of data_path is
+      type data_bus_type is record
+        valid : std_logic;
+        data : std_logic_vector(7 downto 0);
+        last : std_logic;
+        id : std_logic_vector(3 downto 0);
+      end record;
+      
+      signal data_bus, reg_data_bus : data_bus_type;
+    begin
+      process(clk)
+      begin
+        if rising_edge(clk) then
+          reg_data_bus <= data_bus; -- Single assignment for all related signals
+        end if;
+      end process;
+    end architecture;
+    ```
+    Use records to group related signals together. This makes your code more readable, maintainable, and less error-prone. It also simplifies port maps and signal assignments for groups of related signals.
+  </Accordion>
+  
+  <Accordion title="Not Using Packages for Common Definitions" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Duplicating definitions across files
+    -- In file1.vhd
+    architecture bad1 of module1 is
+      type state_type is (IDLE, READ, WRITE, DONE);
+      constant TIMEOUT : integer := 1000;
+    begin
+      -- Implementation
+    end architecture;
+    
+    -- In file2.vhd
+    architecture bad2 of module2 is
+      type state_type is (IDLE, READ, WRITE, DONE); -- Duplicated definition
+      constant TIMEOUT : integer := 1000; -- Duplicated definition
+    begin
+      -- Implementation
+    end architecture;
+    
+    -- Better approach: Use packages for common definitions
+    -- In common_pkg.vhd
+    package common_pkg is
+      type state_type is (IDLE, READ, WRITE, DONE);
+      constant TIMEOUT : integer := 1000;
+    end package;
+    
+    -- In file1.vhd
+    use work.common_pkg.all;
+    
+    architecture good1 of module1 is
+    begin
+      -- Implementation using state_type and TIMEOUT
+    end architecture;
+    
+    -- In file2.vhd
+    use work.common_pkg.all;
+    
+    architecture good2 of module2 is
+    begin
+      -- Implementation using state_type and TIMEOUT
+    end architecture;
+    ```
+    Use packages to define common types, constants, and functions that are used across multiple files. This promotes code reuse, consistency, and maintainability.
+  </Accordion>
+  
+  <Accordion title="Not Using Generics for Parameterization" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Hardcoded values
+    entity counter_bad is
+      port (
+        clk : in std_logic;
+        reset : in std_logic;
+        count : out std_logic_vector(7 downto 0) -- Hardcoded width
+      );
+    end entity;
+    
+    architecture rtl of counter_bad is
+      signal counter_reg : unsigned(7 downto 0);
+      constant MAX_COUNT : integer := 100; -- Hardcoded value
+    begin
+      process(clk, reset)
+      begin
+        if reset = '1' then
+          counter_reg <= (others => '0');
+        elsif rising_edge(clk) then
+          if counter_reg = MAX_COUNT - 1 then
+            counter_reg <= (others => '0');
+          else
+            counter_reg <= counter_reg + 1;
+          end if;
+        end if;
+      end process;
+      
+      count <= std_logic_vector(counter_reg);
+    end architecture;
+    
+    -- Better approach: Use generics for parameterization
+    entity counter_good is
+      generic (
+        WIDTH : integer := 8;
+        MAX_COUNT : integer := 100
+      );
+      port (
+        clk : in std_logic;
+        reset : in std_logic;
+        count : out std_logic_vector(WIDTH-1 downto 0)
+      );
+    end entity;
+    
+    architecture rtl of counter_good is
+      signal counter_reg : unsigned(WIDTH-1 downto 0);
+    begin
+      process(clk, reset)
+      begin
+        if reset = '1' then
+          counter_reg <= (others => '0');
+        elsif rising_edge(clk) then
+          if counter_reg = MAX_COUNT - 1 then
+            counter_reg <= (others => '0');
+          else
+            counter_reg <= counter_reg + 1;
+          end if;
+        end if;
+      end process;
+      
+      count <= std_logic_vector(counter_reg);
+    end architecture;
+    ```
+    Use generics to parameterize your designs. This makes your code more reusable and configurable. Generics can be used to specify bit widths, constants, and other parameters that might need to be changed when reusing the design.
+  </Accordion>
+  
+  <Accordion title="Not Using Named Association in Port Maps" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Positional association in port maps
+    architecture bad of top is
+      signal clk, reset, enable : std_logic;
+      signal data_in, data_out : std_logic_vector(7 downto 0);
+    begin
+      -- Positional port map is error-prone
+      counter_inst : entity work.counter
+        port map (clk, reset, enable, data_in, data_out);
+    end architecture;
+    
+    -- Better approach: Use named association in port maps
+    architecture good of top is
+      signal clk, reset, enable : std_logic;
+      signal data_in, data_out : std_logic_vector(7 downto 0);
+    begin
+      -- Named port map is clearer and less error-prone
+      counter_inst : entity work.counter
+        port map (
+          clk => clk,
+          reset => reset,
+          enable => enable,
+          data_in => data_in,
+          data_out => data_out
+        );
+    end architecture;
+    ```
+    Use named association in port maps and generic maps. Named association is clearer, less error-prone, and allows for port reordering without breaking your design.
+  </Accordion>
+  
+  <Accordion title="Not Using Functions and Procedures" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Duplicated code
+    architecture bad of module is
+      signal count1, count2 : integer range 0 to 15;
+    begin
+      process(clk)
+      begin
+        if rising_edge(clk) then
+          -- Duplicated logic for count1
+          if count1 = 15 then
+            count1 <= 0;
+          else
+            count1 <= count1 + 1;
+          end if;
+          
+          -- Duplicated logic for count2
+          if count2 = 15 then
+            count2 <= 0;
+          else
+            count2 <= count2 + 1;
+          end if;
+        end if;
+      end process;
+    end architecture;
+    
+    -- Better approach: Use functions and procedures
+    architecture good of module is
+      signal count1, count2 : integer range 0 to 15;
+      
+      -- Function to increment with wrap-around
+      function increment_with_wrap(value : integer; max_value : integer) return integer is
+      begin
+        if value = max_value then
+          return 0;
+        else
+          return value + 1;
+        end if;
+      end function;
+    begin
+      process(clk)
+      begin
+        if rising_edge(clk) then
+          count1 <= increment_with_wrap(count1, 15);
+          count2 <= increment_with_wrap(count2, 15);
+        end if;
+      end process;
+    end architecture;
+    ```
+    Use functions and procedures to encapsulate common logic and avoid code duplication. This makes your code more maintainable, readable, and less error-prone.
+  </Accordion>
+  
+  <Accordion title="Not Using Assertions" icon="warning">
+    ```vhdl
+    -- Anti-pattern: No assertions for verification
+    architecture bad of module is
+      signal count : integer range 0 to 15;
+    begin
+      process(clk)
+      begin
+        if rising_edge(clk) then
+          count <= count + 1;
+          -- No checks for overflow or other conditions
+        end if;
+      end process;
+    end architecture;
+    
+    -- Better approach: Use assertions for verification
+    architecture good of module is
+      signal count : integer range 0 to 15;
+    begin
+      process(clk)
+      begin
+        if rising_edge(clk) then
+          -- Check for overflow
+          assert count < 15 report "Counter overflow" severity warning;
+          
+          count <= count + 1;
+        end if;
+      end process;
+      
+      -- Check timing constraints
+      assert clk'event_time >= 10 ns report "Clock period violation" severity error;
+      
+      -- Check protocol compliance
+      assert not (valid = '1' and ready = '0' and last_valid = '1' and last_ready = '0')
+        report "Handshake protocol violation: valid asserted for two cycles without ready"
+        severity error;
+    end architecture;
+    ```
+    Use assertions to verify the correctness of your design. Assertions can catch bugs early in the design process and serve as documentation for expected behavior.
+  </Accordion>
+  
+  <Accordion title="Not Using Configuration Declarations" icon="warning">
+    ```vhdl
+    -- Anti-pattern: Hardcoded component instantiations
+    architecture bad of top is
+      component counter is
+        port (
+          clk : in std_logic;
+          reset : in std_logic;
+          count : out std_logic_vector(7 downto 0)
+        );
+      end component;
+    begin
+      -- Hardcoded binding to a specific implementation
+      counter_inst : counter
+        port map (clk, reset, count);
+    end architecture;
+    
+    -- Better approach: Use configuration declarations
+    architecture good of top is
+      component counter is
+        port (
+          clk : in std_logic;
+          reset : in std_logic;
+          count : out std_logic_vector(7 downto 0)
+        );
+      end component;
+    begin
+      counter_inst : counter
+        port map (clk => clk, reset => reset, count => count);
+    end architecture;
+    
+    -- Configuration declaration in a separate file
+    configuration top_config of top is
+      for good
+        -- For simulation
+        for counter_inst : counter
+          use entity work.counter(rtl);
+        end for;
+      end for;
+    end configuration;
+    
+    -- Alternative configuration for synthesis
+    configuration top_synth_config of top is
+      for good
+        -- For synthesis
+        for counter_inst : counter
+          use entity work.counter(synth);
+        end for;
+      end for;
+    end configuration;
+    ```
+    Use configuration declarations to separate the structural description of your design from the binding to specific implementations. This allows you to easily switch between different implementations for simulation and synthesis.
+  </Accordion>
+</AccordionGroup>

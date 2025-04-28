@@ -1,0 +1,523 @@
+---
+title: 'PHP'
+description: 'PHP is a popular general-purpose scripting language especially suited for web development. It is fast, flexible, and pragmatic, powering everything from blogs to the most popular websites in the world.'
+---
+
+<AccordionGroup>
+  <Accordion title="PHP Anti-Patterns Overview" icon="php">
+    PHP, despite its widespread use and continuous improvements, still has common anti-patterns that can lead to bugs, security vulnerabilities, and maintenance problems. Here are the most important anti-patterns to avoid when writing PHP code.
+  </Accordion>
+  
+  <Accordion title="Using Loose Comparisons" icon="warning">
+    ```php
+    // Anti-pattern: Loose comparisons
+    if ($value == 0) {
+        // This will be true for 0, '0', false, null, empty array
+    }
+    
+    // Better approach: Use strict comparisons
+    if ($value === 0) {
+        // This will only be true for 0
+    }
+    ```
+    PHP's loose comparison (`==`) can lead to unexpected results due to type juggling. Always use strict comparison (`===`) to compare both value and type.
+  </Accordion>
+  
+  <Accordion title="Not Sanitizing User Input" icon="warning">
+    ```php
+    // Anti-pattern: Unsanitized input
+    $username = $_POST['username'];
+    $query = "SELECT * FROM users WHERE username = '$username'";
+    $result = mysqli_query($connection, $query);
+    // SQL injection vulnerability
+    
+    // Better approach: Use prepared statements
+    $username = $_POST['username'];
+    $stmt = $connection->prepare("SELECT * FROM users WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    ```
+    Always sanitize user input to prevent SQL injection, XSS, and other security vulnerabilities. Use prepared statements for database queries.
+  </Accordion>
+  
+  <Accordion title="Using Deprecated mysql_ Functions" icon="warning">
+    ```php
+    // Anti-pattern: Using deprecated mysql_ functions
+    $connection = mysql_connect('localhost', 'user', 'password');
+    mysql_select_db('database');
+    $result = mysql_query("SELECT * FROM users");
+    
+    // Better approach: Use mysqli or PDO
+    $connection = new mysqli('localhost', 'user', 'password', 'database');
+    $result = $connection->query("SELECT * FROM users");
+    
+    // Or with PDO
+    $pdo = new PDO('mysql:host=localhost;dbname=database', 'user', 'password');
+    $statement = $pdo->query("SELECT * FROM users");
+    ```
+    The `mysql_*` functions are deprecated and removed in PHP 7+. Use `mysqli_*` or PDO instead for database operations.
+  </Accordion>
+  
+  <Accordion title="Not Using Namespaces" icon="warning">
+    ```php
+    // Anti-pattern: Global namespace
+    class User {
+        // ...
+    }
+    
+    function validate_email($email) {
+        // ...
+    }
+    
+    // Better approach: Use namespaces
+    namespace App\Models;
+    
+    class User {
+        // ...
+    }
+    
+    namespace App\Utils;
+    
+    function validate_email($email) {
+        // ...
+    }
+    ```
+    Use namespaces to organize your code and avoid naming conflicts, especially in larger applications.
+  </Accordion>
+  
+  <Accordion title="Using eval()" icon="warning">
+    ```php
+    // Anti-pattern: Using eval
+    $calculation = $_GET['calc'];
+    $result = eval('return ' . $calculation . ';');
+    // Extremely dangerous - allows code execution
+    
+    // Better approach: Use safer alternatives
+    $calculation = $_GET['calc'];
+    if (preg_match('/^[0-9+\-*\/()\.\s]+$/', $calculation)) {
+        // Still not perfect, but safer than eval
+        $result = eval('return ' . $calculation . ';');
+    } else {
+        throw new Exception("Invalid calculation");
+    }
+    
+    // Even better: Use a proper math library
+    use MathParser\StdMathParser;
+    $parser = new StdMathParser();
+    $result = $parser->parse($calculation)->evaluate();
+    ```
+    Never use `eval()` as it allows arbitrary code execution. Use safer alternatives specific to your use case.
+  </Accordion>
+  
+  <Accordion title="Not Using Autoloading" icon="warning">
+    ```php
+    // Anti-pattern: Manual includes
+    require_once 'models/User.php';
+    require_once 'models/Post.php';
+    require_once 'controllers/UserController.php';
+    // Many more requires...
+    
+    // Better approach: Use autoloading (PSR-4)
+    // composer.json
+    // {
+    //     "autoload": {
+    //         "psr-4": {
+    //             "App\\": "src/"
+    //         }
+    //     }
+    // }
+    
+    // Then in your code
+    require_once 'vendor/autoload.php';
+    
+    use App\Models\User;
+    use App\Models\Post;
+    use App\Controllers\UserController;
+    ```
+    Use Composer's autoloading (PSR-4) instead of manual `require`/`include` statements to automatically load classes when needed.
+  </Accordion>
+  
+  <Accordion title="Not Using Type Declarations" icon="warning">
+    ```php
+    // Anti-pattern: No type declarations
+    function calculateTotal($items, $tax) {
+        $total = 0;
+        foreach ($items as $item) {
+            $total += $item->price;
+        }
+        return $total * (1 + $tax);
+    }
+    
+    // Better approach: Use type declarations (PHP 7+)
+    function calculateTotal(array $items, float $tax): float {
+        $total = 0;
+        foreach ($items as $item) {
+            $total += $item->price;
+        }
+        return $total * (1 + $tax);
+    }
+    ```
+    Use type declarations (scalar types, return types, nullable types) to make your code more robust and self-documenting.
+  </Accordion>
+  
+  <Accordion title="Using Short Tags" icon="warning">
+    ```php
+    // Anti-pattern: Using short tags
+    <? echo $variable; ?>
+    
+    // Better approach: Use full PHP tags
+    <?php echo $variable; ?>
+    
+    // Or for echo statements
+    <?= $variable ?>
+    ```
+    Short tags (`<?`) are not enabled on all servers and may conflict with XML declarations. Always use full PHP tags (`<?php`) or the echo shorthand (`<?=`).
+  </Accordion>
+  
+  <Accordion title="Not Using Error Handling" icon="warning">
+    ```php
+    // Anti-pattern: No error handling
+    $file = file_get_contents('config.json');
+    $config = json_decode($file);
+    // What if file doesn't exist or contains invalid JSON?
+    
+    // Better approach: Proper error handling
+    try {
+        if (!file_exists('config.json')) {
+            throw new Exception('Config file not found');
+        }
+        
+        $file = file_get_contents('config.json');
+        $config = json_decode($file, false, 512, JSON_THROW_ON_ERROR);
+    } catch (Exception $e) {
+        // Log error
+        error_log('Config error: ' . $e->getMessage());
+        // Use default config
+        $config = new stdClass();
+        $config->default = true;
+    }
+    ```
+    Use proper error handling with try-catch blocks and exceptions to gracefully handle errors.
+  </Accordion>
+  
+  <Accordion title="Using Superglobals Directly" icon="warning">
+    ```php
+    // Anti-pattern: Using superglobals directly
+    $username = $_POST['username'];
+    $page = $_GET['page'];
+    
+    // Better approach: Validate and sanitize
+    $username = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_STRING) ?? '';
+    $page = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?? 1;
+    
+    // Even better: Use a request object
+    class Request {
+        public function post(string $key, $default = null) {
+            return filter_input(INPUT_POST, $key, FILTER_SANITIZE_STRING) ?? $default;
+        }
+        
+        public function get(string $key, $default = null) {
+            return filter_input(INPUT_GET, $key, FILTER_SANITIZE_STRING) ?? $default;
+        }
+    }
+    
+    $request = new Request();
+    $username = $request->post('username');
+    $page = $request->get('page', 1);
+    ```
+    Don't use superglobals (`$_GET`, `$_POST`, etc.) directly. Validate and sanitize input or use a request abstraction.
+  </Accordion>
+  
+  <Accordion title="Not Using Environment Variables" icon="warning">
+    ```php
+    // Anti-pattern: Hardcoded configuration
+    $dbHost = 'localhost';
+    $dbUser = 'root';
+    $dbPass = 'secret_password';
+    $apiKey = 'abc123xyz';
+    
+    // Better approach: Use environment variables
+    // .env file (not in version control)
+    // DB_HOST=localhost
+    // DB_USER=root
+    // DB_PASS=secret_password
+    // API_KEY=abc123xyz
+    
+    // In your code
+    $dbHost = getenv('DB_HOST') ?: 'localhost';
+    $dbUser = getenv('DB_USER') ?: 'root';
+    $dbPass = getenv('DB_PASS') ?: '';
+    $apiKey = getenv('API_KEY') ?: '';
+    
+    // Even better: Use a library like phpdotenv
+    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+    $dotenv->load();
+    
+    $dbHost = $_ENV['DB_HOST'];
+    $dbUser = $_ENV['DB_USER'];
+    $dbPass = $_ENV['DB_PASS'];
+    $apiKey = $_ENV['API_KEY'];
+    ```
+    Don't hardcode sensitive information like database credentials or API keys. Use environment variables or a `.env` file (with proper security).
+  </Accordion>
+  
+  <Accordion title="Not Using Dependency Injection" icon="warning">
+    ```php
+    // Anti-pattern: Hardcoded dependencies
+    class UserController {
+        public function index() {
+            $repository = new UserRepository();
+            $users = $repository->getAll();
+            // ...
+        }
+    }
+    
+    // Better approach: Dependency injection
+    class UserController {
+        private $repository;
+        
+        public function __construct(UserRepository $repository) {
+            $this->repository = $repository;
+        }
+        
+        public function index() {
+            $users = $this->repository->getAll();
+            // ...
+        }
+    }
+    ```
+    Use dependency injection to make your code more testable and flexible.
+  </Accordion>
+  
+  <Accordion title="Not Using Interfaces" icon="warning">
+    ```php
+    // Anti-pattern: No interfaces
+    class UserRepository {
+        public function getAll() { /* ... */ }
+        public function findById($id) { /* ... */ }
+        public function save($user) { /* ... */ }
+    }
+    
+    // Better approach: Define interfaces
+    interface UserRepositoryInterface {
+        public function getAll(): array;
+        public function findById(int $id): ?User;
+        public function save(User $user): bool;
+    }
+    
+    class MySqlUserRepository implements UserRepositoryInterface {
+        // Implementation for MySQL
+    }
+    
+    class RedisUserRepository implements UserRepositoryInterface {
+        // Implementation for Redis
+    }
+    ```
+    Use interfaces to define contracts and allow for different implementations.
+  </Accordion>
+  
+  <Accordion title="Using Magic Methods Excessively" icon="warning">
+    ```php
+    // Anti-pattern: Overusing magic methods
+    class User {
+        private $data = [];
+        
+        public function __get($name) {
+            return $this->data[$name] ?? null;
+        }
+        
+        public function __set($name, $value) {
+            $this->data[$name] = $value;
+        }
+    }
+    
+    // Better approach: Explicit properties and methods
+    class User {
+        private $name;
+        private $email;
+        
+        public function getName(): string {
+            return $this->name;
+        }
+        
+        public function setName(string $name): void {
+            $this->name = $name;
+        }
+        
+        public function getEmail(): string {
+            return $this->email;
+        }
+        
+        public function setEmail(string $email): void {
+            $this->email = $email;
+        }
+    }
+    ```
+    Magic methods (`__get`, `__set`, etc.) can make code harder to understand and debug. Use them sparingly and prefer explicit properties and methods.
+  </Accordion>
+  
+  <Accordion title="Not Using Composer for Dependencies" icon="warning">
+    ```php
+    // Anti-pattern: Manual dependency management
+    // Downloading libraries manually and including them
+    require_once 'libs/some-library/src/SomeClass.php';
+    
+    // Better approach: Use Composer
+    // composer.json
+    // {
+    //     "require": {
+    //         "vendor/package": "^1.0"
+    //     }
+    // }
+    
+    // In your code
+    require_once 'vendor/autoload.php';
+    use Vendor\Package\SomeClass;
+    ```
+    Use Composer to manage dependencies instead of downloading libraries manually.
+  </Accordion>
+  
+  <Accordion title="Not Using a Proper MVC Structure" icon="warning">
+    ```php
+    // Anti-pattern: Mixed concerns
+    // index.php
+    $conn = new mysqli('localhost', 'user', 'pass', 'db');
+    $result = $conn->query("SELECT * FROM users");
+    
+    echo "<html><body><table>";
+    while ($row = $result->fetch_assoc()) {
+        echo "<tr><td>{$row['name']}</td></tr>";
+    }
+    echo "</table></body></html>";
+    
+    // Better approach: MVC separation
+    // Model (UserModel.php)
+    class UserModel {
+        private $conn;
+        
+        public function __construct(mysqli $conn) {
+            $this->conn = $conn;
+        }
+        
+        public function getAllUsers(): array {
+            $result = $this->conn->query("SELECT * FROM users");
+            $users = [];
+            while ($row = $result->fetch_assoc()) {
+                $users[] = $row;
+            }
+            return $users;
+        }
+    }
+    
+    // Controller (UserController.php)
+    class UserController {
+        private $model;
+        
+        public function __construct(UserModel $model) {
+            $this->model = $model;
+        }
+        
+        public function index() {
+            $users = $this->model->getAllUsers();
+            include 'views/users/index.php';
+        }
+    }
+    
+    // View (views/users/index.php)
+    <html>
+    <body>
+        <table>
+            <?php foreach ($users as $user): ?>
+                <tr><td><?= htmlspecialchars($user['name']) ?></td></tr>
+            <?php endforeach; ?>
+        </table>
+    </body>
+    </html>
+    ```
+    Separate your code into Model (data), View (presentation), and Controller (logic) components.
+  </Accordion>
+  
+  <Accordion title="Not Using PHP-FIG Standards" icon="warning">
+    ```php
+    // Anti-pattern: Inconsistent coding style
+    function get_user_data($userId) {
+        // ...
+    }
+    
+    class userController {
+        function ShowProfile($id) {
+            // ...
+        }
+    }
+    
+    // Better approach: Follow PSR standards
+    // PSR-1: Basic Coding Standard
+    // PSR-2/PSR-12: Coding Style Guide
+    function getUserData($userId) {
+        // ...
+    }
+    
+    class UserController {
+        public function showProfile($id) {
+            // ...
+        }
+    }
+    ```
+    Follow PHP-FIG standards (PSR-1, PSR-2/PSR-12, etc.) for consistent, readable code.
+  </Accordion>
+  
+  <Accordion title="Not Using Static Analysis Tools" icon="warning">
+    ```php
+    // Anti-pattern: Code with potential issues
+    function calculate($a, $b) {
+        return $a + $b;
+    }
+    
+    $result = calculate('5', '10'); // Works but not type-safe
+    
+    // Better approach: Use static analysis tools
+    // phpstan.neon
+    // parameters:
+    //     level: 8
+    
+    /**
+     * @param int $a
+     * @param int $b
+     * @return int
+     */
+    function calculate(int $a, int $b): int {
+        return $a + $b;
+    }
+    
+    $result = calculate(5, 10); // Type-safe
+    ```
+    Use static analysis tools like PHPStan, Psalm, or PHP_CodeSniffer to catch potential issues early.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Session Management" icon="warning">
+    ```php
+    // Anti-pattern: Insecure session management
+    session_start();
+    $_SESSION['user_id'] = $userId;
+    
+    // Better approach: Secure session management
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.cookie_secure', 1);
+    ini_set('session.use_only_cookies', 1);
+    ini_set('session.cookie_samesite', 'Lax');
+    
+    session_start([
+        'cookie_httponly' => true,
+        'cookie_secure' => true,
+        'use_only_cookies' => true,
+        'cookie_samesite' => 'Lax'
+    ]);
+    
+    $_SESSION['user_id'] = $userId;
+    $_SESSION['created_at'] = time();
+    $_SESSION['ip_address'] = $_SERVER['REMOTE_ADDR'];
+    ```
+    Configure sessions securely to prevent session hijacking and other attacks.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,650 @@
+---
+title: 'D'
+description: 'D is a general-purpose programming language with static typing, systems-level access, and C-like syntax. It combines the performance and safety of compiled languages with the expressive power and convenience of modern languages.'
+---
+
+<AccordionGroup>
+  <Accordion title="D Anti-Patterns Overview" icon="d">
+    D, despite being a powerful and versatile language, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing D code.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Runtime Type Information (RTTI)" icon="warning">
+    ```d
+    // Anti-pattern: Excessive use of RTTI
+    void processObject(Object obj) {
+        if (auto stringObj = cast(String)obj) {
+            // Handle string
+            writeln("String: ", stringObj);
+        } else if (auto intObj = cast(Integer)obj) {
+            // Handle integer
+            writeln("Integer: ", intObj.value);
+        } else if (auto arrayObj = cast(Array)obj) {
+            // Handle array
+            writeln("Array with ", arrayObj.length, " elements");
+        }
+        // And so on for many types...
+    }
+    
+    // Better approach: Use polymorphism or templates
+    interface Processable {
+        void process();
+    }
+    
+    class String : Processable {
+        string value;
+        this(string value) { this.value = value; }
+        void process() { writeln("String: ", value); }
+    }
+    
+    class Integer : Processable {
+        int value;
+        this(int value) { this.value = value; }
+        void process() { writeln("Integer: ", value); }
+    }
+    
+    void processObject(Processable obj) {
+        obj.process();
+    }
+    
+    // Or using templates
+    void processObject(T)(T obj) {
+        static if (is(T == string)) {
+            writeln("String: ", obj);
+        } else static if (is(T : int)) {
+            writeln("Integer: ", obj);
+        } else static if (isArray!T) {
+            writeln("Array with ", obj.length, " elements");
+        } else {
+            static assert(false, "Unsupported type: " ~ T.stringof);
+        }
+    }
+    ```
+    Avoid excessive use of runtime type information (RTTI) with `cast` operations. This approach is slow, error-prone, and leads to brittle code. Instead, use polymorphism, interfaces, or templates to handle different types in a more type-safe and efficient manner.
+  </Accordion>
+  
+  <Accordion title="Not Using @safe, @trusted, and @system Properly" icon="warning">
+    ```d
+    // Anti-pattern: Not using safety attributes
+    void* dangerousFunction(int* ptr) {
+        void* result = ptr;  // Unsafe pointer conversion
+        result += 10;       // Unsafe pointer arithmetic
+        return result;
+    }
+    
+    // Better approach: Use safety attributes
+    @system void* unsafeOperation(int* ptr) {
+        void* result = ptr;  // Unsafe pointer conversion
+        result += 10;       // Unsafe pointer arithmetic
+        return result;
+    }
+    
+    @trusted void* wrappedUnsafeOperation(int* ptr) {
+        // Call unsafe code but ensure it's used safely
+        return unsafeOperation(ptr);
+    }
+    
+    @safe void safeFunction() {
+        // Only calls @safe or @trusted functions
+        int[5] arr = [1, 2, 3, 4, 5];
+        auto result = wrappedUnsafeOperation(&arr[0]);
+        // Use result safely...
+    }
+    ```
+    Use D's safety attributes (`@safe`, `@trusted`, and `@system`) to clearly indicate the safety level of your code. Mark unsafe code as `@system`, wrap it with carefully reviewed `@trusted` functions, and aim to make most of your codebase `@safe`. This helps prevent memory safety issues and makes your code more robust.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Shared Mutable State" icon="warning">
+    ```d
+    // Anti-pattern: Excessive shared mutable state
+    int globalCounter = 0;
+    
+    void incrementCounter() {
+        globalCounter++;
+    }
+    
+    void processData() {
+        // Multiple threads might access globalCounter
+        incrementCounter();
+        // More processing...
+    }
+    
+    // Better approach: Use immutability and message passing
+    immutable int CONSTANT_VALUE = 42;
+    
+    // Or use thread-local storage
+    __gshared int globalCounter = 0;  // Explicitly mark as global shared
+    
+    // Or use proper synchronization
+    import core.sync.mutex : Mutex;
+    
+    class ThreadSafeCounter {
+        private int _value = 0;
+        private Mutex _mutex;
+        
+        this() {
+            _mutex = new Mutex();
+        }
+        
+        void increment() {
+            synchronized(_mutex) {
+                _value++;
+            }
+        }
+        
+        int value() {
+            synchronized(_mutex) {
+                return _value;
+            }
+        }
+    }
+    ```
+    Avoid excessive use of shared mutable state. Shared mutable state makes code harder to reason about and can lead to race conditions in concurrent programs. Instead, prefer immutability, message passing, or proper synchronization mechanisms when shared state is necessary.
+  </Accordion>
+  
+  <Accordion title="Not Using UFCS (Uniform Function Call Syntax)" icon="warning">
+    ```d
+    // Anti-pattern: Not using UFCS
+    string convertToUpper(string input) {
+        return toUpper(input);  // Traditional function call
+    }
+    
+    // Better approach: Embrace UFCS
+    string convertToUpper(string input) {
+        return input.toUpper();  // Using UFCS
+    }
+    
+    // This allows for chaining operations
+    string processString(string input) {
+        return input
+            .strip()
+            .toUpper()
+            .replace("OLD", "NEW");
+    }
+    ```
+    Embrace Uniform Function Call Syntax (UFCS), which allows free functions to be called using method syntax. This makes your code more readable, especially when chaining operations, and helps create a more consistent API style.
+  </Accordion>
+  
+  <Accordion title="Not Using Range-Based Algorithms" icon="warning">
+    ```d
+    // Anti-pattern: Manual iteration and transformation
+    int[] doubleValues(int[] arr) {
+        int[] result = new int[arr.length];
+        foreach (i, v; arr) {
+            result[i] = v * 2;
+        }
+        return result;
+    }
+    
+    // Better approach: Use range-based algorithms
+    import std.algorithm : map;
+    import std.array : array;
+    
+    int[] doubleValues(int[] arr) {
+        return arr.map!(a => a * 2).array;
+    }
+    
+    // Even more complex operations become cleaner
+    import std.algorithm : filter, map, sum;
+    
+    int sumOfEvenDoubles(int[] arr) {
+        return arr
+            .filter!(a => a % 2 == 0)  // Keep only even numbers
+            .map!(a => a * 2)          // Double each value
+            .sum;                      // Sum the results
+    }
+    ```
+    Use D's powerful range-based algorithms from `std.algorithm` and related modules instead of manual iteration and transformation. Range-based algorithms are more expressive, less error-prone, and often more efficient than manual loops.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Dynamic Arrays" icon="warning">
+    ```d
+    // Anti-pattern: Excessive use of dynamic arrays
+    void processLargeData() {
+        int[] data = new int[1_000_000];  // Allocates on GC heap
+        
+        // Fill and process data
+        foreach (i; 0..data.length) {
+            data[i] = i;
+        }
+        
+        // More processing...
+    }
+    
+    // Better approach: Use stack arrays or custom allocators when appropriate
+    void processSmallData() {
+        int[100] data;  // Stack allocation, no GC
+        
+        // Fill and process data
+        foreach (i; 0..data.length) {
+            data[i] = i;
+        }
+        
+        // More processing...
+    }
+    
+    // For larger data, consider custom allocators
+    import std.experimental.allocator;
+    import std.experimental.allocator.mallocator;
+    
+    void processLargeDataWithCustomAllocator() {
+        // Use Mallocator instead of GC
+        auto data = Mallocator.instance.makeArray!int(1_000_000);
+        scope(exit) Mallocator.instance.dispose(data);
+        
+        // Fill and process data
+        foreach (i; 0..data.length) {
+            data[i] = i;
+        }
+        
+        // More processing...
+    }
+    ```
+    Be mindful of excessive use of dynamic arrays, which allocate on the garbage-collected heap. For small, fixed-size arrays, use stack arrays. For large arrays or performance-critical code, consider using custom allocators from `std.experimental.allocator` to have more control over memory management.
+  </Accordion>
+  
+  <Accordion title="Not Using Contract Programming" icon="warning">
+    ```d
+    // Anti-pattern: Manual parameter checking
+    int divide(int a, int b) {
+        if (b == 0) {
+            throw new Exception("Division by zero");
+        }
+        return a / b;
+    }
+    
+    // Better approach: Use contracts
+    int divide(int a, int b)
+    in {
+        assert(b != 0, "Division by zero");
+    }
+    do {
+        return a / b;
+    }
+    
+    // More complex example with pre and post conditions
+    int[] sort(int[] arr)
+    in {
+        assert(arr !is null, "Array cannot be null");
+    }
+    out (result) {
+        // Verify the result is sorted
+        for (size_t i = 1; i < result.length; i++) {
+            assert(result[i-1] <= result[i], "Array not sorted");
+        }
+    }
+    do {
+        import std.algorithm : sort;
+        return arr.dup.sort().array;
+    }
+    ```
+    Use D's contract programming features (`in` and `out` blocks) to specify preconditions and postconditions for functions. Contracts make your code more robust by clearly documenting and enforcing expectations about inputs and outputs.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```d
+    // Anti-pattern: Poor error handling
+    void processFile(string filename) {
+        auto file = File(filename, "r");  // Might throw if file doesn't exist
+        auto content = file.readln();     // Might throw on I/O error
+        // Process content...
+    }
+    
+    // Better approach: Use proper error handling
+    import std.exception : collectException;
+    
+    bool processFile(string filename, out string errorMessage) {
+        try {
+            auto file = File(filename, "r");
+            auto content = file.readln();
+            // Process content...
+            return true;
+        } catch (Exception e) {
+            errorMessage = e.msg;
+            return false;
+        }
+    }
+    
+    // Alternative: Use Nullable or std.typecons.Tuple for return values
+    import std.typecons : Tuple, tuple;
+    import std.typecons : Nullable;
+    
+    Tuple!(bool, string) processFile(string filename) {
+        auto e = collectException!Exception({
+            auto file = File(filename, "r");
+            auto content = file.readln();
+            // Process content...
+        }());
+        
+        if (e) {
+            return tuple(false, e.msg);
+        }
+        return tuple(true, "");
+    }
+    ```
+    Implement proper error handling in your code. D uses exceptions for error handling, but you should consider using return values or `std.typecons` types like `Nullable` or `Tuple` to represent success/failure states when appropriate, especially for operations that might reasonably fail.
+  </Accordion>
+  
+  <Accordion title="Not Using Templates Effectively" icon="warning">
+    ```d
+    // Anti-pattern: Duplicated code for different types
+    int findMaxInt(int[] arr) {
+        if (arr.length == 0) throw new Exception("Empty array");
+        int max = arr[0];
+        foreach (v; arr[1..$]) {
+            if (v > max) max = v;
+        }
+        return max;
+    }
+    
+    double findMaxDouble(double[] arr) {
+        if (arr.length == 0) throw new Exception("Empty array");
+        double max = arr[0];
+        foreach (v; arr[1..$]) {
+            if (v > max) max = v;
+        }
+        return max;
+    }
+    
+    // Better approach: Use templates
+    T findMax(T)(T[] arr) {
+        if (arr.length == 0) throw new Exception("Empty array");
+        T max = arr[0];
+        foreach (v; arr[1..$]) {
+            if (v > max) max = v;
+        }
+        return max;
+    }
+    
+    // Even better: Use constraints and std.algorithm
+    import std.algorithm : max, reduce;
+    import std.traits : isOrderingComparable;
+    
+    T findMax(T)(T[] arr)
+    if (isOrderingComparable!T) {
+        if (arr.length == 0) throw new Exception("Empty array");
+        return arr.reduce!max;
+    }
+    ```
+    Use templates effectively to create generic code that works with multiple types. Add constraints using static if and template constraints to ensure type safety and provide clear error messages when templates are misused.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Memory Management" icon="warning">
+    ```d
+    // Anti-pattern: Memory leaks with manual memory management
+    class Resource {
+        private void* _data;
+        
+        this() {
+            _data = malloc(1024);  // Allocate memory
+        }
+        
+        // No destructor to free memory
+    }
+    
+    // Better approach: Implement proper cleanup
+    class Resource {
+        private void* _data;
+        
+        this() {
+            _data = malloc(1024);  // Allocate memory
+        }
+        
+        ~this() {
+            if (_data) {
+                free(_data);  // Free memory
+                _data = null;
+            }
+        }
+    }
+    
+    // Even better: Use RAII with scope(exit)
+    void processResource() {
+        void* data = malloc(1024);
+        scope(exit) free(data);  // Will be called when function exits
+        
+        // Use data...
+        // No need to manually call free at each return point
+    }
+    ```
+    Implement proper memory management, especially when using manual memory allocation. Use destructors, the `scope` statement, or RAII (Resource Acquisition Is Initialization) patterns to ensure resources are properly cleaned up.
+  </Accordion>
+  
+  <Accordion title="Not Using Immutability" icon="warning">
+    ```d
+    // Anti-pattern: Excessive mutability
+    struct Point {
+        int x;
+        int y;
+    }
+    
+    void processPoint(Point p) {
+        // p can be modified, even if that's not intended
+        p.x += 10;  // Oops, unintended modification
+    }
+    
+    // Better approach: Use immutability
+    void processPoint(const Point p) {
+        // p cannot be modified
+        // p.x += 10;  // Compilation error
+    }
+    
+    // For class references
+    void processObject(const Object obj) {
+        // obj's fields cannot be modified
+    }
+    
+    // For deeply immutable data
+    void processData(immutable int[] data) {
+        // data cannot be modified at all
+    }
+    ```
+    Use immutability (`const`, `immutable`) to make your code more robust and easier to reason about. Mark function parameters as `const` when they shouldn't be modified, and use `immutable` for data that should never change.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Modules" icon="warning">
+    ```d
+    // Anti-pattern: Everything in one module
+    // myapp.d
+    module myapp;
+    
+    // Hundreds of classes, functions, and variables all in one file
+    
+    // Better approach: Organize code into modules
+    // myapp/package.d
+    module myapp;
+    
+    public import myapp.core;
+    public import myapp.utils;
+    public import myapp.models;
+    
+    // myapp/core.d
+    module myapp.core;
+    
+    // Core functionality
+    
+    // myapp/utils.d
+    module myapp.utils;
+    
+    // Utility functions
+    
+    // myapp/models.d
+    module myapp.models;
+    
+    // Data models
+    ```
+    Organize your code into proper modules instead of putting everything in one file. This improves maintainability, compilation times, and allows for better encapsulation of implementation details.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```d
+    // Anti-pattern: Poor or no documentation
+    int calculate(int a, int b) {
+        return a * b + 42;
+    }
+    
+    // Better approach: Use proper documentation comments
+    /**
+     * Calculates a special value based on two inputs.
+     *
+     * The calculation multiplies the inputs and adds a magic number.
+     *
+     * Params:
+     *     a = First input value
+     *     b = Second input value
+     *
+     * Returns: The calculated result
+     *
+     * Throws: Nothing
+     *
+     * Examples:
+     * ---
+     * assert(calculate(2, 3) == 48);
+     * ---
+     */
+    int calculate(int a, int b) {
+        return a * b + 42;
+    }
+    ```
+    Use proper documentation comments for your code. D supports DDoc, a documentation generator that processes specially formatted comments to create documentation. Include information about parameters, return values, exceptions, and examples to make your code more accessible to others.
+  </Accordion>
+  
+  <Accordion title="Not Using Unit Tests" icon="warning">
+    ```d
+    // Anti-pattern: No unit tests
+    int add(int a, int b) {
+        return a + b;
+    }
+    
+    // Better approach: Include unit tests
+    int add(int a, int b) {
+        return a + b;
+    }
+    
+    unittest {
+        assert(add(2, 3) == 5);
+        assert(add(-1, 1) == 0);
+        assert(add(0, 0) == 0);
+        
+        // Test edge cases
+        import std.math : isClose;
+        assert(isClose(add(int.max, 1), int.min));  // Overflow
+    }
+    ```
+    Include unit tests in your code using D's built-in `unittest` blocks. Unit tests help ensure your code works correctly and continues to work as you make changes. They also serve as executable documentation showing how your code is intended to be used.
+  </Accordion>
+  
+  <Accordion title="Not Using Properties" icon="warning">
+    ```d
+    // Anti-pattern: Direct field access
+    class Person {
+        string name;  // Public field
+        int age;      // Public field
+    }
+    
+    // Better approach: Use properties
+    class Person {
+        private string _name;
+        private int _age;
+        
+        @property string name() const { return _name; }
+        @property void name(string value) { _name = value; }
+        
+        @property int age() const { return _age; }
+        @property void age(int value) {
+            if (value < 0) throw new Exception("Age cannot be negative");
+            _age = value;
+        }
+    }
+    
+    // Usage remains simple
+    auto person = new Person();
+    person.name = "John";  // Calls the setter
+    auto name = person.name;  // Calls the getter
+    ```
+    Use properties (getters and setters) instead of public fields for class and struct members that need validation or might change implementation in the future. Properties allow you to encapsulate the internal representation while providing a simple interface.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Concurrency Patterns" icon="warning">
+    ```d
+    // Anti-pattern: Unsafe shared data access
+    shared int counter = 0;
+    
+    void incrementCounter() {
+        import core.thread : Thread;
+        
+        auto threads = new Thread[10];
+        foreach (i; 0..10) {
+            threads[i] = new Thread({
+                foreach (j; 0..1000) {
+                    counter++;  // Race condition!
+                }
+            });
+            threads[i].start();
+        }
+        
+        foreach (t; threads) {
+            t.join();
+        }
+    }
+    
+    // Better approach: Use proper synchronization
+    import core.atomic : atomicOp;
+    
+    shared int counter = 0;
+    
+    void incrementCounter() {
+        import core.thread : Thread;
+        
+        auto threads = new Thread[10];
+        foreach (i; 0..10) {
+            threads[i] = new Thread({
+                foreach (j; 0..1000) {
+                    atomicOp!"+="(counter, 1);  // Atomic operation
+                }
+            });
+            threads[i].start();
+        }
+        
+        foreach (t; threads) {
+            t.join();
+        }
+    }
+    
+    // Even better: Use message passing
+    import std.concurrency;
+    
+    void counterThread() {
+        int counter = 0;
+        
+        while (true) {
+            receive(
+                (string msg) {
+                    if (msg == "increment") {
+                        counter++;
+                    } else if (msg == "get") {
+                        send(ownerTid, counter);
+                    } else if (msg == "quit") {
+                        break;
+                    }
+                }
+            );
+        }
+    }
+    
+    void useCounter() {
+        auto tid = spawn(&counterThread);
+        
+        foreach (i; 0..1000) {
+            send(tid, "increment");
+        }
+        
+        send(tid, "get");
+        auto count = receiveOnly!int();
+        writeln("Counter: ", count);
+        
+        send(tid, "quit");
+    }
+    ```
+    Use proper concurrency patterns when writing multithreaded code. Prefer message passing using `std.concurrency` over shared mutable state. When shared state is necessary, use proper synchronization mechanisms like atomic operations, mutexes, or reader-writer locks.
+  </Accordion>
+</AccordionGroup>

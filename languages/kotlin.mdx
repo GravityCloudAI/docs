@@ -1,0 +1,473 @@
+---
+title: 'Kotlin'
+description: 'Kotlin is a modern, concise, and safe programming language that is fully interoperable with Java. It is designed to be more expressive and concise than Java, with features that help avoid common programming errors.'
+---
+
+<AccordionGroup>
+  <Accordion title="Kotlin Anti-Patterns Overview" icon="kotlin">
+    Kotlin, despite being a modern and well-designed language, still has common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing Kotlin code.
+  </Accordion>
+  
+  <Accordion title="Using !! Operator Excessively" icon="warning">
+    ```kotlin
+    // Anti-pattern: Excessive use of !!
+    fun processUser(user: User?) {
+        val name = user!!.name
+        val age = user!!.age
+        val address = user!!.address!!
+        // NullPointerException if any is null
+    }
+    
+    // Better approach: Safe calls and Elvis operator
+    fun processUser(user: User?) {
+        val name = user?.name ?: "Unknown"
+        val age = user?.age ?: 0
+        val address = user?.address?.toString() ?: "No address"
+    }
+    ```
+    The `!!` operator forces a nullable type to be non-null and throws a `NullPointerException` if the value is null. Use safe calls (`?.`) and the Elvis operator (`?:`) instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Data Classes for Simple Data Holders" icon="warning">
+    ```kotlin
+    // Anti-pattern: Regular class for data
+    class User(val name: String, val age: Int) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is User) return false
+            return name == other.name && age == other.age
+        }
+        
+        override fun hashCode(): Int {
+            var result = name.hashCode()
+            result = 31 * result + age
+            return result
+        }
+        
+        override fun toString(): String {
+            return "User(name='$name', age=$age)"
+        }
+    }
+    
+    // Better approach: Use data classes
+    data class User(val name: String, val age: Int)
+    // equals, hashCode, toString, copy are generated automatically
+    ```
+    Use data classes for simple data containers to automatically get `equals()`, `hashCode()`, `toString()`, and `copy()` methods.
+  </Accordion>
+  
+  <Accordion title="Ignoring Nullability in Platform Types" icon="warning">
+    ```kotlin
+    // Anti-pattern: Ignoring Java nullability
+    fun processJavaString(javaUtil: JavaUtil) {
+        val str = javaUtil.getStringThatMightBeNull()
+        println(str.length)  // Potential NPE
+    }
+    
+    // Better approach: Handle potential nulls
+    fun processJavaString(javaUtil: JavaUtil) {
+        val str = javaUtil.getStringThatMightBeNull()
+        if (str != null) {
+            println(str.length)
+        }
+        // Or
+        println(str?.length ?: 0)
+    }
+    ```
+    Platform types (types coming from Java) may be nullable even if not marked as such. Always handle them carefully.
+  </Accordion>
+  
+  <Accordion title="Overusing Extension Functions" icon="warning">
+    ```kotlin
+    // Anti-pattern: Extension function abuse
+    fun String.toInteger(): Int = this.toInt()
+    fun String.toDouble(): Double = this.toDouble()
+    fun String.isValidEmail(): Boolean = this.matches(Regex("^[A-Za-z](.*)([@]{1})(.*)$"))
+    
+    // Better approach: Use utility class for related functions
+    object StringUtils {
+        fun toInteger(s: String): Int = s.toInt()
+        fun toDouble(s: String): Double = s.toDouble()
+        fun isValidEmail(s: String): Boolean = s.matches(Regex("^[A-Za-z](.*)([@]{1})(.*)$"))
+    }
+    ```
+    While extension functions are powerful, overusing them can lead to namespace pollution. Group related functions in utility classes or objects.
+  </Accordion>
+  
+  <Accordion title="Not Using Coroutines for Asynchronous Operations" icon="warning">
+    ```kotlin
+    // Anti-pattern: Callbacks for async operations
+    fun fetchUserData(userId: String, callback: (User) -> Unit, errorCallback: (Exception) -> Unit) {
+        thread {
+            try {
+                val user = api.getUser(userId)
+                callback(user)
+            } catch (e: Exception) {
+                errorCallback(e)
+            }
+        }
+    }
+    
+    // Better approach: Use coroutines
+    suspend fun fetchUserData(userId: String): User {
+        return withContext(Dispatchers.IO) {
+            api.getUser(userId)
+        }
+    }
+    
+    // Usage
+    lifecycleScope.launch {
+        try {
+            val user = fetchUserData(userId)
+            updateUI(user)
+        } catch (e: Exception) {
+            showError(e)
+        }
+    }
+    ```
+    Use coroutines for asynchronous operations instead of callbacks or threads for more readable and maintainable code.
+  </Accordion>
+  
+  <Accordion title="Not Using Kotlin's Standard Library Functions" icon="warning">
+    ```kotlin
+    // Anti-pattern: Manual implementation
+    fun <T> findFirst(list: List<T>, predicate: (T) -> Boolean): T? {
+        for (item in list) {
+            if (predicate(item)) {
+                return item
+            }
+        }
+        return null
+    }
+    
+    // Better approach: Use standard library functions
+    fun <T> findFirst(list: List<T>, predicate: (T) -> Boolean): T? {
+        return list.find(predicate)
+    }
+    ```
+    Kotlin's standard library provides many useful functions. Use them instead of reimplementing common functionality.
+  </Accordion>
+  
+  <Accordion title="Not Using Property Delegation" icon="warning">
+    ```kotlin
+    // Anti-pattern: Manual property initialization
+    class UserViewModel {
+        private var _user: User? = null
+        val user: User
+            get() = _user ?: throw IllegalStateException("User not initialized")
+        
+        fun init() {
+            _user = fetchUser()
+        }
+    }
+    
+    // Better approach: Use lazy delegation
+    class UserViewModel {
+        val user: User by lazy {
+            fetchUser()
+        }
+    }
+    ```
+    Use property delegation (`lazy`, `Delegates.observable`, etc.) for common property patterns.
+  </Accordion>
+  
+  <Accordion title="Not Using Sealed Classes for State" icon="warning">
+    ```kotlin
+    // Anti-pattern: Using enums or constants for state
+    class UserRepository {
+        companion object {
+            const val STATE_LOADING = 0
+            const val STATE_SUCCESS = 1
+            const val STATE_ERROR = 2
+        }
+        
+        var state = STATE_LOADING
+        var data: User? = null
+        var error: Exception? = null
+    }
+    
+    // Better approach: Use sealed classes
+    sealed class Result<out T> {
+        object Loading : Result<Nothing>()
+        data class Success<T>(val data: T) : Result<T>()
+        data class Error(val exception: Exception) : Result<Nothing>()
+    }
+    
+    class UserRepository {
+        var result: Result<User> = Result.Loading
+    }
+    ```
+    Use sealed classes to represent states with associated data instead of using constants or enums.
+  </Accordion>
+  
+  <Accordion title="Not Using Scope Functions" icon="warning">
+    ```kotlin
+    // Anti-pattern: Verbose object initialization
+    fun createUser(name: String, age: Int): User {
+        val user = User(name, age)
+        user.status = "Active"
+        user.lastLoginDate = Date()
+        return user
+    }
+    
+    // Better approach: Use scope functions
+    fun createUser(name: String, age: Int): User {
+        return User(name, age).apply {
+            status = "Active"
+            lastLoginDate = Date()
+        }
+    }
+    ```
+    Use scope functions (`let`, `run`, `with`, `apply`, `also`) to make code more concise and readable.
+  </Accordion>
+  
+  <Accordion title="Not Using Inline Functions for Higher-Order Functions" icon="warning">
+    ```kotlin
+    // Anti-pattern: Non-inline higher-order functions
+    fun <T> measureTime(action: () -> T): Pair<T, Long> {
+        val startTime = System.currentTimeMillis()
+        val result = action()
+        val endTime = System.currentTimeMillis()
+        return result to (endTime - startTime)
+    }
+    
+    // Better approach: Use inline for higher-order functions
+    inline fun <T> measureTime(action: () -> T): Pair<T, Long> {
+        val startTime = System.currentTimeMillis()
+        val result = action()
+        val endTime = System.currentTimeMillis()
+        return result to (endTime - startTime)
+    }
+    ```
+    Use `inline` for higher-order functions to avoid the overhead of lambda object creation and virtual function calls.
+  </Accordion>
+  
+  <Accordion title="Not Using Companion Objects Properly" icon="warning">
+    ```kotlin
+    // Anti-pattern: Misusing companion objects
+    class User {
+        companion object {
+            // Instance-related method in companion object
+            fun getName(user: User): String {
+                return user.name
+            }
+        }
+        
+        var name: String = ""
+    }
+    
+    // Better approach: Proper use of companion objects
+    class User(val name: String) {
+        companion object {
+            // Factory method - appropriate for companion object
+            fun createWithDefaultName(): User {
+                return User("John Doe")
+            }
+        }
+        
+        // Instance method belongs to the class, not companion
+        fun getName(): String {
+            return name
+        }
+    }
+    ```
+    Use companion objects for factory methods and static utilities, not for instance-related functionality.
+  </Accordion>
+  
+  <Accordion title="Not Using Type Aliases for Complex Types" icon="warning">
+    ```kotlin
+    // Anti-pattern: Repeating complex types
+    fun processUserData(data: Map<String, List<Pair<String, Any>>>) {
+        // Process data
+    }
+    
+    fun storeUserData(data: Map<String, List<Pair<String, Any>>>) {
+        // Store data
+    }
+    
+    // Better approach: Use type aliases
+    typealias UserData = Map<String, List<Pair<String, Any>>>
+    
+    fun processUserData(data: UserData) {
+        // Process data
+    }
+    
+    fun storeUserData(data: UserData) {
+        // Store data
+    }
+    ```
+    Use type aliases to give meaningful names to complex types, making code more readable and maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Extension Properties" icon="warning">
+    ```kotlin
+    // Anti-pattern: Extension functions for properties
+    fun String.isEmail(): Boolean {
+        return matches(Regex("^[A-Za-z](.*)([@]{1})(.*)$"))
+    }
+    
+    // Usage
+    if (email.isEmail()) {
+        // Do something
+    }
+    
+    // Better approach: Use extension properties
+    val String.isEmail: Boolean
+        get() = matches(Regex("^[A-Za-z](.*)([@]{1})(.*)$"))
+    
+    // Usage
+    if (email.isEmail) {
+        // Do something
+    }
+    ```
+    Use extension properties instead of extension functions when the function doesn't take parameters and returns a value.
+  </Accordion>
+  
+  <Accordion title="Not Using Object Expressions for Interfaces" icon="warning">
+    ```kotlin
+    // Anti-pattern: Anonymous class implementation
+    val clickListener = object : OnClickListener {
+        override fun onClick(view: View) {
+            // Handle click
+        }
+    }
+    
+    // Better approach: Use lambda for single-method interfaces
+    val clickListener = OnClickListener { view ->
+        // Handle click
+    }
+    ```
+    For single-method interfaces (SAM interfaces), use lambda expressions instead of object expressions.
+  </Accordion>
+  
+  <Accordion title="Not Using Kotlin's Collection Operations" icon="warning">
+    ```kotlin
+    // Anti-pattern: Manual collection operations
+    fun getAdultNames(people: List<Person>): List<String> {
+        val adults = ArrayList<Person>()
+        for (person in people) {
+            if (person.age >= 18) {
+                adults.add(person)
+            }
+        }
+        
+        val names = ArrayList<String>()
+        for (adult in adults) {
+            names.add(adult.name)
+        }
+        
+        return names
+    }
+    
+    // Better approach: Use collection operations
+    fun getAdultNames(people: List<Person>): List<String> {
+        return people
+            .filter { it.age >= 18 }
+            .map { it.name }
+    }
+    ```
+    Use Kotlin's collection operations (`map`, `filter`, `reduce`, etc.) for more concise and readable code.
+  </Accordion>
+  
+  <Accordion title="Not Using Destructuring Declarations" icon="warning">
+    ```kotlin
+    // Anti-pattern: Not using destructuring
+    fun processCoordinates(point: Pair<Int, Int>) {
+        val x = point.first
+        val y = point.second
+        // Process coordinates
+    }
+    
+    // Better approach: Use destructuring declarations
+    fun processCoordinates(point: Pair<Int, Int>) {
+        val (x, y) = point
+        // Process coordinates
+    }
+    ```
+    Use destructuring declarations to extract multiple values from objects like pairs, triples, and data classes.
+  </Accordion>
+  
+  <Accordion title="Not Using Kotlin's String Templates" icon="warning">
+    ```kotlin
+    // Anti-pattern: String concatenation
+    fun greeting(name: String, age: Int): String {
+        return "Hello, " + name + "! You are " + age + " years old."
+    }
+    
+    // Better approach: Use string templates
+    fun greeting(name: String, age: Int): String {
+        return "Hello, $name! You are $age years old."
+    }
+    
+    // For complex expressions
+    fun complexGreeting(person: Person): String {
+        return "Hello, ${person.fullName}! You are ${person.age} years old."
+    }
+    ```
+    Use string templates (`$variable` or `${expression}`) instead of string concatenation for more readable code.
+  </Accordion>
+  
+  <Accordion title="Not Using Named Arguments" icon="warning">
+    ```kotlin
+    // Anti-pattern: Positional arguments
+    fun createUser("John", "Doe", 30, true, "admin")
+    
+    // Better approach: Use named arguments
+    fun createUser(
+        firstName = "John",
+        lastName = "Doe",
+        age = 30,
+        isActive = true,
+        role = "admin"
+    )
+    ```
+    Use named arguments for better readability, especially when calling functions with many parameters.
+  </Accordion>
+  
+  <Accordion title="Not Using Kotlin's Flow for Reactive Programming" icon="warning">
+    ```kotlin
+    // Anti-pattern: Using callbacks for data streams
+    interface DataListener {
+        fun onNewData(data: Data)
+        fun onError(error: Exception)
+    }
+    
+    class DataRepository {
+        private val listeners = mutableListOf<DataListener>()
+        
+        fun addListener(listener: DataListener) {
+            listeners.add(listener)
+        }
+        
+        fun removeListener(listener: DataListener) {
+            listeners.remove(listener)
+        }
+        
+        fun fetchData() {
+            // Fetch data and notify listeners
+        }
+    }
+    
+    // Better approach: Use Flow
+    class DataRepository {
+        fun fetchData(): Flow<Data> = flow {
+            // Fetch data and emit
+            try {
+                val data = api.fetchData()
+                emit(data)
+            } catch (e: Exception) {
+                throw e
+            }
+        }
+    }
+    
+    // Usage
+    viewModelScope.launch {
+        dataRepository.fetchData()
+            .catch { e -> handleError(e) }
+            .collect { data -> updateUI(data) }
+    }
+    ```
+    Use Kotlin's Flow for reactive programming instead of callbacks or custom observer patterns.
+  </Accordion>
+</AccordionGroup>

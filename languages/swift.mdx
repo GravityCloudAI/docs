@@ -1,0 +1,626 @@
+---
+title: 'Swift'
+description: 'Swift is a powerful and intuitive programming language developed by Apple for iOS, macOS, watchOS, and tvOS app development. It is designed to be safe, fast, and expressive.'
+---
+
+<AccordionGroup>
+  <Accordion title="Swift Anti-Patterns Overview" icon="swift">
+    Swift, despite being a modern and safety-focused language, still has common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing Swift code.
+  </Accordion>
+  
+  <Accordion title="Force Unwrapping Optionals" icon="warning">
+    ```swift
+    // Anti-pattern: Force unwrapping optionals
+    func getUserName(userId: Int) -> String {
+        let user = database.getUser(id: userId)
+        return user!.name // Crashes if user is nil
+    }
+    
+    // Better approach: Optional binding
+    func getUserName(userId: Int) -> String {
+        if let user = database.getUser(id: userId) {
+            return user.name
+        } else {
+            return "Unknown User"
+        }
+    }
+    
+    // Or using nil coalescing
+    func getUserName(userId: Int) -> String {
+        return database.getUser(id: userId)?.name ?? "Unknown User"
+    }
+    ```
+    Force unwrapping optionals with `!` can lead to runtime crashes. Use optional binding (`if let`), nil coalescing (`??`), or guard statements instead.
+  </Accordion>
+  
+  <Accordion title="Implicitly Unwrapped Optionals" icon="warning">
+    ```swift
+    // Anti-pattern: Implicitly unwrapped optionals
+    class ViewController: UIViewController {
+        var tableView: UITableView!
+        
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            tableView = UITableView(frame: view.bounds)
+            view.addSubview(tableView)
+        }
+    }
+    
+    // Better approach: Proper initialization
+    class ViewController: UIViewController {
+        let tableView: UITableView
+        
+        init() {
+            tableView = UITableView()
+            super.init(nibName: nil, bundle: nil)
+        }
+        
+        required init?(coder: NSCoder) {
+            tableView = UITableView()
+            super.init(coder: coder)
+        }
+        
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            tableView.frame = view.bounds
+            view.addSubview(tableView)
+        }
+    }
+    ```
+    Implicitly unwrapped optionals (`var name: Type!`) should be avoided when possible. Use proper initialization or lazy properties instead.
+  </Accordion>
+  
+  <Accordion title="Massive View Controllers" icon="warning">
+    ```swift
+    // Anti-pattern: Massive View Controller
+    class UserViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UITextFieldDelegate, NetworkDelegate {
+        // Hundreds of lines of code with mixed responsibilities
+        // UI setup, data fetching, business logic, etc.
+    }
+    
+    // Better approach: Separation of concerns
+    // UserViewController.swift
+    class UserViewController: UIViewController {
+        private let tableView = UITableView()
+        private let dataSource: UserDataSource
+        private let networkService: NetworkService
+        
+        init(dataSource: UserDataSource, networkService: NetworkService) {
+            self.dataSource = dataSource
+            self.networkService = networkService
+            super.init(nibName: nil, bundle: nil)
+        }
+        
+        // UI setup and view lifecycle methods only
+    }
+    
+    // UserDataSource.swift
+    class UserDataSource: NSObject, UITableViewDataSource {
+        // Table view data source methods
+    }
+    
+    // NetworkService.swift
+    class NetworkService {
+        // Network-related code
+    }
+    ```
+    Break up large view controllers into smaller, focused components using patterns like MVVM, Coordinator, or Clean Architecture.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Type System" icon="warning">
+    ```swift
+    // Anti-pattern: Using strings for identifiers
+    func fetchData(type: String) {
+        if type == "user" {
+            // Fetch user data
+        } else if type == "post" {
+            // Fetch post data
+        }
+    }
+    
+    // Better approach: Use enums
+    enum DataType {
+        case user
+        case post
+    }
+    
+    func fetchData(type: DataType) {
+        switch type {
+        case .user:
+            // Fetch user data
+        case .post:
+            // Fetch post data
+        }
+    }
+    ```
+    Leverage Swift's strong type system with enums, structs, and generics to make code safer and more expressive.
+  </Accordion>
+  
+  <Accordion title="Overusing Singletons" icon="warning">
+    ```swift
+    // Anti-pattern: Overusing singletons
+    class DataManager {
+        static let shared = DataManager()
+        
+        private init() {}
+        
+        func fetchData() { /* ... */ }
+        func saveData() { /* ... */ }
+    }
+    
+    // Usage
+    DataManager.shared.fetchData()
+    
+    // Better approach: Dependency injection
+    protocol DataManaging {
+        func fetchData()
+        func saveData()
+    }
+    
+    class DataManager: DataManaging {
+        func fetchData() { /* ... */ }
+        func saveData() { /* ... */ }
+    }
+    
+    class ViewController {
+        let dataManager: DataManaging
+        
+        init(dataManager: DataManaging) {
+            self.dataManager = dataManager
+        }
+        
+        func viewDidLoad() {
+            dataManager.fetchData()
+        }
+    }
+    ```
+    Singletons create hidden dependencies and make testing difficult. Use dependency injection instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Result Type for Error Handling" icon="warning">
+    ```swift
+    // Anti-pattern: Inconsistent error handling
+    func fetchUser(id: Int, completion: @escaping (User?, Error?) -> Void) {
+        // Network request
+        if success {
+            completion(user, nil)
+        } else {
+            completion(nil, error)
+        }
+    }
+    
+    // Usage
+    fetchUser(id: 123) { user, error in
+        if let error = error {
+            // Handle error
+        } else if let user = user {
+            // Use user
+        }
+    }
+    
+    // Better approach: Use Result type
+    func fetchUser(id: Int, completion: @escaping (Result<User, Error>) -> Void) {
+        // Network request
+        if success {
+            completion(.success(user))
+        } else {
+            completion(.failure(error))
+        }
+    }
+    
+    // Usage
+    fetchUser(id: 123) { result in
+        switch result {
+        case .success(let user):
+            // Use user
+        case .failure(let error):
+            // Handle error
+        }
+    }
+    ```
+    Use Swift's `Result` type for clearer and more consistent error handling in asynchronous code.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Access Control" icon="warning">
+    ```swift
+    // Anti-pattern: Everything public
+    class UserManager {
+        public var users: [User] = []
+        public var database: Database
+        
+        public init(database: Database) {
+            self.database = database
+        }
+        
+        public func internalHelperMethod() { /* ... */ }
+    }
+    
+    // Better approach: Proper access control
+    class UserManager {
+        private(set) var users: [User] = []
+        private let database: Database
+        
+        init(database: Database) {
+            self.database = database
+        }
+        
+        func fetchUsers() {
+            // Public API
+        }
+        
+        private func internalHelperMethod() {
+            // Implementation detail
+        }
+    }
+    ```
+    Use Swift's access control modifiers (`private`, `fileprivate`, `internal`, `public`, `open`) to hide implementation details and create clear APIs.
+  </Accordion>
+  
+  <Accordion title="Capturing Self Strongly in Closures" icon="warning">
+    ```swift
+    // Anti-pattern: Strong reference cycle
+    class ViewController: UIViewController {
+        var completion: (() -> Void)?
+        
+        func setupCompletion() {
+            completion = {
+                self.updateUI() // Strong reference to self
+            }
+        }
+        
+        func updateUI() { /* ... */ }
+    }
+    
+    // Better approach: Weak self
+    class ViewController: UIViewController {
+        var completion: (() -> Void)?
+        
+        func setupCompletion() {
+            completion = { [weak self] in
+                guard let self = self else { return }
+                self.updateUI()
+            }
+        }
+        
+        func updateUI() { /* ... */ }
+    }
+    ```
+    Use `[weak self]` or `[unowned self]` in closures to avoid reference cycles and memory leaks.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Collection Features" icon="warning">
+    ```swift
+    // Anti-pattern: Manual iteration and filtering
+    func getAdultUsers(users: [User]) -> [User] {
+        var adults: [User] = []
+        for user in users {
+            if user.age >= 18 {
+                adults.append(user)
+            }
+        }
+        return adults
+    }
+    
+    // Better approach: Use Swift's collection methods
+    func getAdultUsers(users: [User]) -> [User] {
+        return users.filter { $0.age >= 18 }
+    }
+    
+    // Another example
+    func getUserNames(users: [User]) -> [String] {
+        return users.map { $0.name }
+    }
+    ```
+    Use Swift's powerful collection methods like `map`, `filter`, `reduce`, `compactMap`, and `flatMap` for cleaner, more expressive code.
+  </Accordion>
+  
+  <Accordion title="Using Force Try" icon="warning">
+    ```swift
+    // Anti-pattern: Force try
+    func loadData() {
+        let data = try! JSONDecoder().decode(MyData.self, from: jsonData)
+        // Use data
+    }
+    
+    // Better approach: Proper error handling
+    func loadData() {
+        do {
+            let data = try JSONDecoder().decode(MyData.self, from: jsonData)
+            // Use data
+        } catch {
+            // Handle error
+            print("Failed to decode data: \(error)")
+        }
+    }
+    ```
+    Avoid `try!` as it can cause crashes. Use proper error handling with `do-catch` blocks.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Property Observers" icon="warning">
+    ```swift
+    // Anti-pattern: Manual property updates
+    class ProfileViewController: UIViewController {
+        var user: User {
+            didSet {
+                updateUI()
+            }
+        }
+        
+        func setUser(_ user: User) {
+            self.user = user
+            updateUI() // Duplicated logic
+        }
+        
+        private func updateUI() {
+            // Update UI with user data
+        }
+    }
+    
+    // Better approach: Use property observers
+    class ProfileViewController: UIViewController {
+        var user: User {
+            didSet {
+                updateUI()
+            }
+        }
+        
+        private func updateUI() {
+            // Update UI with user data
+        }
+    }
+    ```
+    Use Swift's property observers (`willSet` and `didSet`) to react to property changes automatically.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Error Handling" icon="warning">
+    ```swift
+    // Anti-pattern: Using optionals for errors
+    func parseData(json: String) -> Data? {
+        guard let data = json.data(using: .utf8) else {
+            return nil
+        }
+        
+        // More parsing...
+        if somethingWentWrong {
+            return nil // No context about what went wrong
+        }
+        
+        return parsedData
+    }
+    
+    // Better approach: Use Swift's error handling
+    enum ParsingError: Error {
+        case invalidEncoding
+        case invalidFormat
+        case missingRequiredField(String)
+    }
+    
+    func parseData(json: String) throws -> Data {
+        guard let data = json.data(using: .utf8) else {
+            throw ParsingError.invalidEncoding
+        }
+        
+        // More parsing...
+        if missingField {
+            throw ParsingError.missingRequiredField("username")
+        }
+        
+        return parsedData
+    }
+    ```
+    Use Swift's `throws` and `do-catch` for error handling instead of returning nil or optional values.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Value Types" icon="warning">
+    ```swift
+    // Anti-pattern: Using classes for everything
+    class Point {
+        var x: Double
+        var y: Double
+        
+        init(x: Double, y: Double) {
+            self.x = x
+            self.y = y
+        }
+    }
+    
+    // Better approach: Use structs for value semantics
+    struct Point {
+        var x: Double
+        var y: Double
+    }
+    ```
+    Use structs and enums (value types) for data that should have value semantics, and classes for reference semantics.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Lazy Properties" icon="warning">
+    ```swift
+    // Anti-pattern: Eager initialization
+    class ImageProcessor {
+        let heavyResource = HeavyResource() // Created immediately
+        
+        func processImage(_ image: UIImage) {
+            // May never use heavyResource
+        }
+    }
+    
+    // Better approach: Use lazy properties
+    class ImageProcessor {
+        lazy var heavyResource = HeavyResource() // Created only when accessed
+        
+        func processImage(_ image: UIImage) {
+            // heavyResource is created only if needed
+            if needsHeavyProcessing(image) {
+                heavyResource.process(image)
+            }
+        }
+    }
+    ```
+    Use `lazy` properties for expensive resources that might not be needed immediately or at all.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Protocol Extensions" icon="warning">
+    ```swift
+    // Anti-pattern: Duplicated implementations
+    class Cat {
+        func eat() {
+            print("Cat is eating")
+        }
+        
+        func sleep() {
+            print("Sleeping for 12-16 hours a day")
+        }
+    }
+    
+    class Dog {
+        func eat() {
+            print("Dog is eating")
+        }
+        
+        func sleep() {
+            print("Sleeping for 12-16 hours a day")
+        }
+    }
+    
+    // Better approach: Protocol extensions
+    protocol Animal {
+        func eat()
+        func sleep()
+    }
+    
+    extension Animal {
+        func sleep() {
+            print("Sleeping for 12-16 hours a day")
+        }
+    }
+    
+    class Cat: Animal {
+        func eat() {
+            print("Cat is eating")
+        }
+    }
+    
+    class Dog: Animal {
+        func eat() {
+            print("Dog is eating")
+        }
+    }
+    ```
+    Use protocol extensions to share behavior across types without inheritance.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Modern Concurrency" icon="warning">
+    ```swift
+    // Anti-pattern: Callback hell
+    func fetchUserAndPosts(userId: Int, completion: @escaping (Result<(User, [Post]), Error>) -> Void) {
+        fetchUser(userId: userId) { result in
+            switch result {
+            case .success(let user):
+                self.fetchPosts(userId: userId) { postsResult in
+                    switch postsResult {
+                    case .success(let posts):
+                        completion(.success((user, posts)))
+                    case .failure(let error):
+                        completion(.failure(error))
+                    }
+                }
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    // Better approach: Async/await (Swift 5.5+)
+    func fetchUserAndPosts(userId: Int) async throws -> (User, [Post]) {
+        let user = try await fetchUser(userId: userId)
+        let posts = try await fetchPosts(userId: userId)
+        return (user, posts)
+    }
+    
+    // Usage
+    Task {
+        do {
+            let (user, posts) = try await fetchUserAndPosts(userId: 123)
+            // Use user and posts
+        } catch {
+            // Handle error
+        }
+    }
+    ```
+    Use Swift's modern concurrency features (async/await, actors, tasks) for cleaner asynchronous code.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Property Wrappers" icon="warning">
+    ```swift
+    // Anti-pattern: Manual UserDefaults handling
+    class SettingsManager {
+        func isDarkModeEnabled() -> Bool {
+            return UserDefaults.standard.bool(forKey: "isDarkModeEnabled")
+        }
+        
+        func setDarkModeEnabled(_ enabled: Bool) {
+            UserDefaults.standard.set(enabled, forKey: "isDarkModeEnabled")
+        }
+    }
+    
+    // Better approach: Use property wrappers
+    @propertyWrapper
+    struct UserDefault<T> {
+        let key: String
+        let defaultValue: T
+        
+        var wrappedValue: T {
+            get {
+                return UserDefaults.standard.object(forKey: key) as? T ?? defaultValue
+            }
+            set {
+                UserDefaults.standard.set(newValue, forKey: key)
+            }
+        }
+    }
+    
+    class SettingsManager {
+        @UserDefault(key: "isDarkModeEnabled", defaultValue: false)
+        var isDarkModeEnabled: Bool
+    }
+    ```
+    Use property wrappers to encapsulate property storage and access patterns.
+  </Accordion>
+  
+  <Accordion title="Not Using Swift's Result Builders" icon="warning">
+    ```swift
+    // Anti-pattern: Manual view construction
+    func createUserInfoView(for user: User) -> UIView {
+        let containerView = UIView()
+        
+        let nameLabel = UILabel()
+        nameLabel.text = user.name
+        containerView.addSubview(nameLabel)
+        
+        let emailLabel = UILabel()
+        emailLabel.text = user.email
+        containerView.addSubview(emailLabel)
+        
+        // Set up constraints...
+        
+        return containerView
+    }
+    
+    // Better approach: Use result builders (SwiftUI)
+    struct UserInfoView: View {
+        let user: User
+        
+        var body: some View {
+            VStack(alignment: .leading) {
+                Text(user.name)
+                    .font(.headline)
+                Text(user.email)
+                    .font(.subheadline)
+            }
+            .padding()
+        }
+    }
+    ```
+    Use result builders (like SwiftUI's `ViewBuilder`) for declarative, composable code.
+  </Accordion>
+</AccordionGroup>

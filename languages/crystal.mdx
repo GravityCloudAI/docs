@@ -1,0 +1,530 @@
+---
+title: 'Crystal'
+description: 'Crystal is a programming language with Ruby-like syntax and static type checking. It aims to have the elegance and productivity of Ruby combined with the speed, efficiency, and type safety of a compiled language.'
+---
+
+<AccordionGroup>
+  <Accordion title="Crystal Anti-Patterns Overview" icon="crystal">
+    Crystal, despite being a modern language with many safeguards, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing Crystal code.
+  </Accordion>
+  
+  <Accordion title="Not Leveraging the Type System" icon="warning">
+    ```crystal
+    # Anti-pattern: Using generic Object type
+    def process(data : Array(Object))
+      data.each do |item|
+        if item.is_a?(String)
+          puts item.upcase
+        elsif item.is_a?(Int32)
+          puts item + 1
+        end
+      end
+    end
+    
+    # Better approach: Use union types
+    def process(data : Array(String | Int32))
+      data.each do |item|
+        case item
+        when String
+          puts item.upcase
+        when Int32
+          puts item + 1
+        end
+      end
+    end
+    
+    # Even better: Use generics with constraints
+    def process(data : Array(T)) forall T
+      data.each do |item|
+        puts item
+      end
+    end
+    ```
+    Leverage Crystal's type system instead of using generic Object types. Use union types, generics, and type restrictions to make your code more type-safe and efficient. This helps catch errors at compile time rather than runtime.
+  </Accordion>
+  
+  <Accordion title="Using Exceptions for Control Flow" icon="warning">
+    ```crystal
+    # Anti-pattern: Using exceptions for control flow
+    def find_user(id)
+      begin
+        user = User.find(id)
+        return user
+      rescue
+        return nil
+      end
+    end
+    
+    # Better approach: Use nil or Result types
+    def find_user(id) : User?
+      User.find?(id)  # Returns nil if not found
+    end
+    
+    # Alternative: Use a Result type
+    record Success(T), value : T
+    record Failure, error : String
+    
+    alias Result(T) = Success(T) | Failure
+    
+    def find_user(id) : Result(User)
+      user = User.find?(id)
+      if user
+        Success.new(user)
+      else
+        Failure.new("User not found")
+      end
+    end
+    ```
+    Avoid using exceptions for normal control flow. Exceptions should be reserved for exceptional conditions. Instead, use nil or Result types to represent the possibility of failure in a type-safe way.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Nil Handling" icon="warning">
+    ```crystal
+    # Anti-pattern: Unsafe nil handling
+    def get_username(user_id)
+      user = User.find(user_id)  # Might raise if not found
+      return user.username       # Might raise if username is nil
+    end
+    
+    # Better approach: Use safe navigation operator
+    def get_username(user_id)
+      user = User.find?(user_id)
+      return user.try &.username
+    end
+    
+    # Even better: Use explicit nil handling
+    def get_username(user_id) : String?
+      user = User.find?(user_id)
+      return nil unless user
+      
+      user.username
+    end
+    ```
+    Use proper nil handling techniques like the safe navigation operator (`&.`), nil checks, or the `try` method. This makes your code more robust and prevents nil-related runtime errors.
+  </Accordion>
+  
+  <Accordion title="Mutable Global State" icon="warning">
+    ```crystal
+    # Anti-pattern: Using mutable global variables
+    $config = {"api_key" => "secret"}
+    
+    def update_config(key, value)
+      $config[key] = value
+    end
+    
+    def use_config
+      puts $config["api_key"]
+    end
+    
+    # Better approach: Use class variables with controlled access
+    class Config
+      @@instance = {"api_key" => "secret"}
+      
+      def self.get(key)
+        @@instance[key]?
+      end
+      
+      def self.set(key, value)
+        @@instance[key] = value
+      end
+    end
+    
+    # Usage
+    Config.set("api_key", "new_secret")
+    puts Config.get("api_key")
+    ```
+    Avoid using mutable global state. Global variables make code harder to reason about, test, and maintain. Instead, use dependency injection, class variables with controlled access, or dedicated configuration objects.
+  </Accordion>
+  
+  <Accordion title="Not Using Named Arguments for Clarity" icon="warning">
+    ```crystal
+    # Anti-pattern: Using positional arguments for complex methods
+    def create_user(name, email, age, admin, active)
+      # Create user with the given parameters
+    end
+    
+    # Usage - unclear what each argument means
+    create_user("John Doe", "john@example.com", 30, true, false)
+    
+    # Better approach: Use named arguments
+    def create_user(name : String, email : String, age : Int32, admin : Bool = false, active : Bool = true)
+      # Create user with the given parameters
+    end
+    
+    # Usage - much clearer
+    create_user(
+      name: "John Doe",
+      email: "john@example.com",
+      age: 30,
+      admin: true,
+      active: false
+    )
+    ```
+    Use named arguments for methods with many parameters or boolean flags. This makes your code more readable and less prone to errors from mixing up argument order.
+  </Accordion>
+  
+  <Accordion title="Inefficient String Concatenation" icon="warning">
+    ```crystal
+    # Anti-pattern: Inefficient string concatenation
+    def build_report(items)
+      report = ""
+      items.each do |item|
+        report += "Item: #{item.name}, Price: #{item.price}\n"
+      end
+      report
+    end
+    
+    # Better approach: Use string interpolation or String.build
+    def build_report(items)
+      String.build do |str|
+        items.each do |item|
+          str << "Item: #{item.name}, Price: #{item.price}\n"
+        end
+      end
+    end
+    
+    # Alternative: Use array join
+    def build_report(items)
+      items.map { |item| "Item: #{item.name}, Price: #{item.price}" }.join("\n")
+    end
+    ```
+    Avoid inefficient string concatenation in loops. Instead, use `String.build`, array joining, or string interpolation for better performance and readability.
+  </Accordion>
+  
+  <Accordion title="Not Using Crystal's Concurrency Features Properly" icon="warning">
+    ```crystal
+    # Anti-pattern: Misusing fibers without synchronization
+    def process_data(items)
+      results = [] of String
+      
+      items.each do |item|
+        spawn do
+          result = process_item(item)
+          results << result  # Unsafe concurrent access
+        end
+      end
+      
+      Fiber.yield
+      results
+    end
+    
+    # Better approach: Use channels for communication
+    def process_data(items)
+      channel = Channel(String).new
+      
+      items.each do |item|
+        spawn do
+          result = process_item(item)
+          channel.send(result)
+        end
+      end
+      
+      results = [] of String
+      items.size.times do
+        results << channel.receive
+      end
+      
+      results
+    end
+    ```
+    Use Crystal's concurrency features properly. When using fibers with `spawn`, ensure proper synchronization for shared resources using channels, mutexes, or other synchronization primitives.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```crystal
+    # Anti-pattern: Ignoring errors
+    def save_user(user)
+      user.save
+      puts "User saved"
+    end
+    
+    # Better approach: Handle errors explicitly
+    def save_user(user)
+      begin
+        user.save
+        puts "User saved"
+      rescue ex : ValidationError
+        puts "Validation error: #{ex.message}"
+        false
+      rescue ex
+        puts "Unexpected error: #{ex.message}"
+        false
+      else
+        true
+      end
+    end
+    ```
+    Implement proper error handling in your code. Don't ignore exceptions; catch and handle them appropriately. Use specific rescue clauses for different error types to provide better error messages and recovery strategies.
+  </Accordion>
+  
+  <Accordion title="Not Using Crystal's Standard Library" icon="warning">
+    ```crystal
+    # Anti-pattern: Reinventing the wheel
+    def parse_json(json_string)
+      # Custom JSON parsing logic
+    end
+    
+    # Better approach: Use the standard library
+    require "json"
+    
+    def parse_json(json_string)
+      JSON.parse(json_string)
+    end
+    ```
+    Leverage Crystal's rich standard library instead of reinventing the wheel. The standard library provides efficient, well-tested implementations for common tasks like JSON parsing, HTTP requests, file I/O, and more.
+  </Accordion>
+  
+  <Accordion title="Not Using Type Annotations When Helpful" icon="warning">
+    ```crystal
+    # Anti-pattern: Missing type annotations where helpful
+    def process_data(data)
+      # What type is data? What does this return?
+      data.map { |item| item.to_s.upcase }
+    end
+    
+    # Better approach: Add type annotations for clarity
+    def process_data(data : Array(Int32)) : Array(String)
+      data.map { |item| item.to_s.upcase }
+    end
+    ```
+    Add type annotations to method signatures when it helps with clarity, especially for public APIs. While Crystal can often infer types, explicit annotations make your code more self-documenting and can catch type errors earlier.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Abstractions" icon="warning">
+    ```crystal
+    # Anti-pattern: Duplicated code without abstractions
+    def process_users
+      users = User.all
+      users.each do |user|
+        # Complex processing logic
+      end
+    end
+    
+    def process_orders
+      orders = Order.all
+      orders.each do |order|
+        # Similar complex processing logic
+      end
+    end
+    
+    # Better approach: Use abstractions
+    module Processable
+      abstract def process
+    end
+    
+    class User
+      include Processable
+      
+      def process
+        # User-specific processing
+      end
+    end
+    
+    class Order
+      include Processable
+      
+      def process
+        # Order-specific processing
+      end
+    end
+    
+    def process_items(items : Array(Processable))
+      items.each &.process
+    end
+    ```
+    Use proper abstractions like modules, inheritance, and generics to avoid code duplication. This makes your code more maintainable and extensible.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Immutability" icon="warning">
+    ```crystal
+    # Anti-pattern: Excessive mutability
+    class User
+      property name : String
+      property email : String
+      
+      def initialize(@name, @email)
+      end
+      
+      def update_email(new_email)
+        @email = new_email
+      end
+    end
+    
+    # Better approach: Use immutability where appropriate
+    class User
+      getter name : String
+      getter email : String
+      
+      def initialize(@name, @email)
+      end
+      
+      def with_email(new_email) : User
+        User.new(name, new_email)
+      end
+    end
+    ```
+    Consider using immutability for your data structures when appropriate. Immutable objects are easier to reason about, especially in concurrent contexts. Use methods that return new instances instead of modifying existing ones.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Enums" icon="warning">
+    ```crystal
+    # Anti-pattern: Using strings for fixed sets of values
+    def process_status(status : String)
+      case status
+      when "pending"
+        # Handle pending
+      when "processing"
+        # Handle processing
+      when "completed"
+        # Handle completed
+      else
+        raise "Invalid status: #{status}"
+      end
+    end
+    
+    # Better approach: Use enums
+    enum Status
+      Pending
+      Processing
+      Completed
+    end
+    
+    def process_status(status : Status)
+      case status
+      when Status::Pending
+        # Handle pending
+      when Status::Processing
+        # Handle processing
+      when Status::Completed
+        # Handle completed
+      end
+    end
+    ```
+    Use enums for fixed sets of related values instead of strings or integers. Enums provide type safety, better documentation, and prevent invalid values.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Macros" icon="warning">
+    ```crystal
+    # Anti-pattern: Overusing macros for simple cases
+    macro define_getter(name, value)
+      def {{name.id}}
+        {{value}}
+      end
+    end
+    
+    define_getter :api_url, "https://api.example.com"
+    
+    # Better approach: Use simpler constructs when possible
+    API_URL = "https://api.example.com"
+    
+    def api_url
+      API_URL
+    end
+    
+    # Appropriate use of macros for complex metaprogramming
+    macro define_json_mappings(properties)
+      {% for key, type in properties %}
+        property {{key.id}} : {{type.id}}
+      {% end %}
+      
+      def self.from_json(json : String)
+        data = JSON.parse(json)
+        instance = new
+        {% for key, type in properties %}
+          instance.{{key.id}} = data[{{key.stringify}}].as_s
+        {% end %}
+        instance
+      end
+    end
+    ```
+    Use macros judiciously. While Crystal's macro system is powerful, overusing macros can make code harder to understand and debug. Use simpler constructs like methods, constants, or classes when they suffice, and reserve macros for cases where metaprogramming is truly needed.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```crystal
+    # Anti-pattern: Insufficient testing
+    class Calculator
+      def add(a, b)
+        a + b
+      end
+    end
+    
+    # Better approach: Write proper tests
+    require "spec"
+    
+    describe Calculator do
+      describe "#add" do
+        it "adds two positive numbers" do
+          calc = Calculator.new
+          calc.add(2, 3).should eq(5)
+        end
+        
+        it "adds a positive and a negative number" do
+          calc = Calculator.new
+          calc.add(2, -3).should eq(-1)
+        end
+        
+        it "adds two negative numbers" do
+          calc = Calculator.new
+          calc.add(-2, -3).should eq(-5)
+        end
+      end
+    end
+    ```
+    Write comprehensive tests for your code. Crystal's spec framework makes it easy to write and run tests. Test different scenarios, edge cases, and error conditions to ensure your code works correctly in all situations.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```crystal
+    # Anti-pattern: Insufficient documentation
+    class User
+      def initialize(@name, @email)
+      end
+      
+      def valid?
+        @email.includes?("@") && @name.size > 0
+      end
+    end
+    
+    # Better approach: Add proper documentation
+    # A class representing a user in the system.
+    class User
+      # Creates a new user with the given name and email.
+      #
+      # ## Parameters
+      # * name : The user's full name
+      # * email : The user's email address
+      def initialize(@name : String, @email : String)
+      end
+      
+      # Checks if the user has valid information.
+      #
+      # Returns true if the email contains '@' and the name is not empty.
+      def valid? : Bool
+        @email.includes?("@") && @name.size > 0
+      end
+    end
+    ```
+    Document your code properly, especially public APIs. Include descriptions of classes, methods, parameters, return values, and any exceptions that might be raised. Good documentation makes your code more accessible to others and to your future self.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Resource Management" icon="warning">
+    ```crystal
+    # Anti-pattern: Not closing resources properly
+    def read_file(path)
+      file = File.open(path)
+      content = file.gets_to_end
+      # file is never closed
+      content
+    end
+    
+    # Better approach: Use blocks for automatic resource management
+    def read_file(path)
+      File.open(path) do |file|
+        file.gets_to_end
+      end
+    end
+    ```
+    Use proper resource management techniques. When working with resources like files, database connections, or network sockets, use blocks that automatically handle closing the resource, or ensure you close them manually in a `begin`/`ensure` block.
+  </Accordion>
+</AccordionGroup>

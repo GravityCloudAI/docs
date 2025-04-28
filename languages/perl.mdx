@@ -1,0 +1,435 @@
+---
+title: 'Perl'
+description: 'Perl is a high-level, general-purpose, interpreted, dynamic programming language known for its powerful text processing capabilities and flexibility. It combines features from various languages including C, shell scripting, and AWK.'
+---
+
+<AccordionGroup>
+  <Accordion title="Perl Anti-Patterns Overview" icon="perl">
+    Perl, despite its flexibility and power, has several common anti-patterns that can lead to code that is difficult to maintain, debug, and understand. Here are the most important anti-patterns to avoid when writing Perl code.
+  </Accordion>
+  
+  <Accordion title="Not Using strict and warnings" icon="warning">
+    ```perl
+    # Anti-pattern: Not using strict and warnings
+    $name = "John";
+    $greeting = "Hello, $anme!"; # Typo in variable name, but no warning
+    print $greeting;
+    
+    # Better approach: Always use strict and warnings
+    use strict;
+    use warnings;
+    
+    my $name = "John";
+    my $greeting = "Hello, $name!";
+    print $greeting;
+    ```
+    Always use `use strict;` and `use warnings;` at the beginning of your Perl scripts. These pragmas help catch common programming errors like typos in variable names, using undefined variables, and other potential issues.
+  </Accordion>
+  
+  <Accordion title="Using Barewords" icon="warning">
+    ```perl
+    # Anti-pattern: Using barewords
+    $result = open(FILE, "data.txt");
+    
+    # Better approach: Use quotes for strings and lexical filehandles
+    use strict;
+    use warnings;
+    
+    open(my $fh, '<', "data.txt") or die "Cannot open data.txt: $!";
+    ```
+    Avoid using barewords (unquoted strings) in your code. They can lead to confusion and errors, especially when they match built-in function names or when used as hash keys.
+  </Accordion>
+  
+  <Accordion title="Not Checking Return Values" icon="warning">
+    ```perl
+    # Anti-pattern: Not checking return values
+    open(my $fh, '<', "data.txt");
+    while (my $line = <$fh>) {
+        # Process line...
+    }
+    close($fh);
+    
+    # Better approach: Check return values and handle errors
+    open(my $fh, '<', "data.txt") or die "Cannot open data.txt: $!";
+    while (my $line = <$fh>) {
+        # Process line...
+    }
+    close($fh) or warn "Error closing file: $!";
+    ```
+    Always check return values from functions that can fail, such as file operations, database connections, and network calls. Use `or die` or `or warn` to handle errors appropriately.
+  </Accordion>
+  
+  <Accordion title="Using Two-Argument open" icon="warning">
+    ```perl
+    # Anti-pattern: Using two-argument open
+    open(my $fh, "data.txt"); # Ambiguous mode
+    open(my $fh, ">data.txt"); # Security risk with filenames containing special characters
+    
+    # Better approach: Use three-argument open
+    open(my $fh, '<', "data.txt") or die "Cannot open data.txt: $!";
+    open(my $fh, '>', "output.txt") or die "Cannot open output.txt: $!";
+    ```
+    Always use the three-argument form of `open()` instead of the two-argument form. The three-argument form explicitly separates the mode from the filename, making your code safer and more readable.
+  </Accordion>
+  
+  <Accordion title="Not Using Lexical Variables" icon="warning">
+    ```perl
+    # Anti-pattern: Using global variables
+    $count = 0;
+    sub increment {
+        $count++;
+        return $count;
+    }
+    
+    # Better approach: Use lexical variables with my
+    use strict;
+    use warnings;
+    
+    my $count = 0;
+    sub increment {
+        my $local_count = shift;
+        return $local_count + 1;
+    }
+    $count = increment($count);
+    ```
+    Use lexical variables (declared with `my`) instead of global variables. Lexical variables have limited scope, making your code more maintainable and less prone to bugs from unexpected variable modifications.
+  </Accordion>
+  
+  <Accordion title="Using Symbolic References" icon="warning">
+    ```perl
+    # Anti-pattern: Using symbolic references
+    $var_name = "count";
+    $$var_name = 42; # Sets $count to 42
+    
+    # Better approach: Use hash references
+    use strict; # This would prevent the above code from working
+    use warnings;
+    
+    my %vars = (count => 42);
+    print $vars{count};
+    ```
+    Avoid using symbolic references (using variable names stored in other variables). They make code harder to understand and maintain. Use hash references instead.
+  </Accordion>
+  
+  <Accordion title="Using Comma as Statement Separator" icon="warning">
+    ```perl
+    # Anti-pattern: Using comma as statement separator
+    print "Hello", print " World\n";
+    
+    # Better approach: Use semicolons
+    print "Hello";
+    print " World\n";
+    
+    # Or concatenate strings
+    print "Hello World\n";
+    ```
+    Don't use commas as statement separators. Use semicolons to separate statements for clarity and to avoid confusion with list elements.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```perl
+    # Anti-pattern: Poor error handling
+    eval {
+        # Some code that might die
+        die "Something went wrong" if $error;
+    };
+    if ($@) {
+        print "Error: $@";
+    }
+    
+    # Better approach: Use Try::Tiny or similar
+    use Try::Tiny;
+    
+    try {
+        # Some code that might die
+        die "Something went wrong" if $error;
+    } catch {
+        warn "Error: $_";
+        # Handle error...
+    } finally {
+        # Clean up, always executed
+    };
+    ```
+    Use proper error handling with modules like `Try::Tiny` instead of bare `eval` blocks. This helps avoid subtle issues with `$@` and ensures proper error propagation.
+  </Accordion>
+  
+  <Accordion title="Using Perl4-style File Handles" icon="warning">
+    ```perl
+    # Anti-pattern: Using Perl4-style file handles
+    open(FH, '<', "data.txt") or die "Cannot open data.txt: $!";
+    while (<FH>) {
+        # Process line...
+    }
+    close(FH);
+    
+    # Better approach: Use lexical file handles
+    open(my $fh, '<', "data.txt") or die "Cannot open data.txt: $!";
+    while (my $line = <$fh>) {
+        # Process line...
+    }
+    close($fh);
+    ```
+    Use lexical filehandles (declared with `my`) instead of global filehandles. Lexical filehandles are automatically closed when they go out of scope, reducing the risk of resource leaks.
+  </Accordion>
+  
+  <Accordion title="Not Using Modules" icon="warning">
+    ```perl
+    # Anti-pattern: Reinventing the wheel
+    sub parse_json {
+        my $json_str = shift;
+        # Complex, error-prone parsing code...
+    }
+    
+    # Better approach: Use existing modules
+    use JSON::PP;
+    
+    my $data = decode_json($json_str);
+    ```
+    Don't reinvent the wheel. Use existing modules from CPAN for common tasks like parsing JSON, handling HTTP requests, or processing XML.
+  </Accordion>
+  
+  <Accordion title="Using Indirect Object Syntax" icon="warning">
+    ```perl
+    # Anti-pattern: Using indirect object syntax
+    $obj = new MyClass(arg1 => "value1");
+    
+    # Better approach: Use direct method calls
+    $obj = MyClass->new(arg1 => "value1");
+    ```
+    Avoid using indirect object syntax for method calls. Use the arrow (`->`) notation instead, which is clearer and less ambiguous.
+  </Accordion>
+  
+  <Accordion title="Not Using Named Parameters" icon="warning">
+    ```perl
+    # Anti-pattern: Using positional parameters
+    sub create_user {
+        my ($name, $email, $age, $role) = @_;
+        # Create user...
+    }
+    create_user("John", "john@example.com", 30, "admin");
+    
+    # Better approach: Use named parameters with a hash
+    sub create_user {
+        my %params = @_;
+        my $name = $params{name} or die "Name is required";
+        my $email = $params{email} or die "Email is required";
+        my $age = $params{age} || 0;
+        my $role = $params{role} || "user";
+        # Create user...
+    }
+    create_user(
+        name => "John",
+        email => "john@example.com",
+        age => 30,
+        role => "admin"
+    );
+    ```
+    Use named parameters (hash-based) instead of positional parameters for functions with many arguments. This makes your code more readable and allows for optional parameters.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Scoping" icon="warning">
+    ```perl
+    # Anti-pattern: Using global variables in loops
+    for $i (0..10) { # $i is global
+        # Do something with $i
+    }
+    print "Final value: $i\n"; # $i is still accessible
+    
+    # Better approach: Use lexical variables with proper scoping
+    for my $i (0..10) { # $i is lexically scoped to the loop
+        # Do something with $i
+    }
+    # $i is not accessible here
+    ```
+    Use proper variable scoping with `my` to limit the scope of variables to where they are needed. This reduces the risk of variable name collisions and unexpected behavior.
+  </Accordion>
+  
+  <Accordion title="Using Excessive Regular Expressions" icon="warning">
+    ```perl
+    # Anti-pattern: Using regular expressions for simple string operations
+    my $str = "Hello, World!";
+    $str =~ s/^Hello/Hi/; # Overkill for simple replacement
+    
+    # Better approach: Use string functions when appropriate
+    my $str = "Hello, World!";
+    $str =~ s/^Hello/Hi/ if index($str, "Hello") == 0;
+    
+    # Or even simpler
+    if (substr($str, 0, 5) eq "Hello") {
+        substr($str, 0, 5) = "Hi";
+    }
+    ```
+    While Perl excels at regular expressions, they can be overkill for simple string operations. Use string functions like `index()`, `substr()`, and `split()` when appropriate.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```perl
+    # Anti-pattern: No documentation
+    sub process_data {
+        my ($data, $options) = @_;
+        # Complex processing...
+    }
+    
+    # Better approach: Use POD documentation
+    =head2 process_data
+    
+    Process the given data according to the specified options.
+    
+    Parameters:
+        $data - A hashref containing the data to process
+        $options - A hashref of processing options
+    
+    Returns:
+        A hashref containing the processed data
+    
+    =cut
+    
+    sub process_data {
+        my ($data, $options) = @_;
+        # Complex processing...
+    }
+    ```
+    Document your code using Perl's Plain Old Documentation (POD) format. Good documentation helps others (and your future self) understand your code.
+  </Accordion>
+  
+  <Accordion title="Using Excessive Magic Variables" icon="warning">
+    ```perl
+    # Anti-pattern: Excessive use of magic variables
+    while (<>) {
+        s/foo/bar/;
+        print;
+    }
+    
+    # Better approach: Use explicit variables
+    while (my $line = <>) {
+        $line =~ s/foo/bar/;
+        print $line;
+    }
+    ```
+    Avoid excessive use of Perl's magic variables like `$_`, `@_`, `$1`, etc. While they can make code concise, they can also make it harder to understand, especially for less experienced Perl developers.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Package Organization" icon="warning">
+    ```perl
+    # Anti-pattern: Everything in one file
+    # (hundreds of functions in a single file)
+    
+    # Better approach: Organize code into modules and packages
+    package MyApp::User;
+    
+    use strict;
+    use warnings;
+    
+    sub new { ... }
+    sub authenticate { ... }
+    sub get_profile { ... }
+    
+    1; # End of module
+    ```
+    Organize your code into modules and packages instead of putting everything in one file. This improves maintainability and reusability.
+  </Accordion>
+  
+  <Accordion title="Using Bareword Filehandles" icon="warning">
+    ```perl
+    # Anti-pattern: Using bareword filehandles
+    open(FILE, '<', "data.txt") or die "Cannot open data.txt: $!";
+    while (<FILE>) {
+        # Process line...
+    }
+    close(FILE);
+    
+    # Better approach: Use lexical filehandles
+    open(my $file, '<', "data.txt") or die "Cannot open data.txt: $!";
+    while (my $line = <$file>) {
+        # Process line...
+    }
+    close($file);
+    ```
+    Avoid using bareword filehandles. Use lexical filehandles (declared with `my`) instead, which are safer and automatically closed when they go out of scope.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```perl
+    # Anti-pattern: Manual testing or no testing
+    
+    # Better approach: Use Test::More and other testing modules
+    use Test::More tests => 3;
+    
+    require_ok('MyModule');
+    
+    my $obj = MyModule->new();
+    isa_ok($obj, 'MyModule');
+    
+    is($obj->process("input"), "expected output", "process() returns correct result");
+    ```
+    Write proper tests for your code using testing frameworks like `Test::More`. This helps catch bugs early and ensures your code works as expected.
+  </Accordion>
+  
+  <Accordion title="Using Prototypes Incorrectly" icon="warning">
+    ```perl
+    # Anti-pattern: Misusing prototypes
+    sub sum($@) { # Trying to mimic built-in functions
+        my ($first, @rest) = @_;
+        return $first + sum(@rest) if @rest;
+        return $first;
+    }
+    
+    # Better approach: Avoid prototypes unless you know what you're doing
+    sub sum {
+        my $sum = 0;
+        $sum += $_ for @_;
+        return $sum;
+    }
+    ```
+    Avoid using function prototypes unless you fully understand their purpose and limitations. They don't work like function signatures in other languages and can lead to unexpected behavior.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper OO Techniques" icon="warning">
+    ```perl
+    # Anti-pattern: Ad-hoc OO
+    package MyClass;
+    
+    sub new {
+        my $class = shift;
+        return bless {}, $class;
+    }
+    
+    # Better approach: Use Moose or similar
+    package MyClass;
+    use Moose;
+    
+    has 'name' => (is => 'rw', isa => 'Str');
+    has 'age'  => (is => 'rw', isa => 'Int');
+    
+    sub greet {
+        my $self = shift;
+        return "Hello, " . $self->name;
+    }
+    
+    __PACKAGE__->meta->make_immutable;
+    1;
+    ```
+    Use modern object-oriented frameworks like `Moose`, `Moo`, or `Object::Tiny` instead of writing your own object system from scratch. These frameworks provide features like attributes, inheritance, and type checking.
+  </Accordion>
+  
+  <Accordion title="Using Excessive Punctuation Variables" icon="warning">
+    ```perl
+    # Anti-pattern: Excessive punctuation variables
+    while (<>) {
+        if (/^(\w+):(\d+)$/) {
+            $h{$1} = $2;
+        }
+    }
+    
+    # Better approach: Use named variables
+    while (my $line = <>) {
+        if ($line =~ /^(\w+):(\d+)$/) {
+            my $key = $1;
+            my $value = $2;
+            $hash{$key} = $value;
+        }
+    }
+    ```
+    Avoid excessive use of punctuation variables like `$1`, `$2`, etc. Assign them to named variables for clarity.
+  </Accordion>
+</AccordionGroup>

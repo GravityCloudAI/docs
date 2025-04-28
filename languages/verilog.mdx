@@ -1,0 +1,673 @@
+---
+title: 'Verilog'
+description: 'Verilog is a hardware description language (HDL) used to model electronic systems. It is most commonly used in the design, verification, and implementation of digital logic chips at the register-transfer level of abstraction.'
+---
+
+<AccordionGroup>
+  <Accordion title="Verilog Anti-Patterns Overview" icon="verilog">
+    Verilog, as a hardware description language, has several common anti-patterns that can lead to simulation-synthesis mismatches, timing issues, and hard-to-debug hardware designs. Here are the most important anti-patterns to avoid when writing Verilog code.
+  </Accordion>
+  
+  <Accordion title="Blocking Assignments in Sequential Logic" icon="warning">
+    ```verilog
+    // Anti-pattern: Using blocking assignments in sequential logic
+    module counter_bad(input clk, input reset, output reg [3:0] count);
+      always @(posedge clk or posedge reset) begin
+        if (reset) begin
+          count = 0;  // Blocking assignment
+        end else begin
+          count = count + 1;  // Blocking assignment
+        end
+      end
+    endmodule
+    
+    // Better approach: Use non-blocking assignments for sequential logic
+    module counter_good(input clk, input reset, output reg [3:0] count);
+      always @(posedge clk or posedge reset) begin
+        if (reset) begin
+          count <= 0;  // Non-blocking assignment
+        end else begin
+          count <= count + 1;  // Non-blocking assignment
+        end
+      end
+    endmodule
+    ```
+    Always use non-blocking assignments (`<=`) for sequential logic within an `always @(posedge clk)` block. Using blocking assignments (`=`) in sequential logic can lead to race conditions and simulation-synthesis mismatches.
+  </Accordion>
+  
+  <Accordion title="Non-Blocking Assignments in Combinational Logic" icon="warning">
+    ```verilog
+    // Anti-pattern: Using non-blocking assignments in combinational logic
+    module mux_bad(input a, input b, input sel, output reg y);
+      always @(*) begin
+        if (sel) begin
+          y <= a;  // Non-blocking assignment
+        end else begin
+          y <= b;  // Non-blocking assignment
+        end
+      end
+    endmodule
+    
+    // Better approach: Use blocking assignments for combinational logic
+    module mux_good(input a, input b, input sel, output reg y);
+      always @(*) begin
+        if (sel) begin
+          y = a;  // Blocking assignment
+        end else begin
+          y = b;  // Blocking assignment
+        end
+      end
+    endmodule
+    ```
+    Use blocking assignments (`=`) for combinational logic within an `always @(*)` block. Using non-blocking assignments (`<=`) in combinational logic can lead to simulation-synthesis mismatches and incorrect behavior.
+  </Accordion>
+  
+  <Accordion title="Incomplete Sensitivity Lists" icon="warning">
+    ```verilog
+    // Anti-pattern: Incomplete sensitivity list
+    module alu_bad(input [7:0] a, input [7:0] b, input [1:0] op, output reg [7:0] result);
+      always @(a or b) begin  // Missing op in sensitivity list
+        case (op)
+          2'b00: result = a + b;
+          2'b01: result = a - b;
+          2'b10: result = a & b;
+          2'b11: result = a | b;
+        endcase
+      end
+    endmodule
+    
+    // Better approach: Use complete sensitivity list or @(*)
+    module alu_good(input [7:0] a, input [7:0] b, input [1:0] op, output reg [7:0] result);
+      always @(a or b or op) begin  // Complete sensitivity list
+        case (op)
+          2'b00: result = a + b;
+          2'b01: result = a - b;
+          2'b10: result = a & b;
+          2'b11: result = a | b;
+        endcase
+      end
+    endmodule
+    
+    // Even better: Use @(*) for automatic sensitivity list
+    module alu_best(input [7:0] a, input [7:0] b, input [1:0] op, output reg [7:0] result);
+      always @(*) begin  // Automatic sensitivity list
+        case (op)
+          2'b00: result = a + b;
+          2'b01: result = a - b;
+          2'b10: result = a & b;
+          2'b11: result = a | b;
+        endcase
+      end
+    endmodule
+    ```
+    Always use complete sensitivity lists or the automatic sensitivity list `@(*)` for combinational logic. Incomplete sensitivity lists can lead to simulation-synthesis mismatches and incorrect behavior.
+  </Accordion>
+  
+  <Accordion title="Latches Due to Incomplete Assignments" icon="warning">
+    ```verilog
+    // Anti-pattern: Incomplete assignments creating latches
+    module fsm_bad(input clk, input reset, input in, output reg out);
+      reg [1:0] state, next_state;
+      
+      always @(*) begin
+        case (state)
+          2'b00: begin
+            if (in) next_state = 2'b01;
+            // Missing else clause creates a latch for next_state
+          end
+          2'b01: begin
+            next_state = 2'b10;
+            out = 1'b1;  // Missing assignment in other states creates a latch for out
+          end
+          2'b10: begin
+            next_state = 2'b00;
+          end
+          // Missing default case
+        endcase
+      end
+      
+      always @(posedge clk or posedge reset) begin
+        if (reset) state <= 2'b00;
+        else state <= next_state;
+      end
+    endmodule
+    
+    // Better approach: Complete assignments to avoid latches
+    module fsm_good(input clk, input reset, input in, output reg out);
+      reg [1:0] state, next_state;
+      
+      always @(*) begin
+        // Default assignments to avoid latches
+        next_state = state;
+        out = 1'b0;
+        
+        case (state)
+          2'b00: begin
+            if (in) next_state = 2'b01;
+            // else clause not needed due to default assignment
+          end
+          2'b01: begin
+            next_state = 2'b10;
+            out = 1'b1;
+          end
+          2'b10: begin
+            next_state = 2'b00;
+          end
+          default: begin
+            next_state = 2'b00;
+          end
+        endcase
+      end
+      
+      always @(posedge clk or posedge reset) begin
+        if (reset) state <= 2'b00;
+        else state <= next_state;
+      end
+    endmodule
+    ```
+    Always provide default assignments to all variables at the beginning of combinational `always` blocks, and include a default case in case statements. Incomplete assignments can create unintended latches in your design.
+  </Accordion>
+  
+  <Accordion title="Multiple Drivers for the Same Signal" icon="warning">
+    ```verilog
+    // Anti-pattern: Multiple drivers for the same signal
+    module multiple_drivers_bad(input clk, input reset, input en, output reg [7:0] count);
+      always @(posedge clk or posedge reset) begin
+        if (reset) count <= 8'h00;
+        else if (en) count <= count + 1;
+      end
+      
+      always @(posedge clk) begin
+        if (count == 8'hFF) count <= 8'h00;  // Second driver for count
+      end
+    endmodule
+    
+    // Better approach: Single driver for each signal
+    module multiple_drivers_good(input clk, input reset, input en, output reg [7:0] count);
+      always @(posedge clk or posedge reset) begin
+        if (reset) count <= 8'h00;
+        else if (en) begin
+          if (count == 8'hFF) count <= 8'h00;
+          else count <= count + 1;
+        end
+      end
+    endmodule
+    ```
+    Ensure that each signal has only one driver. Multiple drivers for the same signal can lead to simulation-synthesis mismatches and undefined behavior.
+  </Accordion>
+  
+  <Accordion title="Mixing Blocking and Non-Blocking Assignments" icon="warning">
+    ```verilog
+    // Anti-pattern: Mixing blocking and non-blocking assignments
+    module mixed_assignments_bad(input clk, input reset, input [7:0] data_in, output reg [7:0] data_out);
+      reg [7:0] temp;
+      
+      always @(posedge clk or posedge reset) begin
+        if (reset) begin
+          temp <= 8'h00;
+          data_out <= 8'h00;
+        end else begin
+          temp = data_in + 8'h01;  // Blocking assignment
+          data_out <= temp;  // Non-blocking assignment
+        end
+      end
+    endmodule
+    
+    // Better approach: Consistent assignment types
+    module mixed_assignments_good(input clk, input reset, input [7:0] data_in, output reg [7:0] data_out);
+      reg [7:0] temp;
+      
+      always @(posedge clk or posedge reset) begin
+        if (reset) begin
+          temp <= 8'h00;
+          data_out <= 8'h00;
+        end else begin
+          temp <= data_in + 8'h01;  // Non-blocking assignment
+          data_out <= temp;  // Non-blocking assignment
+        end
+      end
+    endmodule
+    ```
+    Avoid mixing blocking and non-blocking assignments within the same `always` block. Use non-blocking assignments consistently for sequential logic and blocking assignments consistently for combinational logic.
+  </Accordion>
+  
+  <Accordion title="Asynchronous Reset Release" icon="warning">
+    ```verilog
+    // Anti-pattern: Asynchronous reset release
+    module async_reset_release_bad(input clk, input reset, output reg [3:0] count);
+      always @(posedge clk or posedge reset) begin
+        if (reset) count <= 4'h0;
+        else count <= count + 1;
+      end
+    endmodule
+    
+    // Better approach: Synchronous reset release
+    module sync_reset_release_good(input clk, input reset, output reg [3:0] count);
+      reg reset_sync1, reset_sync2;
+      
+      // Synchronize reset release
+      always @(posedge clk or posedge reset) begin
+        if (reset) begin
+          reset_sync1 <= 1'b1;
+          reset_sync2 <= 1'b1;
+        end else begin
+          reset_sync1 <= 1'b0;
+          reset_sync2 <= reset_sync1;
+        end
+      end
+      
+      // Use synchronized reset
+      always @(posedge clk or posedge reset) begin
+        if (reset) count <= 4'h0;
+        else if (!reset_sync2) count <= count + 1;
+      end
+    endmodule
+    ```
+    Synchronize asynchronous reset release to avoid metastability issues. While asynchronous reset assertion is often used for reliable system initialization, the release should be synchronized to the clock to prevent timing violations.
+  </Accordion>
+  
+  <Accordion title="Combinational Loops" icon="warning">
+    ```verilog
+    // Anti-pattern: Combinational loop
+    module comb_loop_bad(input a, input b, output reg c);
+      reg temp;
+      
+      always @(*) begin
+        temp = a & c;  // c depends on temp, and temp depends on c
+        c = temp | b;
+      end
+    endmodule
+    
+    // Better approach: Break the combinational loop
+    module comb_loop_good(input a, input b, input clk, output reg c);
+      reg temp;
+      
+      // Use a register to break the loop
+      always @(posedge clk) begin
+        temp <= a & c;
+      end
+      
+      always @(*) begin
+        c = temp | b;
+      end
+    endmodule
+    ```
+    Avoid creating combinational loops in your design. Combinational loops can lead to oscillations, unstable behavior, and synthesis issues. Break loops using registers or redesign your logic.
+  </Accordion>
+  
+  <Accordion title="Inferring Clock Gating" icon="warning">
+    ```verilog
+    // Anti-pattern: Inferring clock gating
+    module clock_gate_bad(input clk, input enable, input [7:0] data_in, output reg [7:0] data_out);
+      wire gated_clk;
+      
+      assign gated_clk = clk & enable;  // Inferred clock gating
+      
+      always @(posedge gated_clk) begin
+        data_out <= data_in;
+      end
+    endmodule
+    
+    // Better approach: Use enable within the always block
+    module clock_gate_good(input clk, input enable, input [7:0] data_in, output reg [7:0] data_out);
+      always @(posedge clk) begin
+        if (enable) data_out <= data_in;
+      end
+    endmodule
+    
+    // Or use proper clock gating cells provided by the technology library
+    module clock_gate_best(input clk, input enable, input [7:0] data_in, output reg [7:0] data_out);
+      wire gated_clk;
+      
+      // Instantiate a proper clock gating cell
+      CKLNQD1 clock_gate_cell (.CP(clk), .E(enable), .TE(1'b0), .Q(gated_clk));
+      
+      always @(posedge gated_clk) begin
+        data_out <= data_in;
+      end
+    endmodule
+    ```
+    Avoid inferring clock gating using simple logic gates. Use enable signals within sequential blocks or instantiate proper clock gating cells provided by your technology library.
+  </Accordion>
+  
+  <Accordion title="Using Initial Blocks for Hardware" icon="warning">
+    ```verilog
+    // Anti-pattern: Using initial blocks for hardware initialization
+    module initial_block_bad(input clk, input [7:0] data_in, output reg [7:0] data_out);
+      reg [7:0] memory [0:15];
+      
+      initial begin
+        // Initialize memory
+        for (int i = 0; i < 16; i = i + 1) begin
+          memory[i] = 8'h00;
+        end
+        data_out = 8'h00;
+      end
+      
+      always @(posedge clk) begin
+        data_out <= memory[data_in[3:0]];
+      end
+    endmodule
+    
+    // Better approach: Use reset for initialization
+    module initial_block_good(input clk, input reset, input [7:0] data_in, output reg [7:0] data_out);
+      reg [7:0] memory [0:15];
+      integer i;
+      
+      always @(posedge clk or posedge reset) begin
+        if (reset) begin
+          // Initialize memory
+          for (i = 0; i < 16; i = i + 1) begin
+            memory[i] <= 8'h00;
+          end
+          data_out <= 8'h00;
+        end else begin
+          data_out <= memory[data_in[3:0]];
+        end
+      end
+    endmodule
+    ```
+    Avoid using `initial` blocks for hardware initialization, as they are generally not synthesizable for hardware (except for some specific cases like memory initialization). Use reset signals to initialize your design.
+  </Accordion>
+  
+  <Accordion title="Ignoring Clock Domain Crossing" icon="warning">
+    ```verilog
+    // Anti-pattern: Ignoring clock domain crossing
+    module cdc_bad(input clk_a, input clk_b, input [7:0] data_a, output reg [7:0] data_b);
+      always @(posedge clk_b) begin
+        data_b <= data_a;  // Direct crossing between clock domains
+      end
+    endmodule
+    
+    // Better approach: Use proper synchronization
+    module cdc_good(input clk_a, input clk_b, input [7:0] data_a, output reg [7:0] data_b);
+      reg [7:0] data_sync1, data_sync2;
+      
+      // Double-flop synchronizer
+      always @(posedge clk_b) begin
+        data_sync1 <= data_a;
+        data_sync2 <= data_sync1;
+        data_b <= data_sync2;
+      end
+    endmodule
+    
+    // Even better for multi-bit signals: Use handshaking or FIFO
+    module cdc_best(input clk_a, input reset_a, input clk_b, input reset_b,
+                   input [7:0] data_a, input valid_a, output reg ready_a,
+                   output reg [7:0] data_b, output reg valid_b, input ready_b);
+      // Simplified handshaking CDC (a complete implementation would be more complex)
+      reg valid_a_sync1, valid_a_sync2;
+      reg valid_b_toggle;
+      reg valid_b_toggle_sync1, valid_b_toggle_sync2;
+      reg valid_b_toggle_prev;
+      reg [7:0] data_capture;
+      
+      // Capture data in source domain
+      always @(posedge clk_a or posedge reset_a) begin
+        if (reset_a) begin
+          valid_b_toggle <= 1'b0;
+          ready_a <= 1'b1;
+          data_capture <= 8'h00;
+        end else begin
+          if (valid_a && ready_a) begin
+            data_capture <= data_a;
+            valid_b_toggle <= ~valid_b_toggle;
+            ready_a <= 1'b0;
+          end else if (valid_b_toggle_sync2 != valid_b_toggle) begin
+            ready_a <= 1'b1;
+          end
+        end
+      end
+      
+      // Synchronize to destination domain
+      always @(posedge clk_b or posedge reset_b) begin
+        if (reset_b) begin
+          valid_a_sync1 <= 1'b0;
+          valid_a_sync2 <= 1'b0;
+          valid_b_toggle_sync1 <= 1'b0;
+          valid_b_toggle_sync2 <= 1'b0;
+          valid_b_toggle_prev <= 1'b0;
+          valid_b <= 1'b0;
+          data_b <= 8'h00;
+        end else begin
+          valid_a_sync1 <= valid_b_toggle;
+          valid_a_sync2 <= valid_a_sync1;
+          valid_b_toggle_sync1 <= valid_b_toggle;
+          valid_b_toggle_sync2 <= valid_b_toggle_sync1;
+          
+          if (valid_b_toggle_sync2 != valid_b_toggle_prev && !valid_b) begin
+            data_b <= data_capture;
+            valid_b <= 1'b1;
+            valid_b_toggle_prev <= valid_b_toggle_sync2;
+          end else if (valid_b && ready_b) begin
+            valid_b <= 1'b0;
+          end
+        end
+      end
+    endmodule
+    ```
+    Always use proper synchronization techniques when crossing clock domains. For single-bit signals, use a double-flop synchronizer. For multi-bit signals, use handshaking protocols, gray coding, or asynchronous FIFOs.
+  </Accordion>
+  
+  <Accordion title="Improper Use of Delays" icon="warning">
+    ```verilog
+    // Anti-pattern: Using delays for hardware timing
+    module delay_bad(input clk, input [7:0] data_in, output reg [7:0] data_out);
+      always @(posedge clk) begin
+        #2 data_out <= data_in;  // Delay is not synthesizable
+      end
+    endmodule
+    
+    // Better approach: Let the synthesis tool handle timing
+    module delay_good(input clk, input [7:0] data_in, output reg [7:0] data_out);
+      always @(posedge clk) begin
+        data_out <= data_in;
+      end
+    endmodule
+    ```
+    Avoid using delays (`#`) in synthesizable code. Delays are for simulation only and are ignored during synthesis. Let the synthesis tool handle timing based on your timing constraints.
+  </Accordion>
+  
+  <Accordion title="Ignoring Tool Warnings" icon="warning">
+    ```verilog
+    // Anti-pattern: Code that generates tool warnings
+    module warning_generator(input clk, input reset, input [7:0] data, output reg valid);
+      always @(posedge clk or posedge reset) begin
+        if (reset) valid <= 1'b0;
+        else if (data == 8'hFF) valid <= 1'b1;
+        // Warning: valid is not assigned in all branches
+      end
+    endmodule
+    
+    // Better approach: Fix the issues causing warnings
+    module warning_free(input clk, input reset, input [7:0] data, output reg valid);
+      always @(posedge clk or posedge reset) begin
+        if (reset) valid <= 1'b0;
+        else if (data == 8'hFF) valid <= 1'b1;
+        else valid <= valid;  // Explicitly maintain current value
+      end
+    endmodule
+    ```
+    Don't ignore warnings from your synthesis and simulation tools. Warnings often indicate potential issues in your design that could lead to unexpected behavior. Fix the issues causing warnings or document why they can be safely ignored.
+  </Accordion>
+  
+  <Accordion title="Not Using Parameters for Constants" icon="warning">
+    ```verilog
+    // Anti-pattern: Hardcoded constants
+    module hardcoded_bad(input clk, input reset, output reg [3:0] count);
+      always @(posedge clk or posedge reset) begin
+        if (reset) count <= 4'h0;
+        else if (count == 4'h9) count <= 4'h0;
+        else count <= count + 1;
+      end
+    endmodule
+    
+    // Better approach: Use parameters for constants
+    module parameterized_good #(
+      parameter WIDTH = 4,
+      parameter MAX_COUNT = 9
+    )(input clk, input reset, output reg [WIDTH-1:0] count);
+      always @(posedge clk or posedge reset) begin
+        if (reset) count <= {WIDTH{1'b0}};
+        else if (count == MAX_COUNT) count <= {WIDTH{1'b0}};
+        else count <= count + 1'b1;
+      end
+    endmodule
+    ```
+    Use parameters for constants in your design. This makes your code more maintainable, reusable, and easier to modify. Parameters can be overridden during module instantiation, allowing for flexible designs.
+  </Accordion>
+  
+  <Accordion title="Not Using Named Port Connections" icon="warning">
+    ```verilog
+    // Anti-pattern: Positional port connections
+    module top_bad();
+      wire clk, reset, enable;
+      wire [7:0] data_in, data_out;
+      
+      // Positional port connections are error-prone
+      counter counter_inst(clk, reset, enable, data_in, data_out);
+    endmodule
+    
+    // Better approach: Use named port connections
+    module top_good();
+      wire clk, reset, enable;
+      wire [7:0] data_in, data_out;
+      
+      // Named port connections are clearer and less error-prone
+      counter counter_inst(
+        .clk(clk),
+        .reset(reset),
+        .enable(enable),
+        .data_in(data_in),
+        .data_out(data_out)
+      );
+    endmodule
+    ```
+    Use named port connections when instantiating modules. Named connections are clearer, less error-prone, and allow for port reordering without breaking your design.
+  </Accordion>
+  
+  <Accordion title="Not Using Generate Blocks" icon="warning">
+    ```verilog
+    // Anti-pattern: Duplicated code for similar structures
+    module ripple_carry_bad(input [3:0] a, input [3:0] b, input cin, output [3:0] sum, output cout);
+      wire c1, c2, c3;
+      
+      full_adder fa0(.a(a[0]), .b(b[0]), .cin(cin), .sum(sum[0]), .cout(c1));
+      full_adder fa1(.a(a[1]), .b(b[1]), .cin(c1), .sum(sum[1]), .cout(c2));
+      full_adder fa2(.a(a[2]), .b(b[2]), .cin(c2), .sum(sum[2]), .cout(c3));
+      full_adder fa3(.a(a[3]), .b(b[3]), .cin(c3), .sum(sum[3]), .cout(cout));
+    endmodule
+    
+    // Better approach: Use generate blocks
+    module ripple_carry_good #(
+      parameter WIDTH = 4
+    )(input [WIDTH-1:0] a, input [WIDTH-1:0] b, input cin, output [WIDTH-1:0] sum, output cout);
+      wire [WIDTH:0] c;
+      
+      assign c[0] = cin;
+      assign cout = c[WIDTH];
+      
+      genvar i;
+      generate
+        for (i = 0; i < WIDTH; i = i + 1) begin : adder_loop
+          full_adder fa(
+            .a(a[i]),
+            .b(b[i]),
+            .cin(c[i]),
+            .sum(sum[i]),
+            .cout(c[i+1])
+          );
+        end
+      endgenerate
+    endmodule
+    ```
+    Use `generate` blocks for repetitive structures in your design. Generate blocks allow for parameterized, scalable designs and reduce code duplication.
+  </Accordion>
+  
+  <Accordion title="Not Using Assertions" icon="warning">
+    ```verilog
+    // Anti-pattern: No assertions for verification
+    module fsm_no_assertions(input clk, input reset, input in, output reg out);
+      reg [1:0] state, next_state;
+      
+      // State transition logic
+      always @(*) begin
+        next_state = state;
+        case (state)
+          2'b00: if (in) next_state = 2'b01;
+          2'b01: next_state = 2'b10;
+          2'b10: next_state = 2'b00;
+          default: next_state = 2'b00;
+        endcase
+      end
+      
+      // Output logic
+      always @(*) begin
+        case (state)
+          2'b01: out = 1'b1;
+          default: out = 1'b0;
+        endcase
+      end
+      
+      // State register
+      always @(posedge clk or posedge reset) begin
+        if (reset) state <= 2'b00;
+        else state <= next_state;
+      end
+    endmodule
+    
+    // Better approach: Use assertions for verification
+    module fsm_with_assertions(input clk, input reset, input in, output reg out);
+      reg [1:0] state, next_state;
+      
+      // State transition logic
+      always @(*) begin
+        next_state = state;
+        case (state)
+          2'b00: if (in) next_state = 2'b01;
+          2'b01: next_state = 2'b10;
+          2'b10: next_state = 2'b00;
+          default: next_state = 2'b00;
+        endcase
+      end
+      
+      // Output logic
+      always @(*) begin
+        case (state)
+          2'b01: out = 1'b1;
+          default: out = 1'b0;
+        endcase
+      end
+      
+      // State register
+      always @(posedge clk or posedge reset) begin
+        if (reset) state <= 2'b00;
+        else state <= next_state;
+      end
+      
+      // Assertions
+      // Check that state is always valid
+      property valid_state;
+        @(posedge clk) disable iff (reset)
+          state inside {2'b00, 2'b01, 2'b10};
+      endproperty
+      assert property (valid_state) else $error("Invalid state detected");
+      
+      // Check state transition from state 01
+      property state_01_transition;
+        @(posedge clk) disable iff (reset)
+          (state == 2'b01) |=> (state == 2'b10);
+      endproperty
+      assert property (state_01_transition) else $error("Invalid transition from state 01");
+      
+      // Check that output is high only in state 01
+      property output_high_only_in_state_01;
+        @(posedge clk) disable iff (reset)
+          (out == 1'b1) |-> (state == 2'b01);
+      endproperty
+      assert property (output_high_only_in_state_01) else $error("Output high in wrong state");
+    endmodule
+    ```
+    Use assertions to verify the correctness of your design. Assertions can catch bugs early in the design process and serve as documentation for expected behavior.
+  </Accordion>
+</AccordionGroup>

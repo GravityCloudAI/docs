@@ -1,0 +1,630 @@
+---
+title: 'Go'
+description: 'Go is a statically typed, compiled programming language designed at Google. It is syntactically similar to C, but with memory safety, garbage collection, structural typing, and CSP-style concurrency.'
+---
+
+<AccordionGroup>
+  <Accordion title="Go Anti-Patterns Overview" icon="go">
+    Go, despite its simplicity and strong design principles, still has common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing Go code.
+  </Accordion>
+  
+  <Accordion title="Not Handling Errors Properly" icon="warning">
+    ```go
+    // Anti-pattern: Ignoring errors
+    func readFile(path string) []byte {
+        data, _ := ioutil.ReadFile(path) // Ignoring error
+        return data
+    }
+    
+    // Better approach: Handle errors
+    func readFile(path string) ([]byte, error) {
+        data, err := ioutil.ReadFile(path)
+        if err != nil {
+            return nil, fmt.Errorf("failed to read file %s: %w", path, err)
+        }
+        return data, nil
+    }
+    ```
+    Go's explicit error handling is a feature, not a burden. Always check and handle errors appropriately, and consider using the `%w` verb to wrap errors for better context.
+  </Accordion>
+  
+  <Accordion title="Using Empty Interface (interface{}) Excessively" icon="warning">
+    ```go
+    // Anti-pattern: Overusing empty interface
+    func processData(data interface{}) interface{} {
+        // Type assertions everywhere
+        switch v := data.(type) {
+        case string:
+            return v + " processed"
+        case int:
+            return v * 2
+        default:
+            return nil
+        }
+    }
+    
+    // Better approach: Use specific interfaces
+    type Processor interface {
+        Process() string
+    }
+    
+    type StringData string
+    func (s StringData) Process() string {
+        return string(s) + " processed"
+    }
+    
+    type IntData int
+    func (i IntData) Process() string {
+        return strconv.Itoa(int(i) * 2)
+    }
+    
+    func processData(data Processor) string {
+        return data.Process()
+    }
+    ```
+    The empty interface (`interface{}`) bypasses Go's type system. Use specific interfaces that define the behavior you need instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Context for Cancellation" icon="warning">
+    ```go
+    // Anti-pattern: Not using context for cancellation
+    func fetchData(url string) ([]byte, error) {
+        resp, err := http.Get(url)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+        return ioutil.ReadAll(resp.Body)
+    }
+    
+    // Better approach: Use context for cancellation
+    func fetchData(ctx context.Context, url string) ([]byte, error) {
+        req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        resp, err := http.DefaultClient.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+        
+        return ioutil.ReadAll(resp.Body)
+    }
+    ```
+    Use `context.Context` for cancellation, timeouts, and passing request-scoped values. This allows callers to cancel long-running operations.
+  </Accordion>
+  
+  <Accordion title="Returning Naked Returns" icon="warning">
+    ```go
+    // Anti-pattern: Using naked returns
+    func divide(a, b int) (result int, err error) {
+        if b == 0 {
+            err = errors.New("division by zero")
+            return
+        }
+        result = a / b
+        return
+    }
+    
+    // Better approach: Explicit returns
+    func divide(a, b int) (int, error) {
+        if b == 0 {
+            return 0, errors.New("division by zero")
+        }
+        return a / b, nil
+    }
+    ```
+    Naked returns (returns without arguments) can make code harder to understand, especially in longer functions. Use explicit returns for clarity.
+  </Accordion>
+  
+  <Accordion title="Using init() Functions Excessively" icon="warning">
+    ```go
+    // Anti-pattern: Overusing init()
+    var db *sql.DB
+    
+    func init() {
+        var err error
+        db, err = sql.Open("postgres", "connection-string")
+        if err != nil {
+            log.Fatal(err) // Program exits if DB connection fails
+        }
+    }
+    
+    // Better approach: Explicit initialization
+    func NewApp() (*App, error) {
+        db, err := sql.Open("postgres", "connection-string")
+        if err != nil {
+            return nil, err
+        }
+        
+        return &App{db: db}, nil
+    }
+    ```
+    `init()` functions run before `main()` and can't return errors. Use explicit initialization functions that can handle errors gracefully.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Package Organization" icon="warning">
+    ```go
+    // Anti-pattern: Poor package organization
+    // All code in one package
+    package main
+    
+    // User-related code
+    type User struct { /* ... */ }
+    func CreateUser() { /* ... */ }
+    
+    // Order-related code
+    type Order struct { /* ... */ }
+    func PlaceOrder() { /* ... */ }
+    
+    // Better approach: Organize by domain
+    // user/user.go
+    package user
+    
+    type User struct { /* ... */ }
+    func Create() { /* ... */ }
+    
+    // order/order.go
+    package order
+    
+    type Order struct { /* ... */ }
+    func Place() { /* ... */ }
+    ```
+    Organize packages by domain, not by technical function. Each package should have a single, well-defined purpose.
+  </Accordion>
+  
+  <Accordion title="Using Global Variables" icon="warning">
+    ```go
+    // Anti-pattern: Using global variables
+    var (  
+        db *sql.DB
+        logger *log.Logger
+        config Config
+    )
+    
+    func GetUser(id string) (*User, error) {
+        // Using global db
+        return db.QueryUser(id)
+    }
+    
+    // Better approach: Dependency injection
+    type UserService struct {
+        db *sql.DB
+        logger *log.Logger
+        config Config
+    }
+    
+    func NewUserService(db *sql.DB, logger *log.Logger, config Config) *UserService {
+        return &UserService{db, logger, config}
+    }
+    
+    func (s *UserService) GetUser(id string) (*User, error) {
+        return s.db.QueryUser(id)
+    }
+    ```
+    Global variables make testing difficult and create implicit dependencies. Use dependency injection to make dependencies explicit.
+  </Accordion>
+  
+  <Accordion title="Not Using Interfaces for Testability" icon="warning">
+    ```go
+    // Anti-pattern: Direct dependency on concrete types
+    type UserService struct {
+        db *sql.DB
+    }
+    
+    func (s *UserService) GetUser(id string) (*User, error) {
+        // Direct dependency on sql.DB
+        row := s.db.QueryRow("SELECT * FROM users WHERE id = $1", id)
+        // ...
+    }
+    
+    // Better approach: Depend on interfaces
+    type Database interface {
+        QueryRow(query string, args ...interface{}) Row
+    }
+    
+    type Row interface {
+        Scan(dest ...interface{}) error
+    }
+    
+    type UserService struct {
+        db Database
+    }
+    
+    func (s *UserService) GetUser(id string) (*User, error) {
+        // Dependency on interface, not concrete type
+        row := s.db.QueryRow("SELECT * FROM users WHERE id = $1", id)
+        // ...
+    }
+    ```
+    Depend on interfaces, not concrete implementations, to make your code more testable and flexible.
+  </Accordion>
+  
+  <Accordion title="Using Pointers Unnecessarily" icon="warning">
+    ```go
+    // Anti-pattern: Unnecessary pointers
+    func NewUser(name string, age int) *User {
+        return &User{name, age}
+    }
+    
+    func ProcessUser(user *User) {
+        // No modification to user
+        fmt.Println(user.name, user.age)
+    }
+    
+    // Better approach: Use values for immutable data
+    func NewUser(name string, age int) User {
+        return User{name, age}
+    }
+    
+    func ProcessUser(user User) {
+        // No modification needed, pass by value
+        fmt.Println(user.name, user.age)
+    }
+    ```
+    Only use pointers when you need to modify the data or when the struct is very large. For small, immutable data, use values.
+  </Accordion>
+  
+  <Accordion title="Not Using defer for Cleanup" icon="warning">
+    ```go
+    // Anti-pattern: Manual cleanup
+    func processFile(path string) error {
+        f, err := os.Open(path)
+        if err != nil {
+            return err
+        }
+        
+        // Process file...
+        
+        // What if there's an error here? The file won't be closed
+        f.Close()
+        return nil
+    }
+    
+    // Better approach: Use defer for cleanup
+    func processFile(path string) error {
+        f, err := os.Open(path)
+        if err != nil {
+            return err
+        }
+        defer f.Close() // Will be called even if the function returns early
+        
+        // Process file...
+        
+        return nil
+    }
+    ```
+    Use `defer` for cleanup operations to ensure they happen even if the function returns early due to an error.
+  </Accordion>
+  
+  <Accordion title="Not Using Structured Logging" icon="warning">
+    ```go
+    // Anti-pattern: Unstructured logging
+    func processOrder(order Order) error {
+        log.Printf("Processing order %s for customer %s", order.ID, order.CustomerID)
+        // Process order...
+        log.Printf("Order %s processed successfully", order.ID)
+        return nil
+    }
+    
+    // Better approach: Structured logging
+    func processOrder(order Order) error {
+        logger := log.With(
+            "order_id", order.ID,
+            "customer_id", order.CustomerID,
+        )
+        
+        logger.Info("Processing order")
+        // Process order...
+        logger.Info("Order processed successfully")
+        return nil
+    }
+    ```
+    Use structured logging with key-value pairs instead of string formatting. This makes logs easier to parse and query.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Types" icon="warning">
+    ```go
+    // Anti-pattern: Using string errors
+    func validateUser(user User) error {
+        if user.Name == "" {
+            return errors.New("name is required")
+        }
+        if user.Age < 0 {
+            return errors.New("age cannot be negative")
+        }
+        return nil
+    }
+    
+    // Better approach: Define error types
+    type ValidationError struct {
+        Field string
+        Message string
+    }
+    
+    func (e ValidationError) Error() string {
+        return fmt.Sprintf("%s: %s", e.Field, e.Message)
+    }
+    
+    func validateUser(user User) error {
+        if user.Name == "" {
+            return ValidationError{Field: "name", Message: "is required"}
+        }
+        if user.Age < 0 {
+            return ValidationError{Field: "age", Message: "cannot be negative"}
+        }
+        return nil
+    }
+    ```
+    Define custom error types that implement the `error` interface for better error handling and more context.
+  </Accordion>
+  
+  <Accordion title="Not Using Channels Correctly" icon="warning">
+    ```go
+    // Anti-pattern: Not closing channels
+    func generateNumbers(n int) <-chan int {
+        ch := make(chan int)
+        go func() {
+            for i := 0; i < n; i++ {
+                ch <- i
+            }
+            // Channel is not closed
+        }()
+        return ch
+    }
+    
+    // Better approach: Close channels when done
+    func generateNumbers(n int) <-chan int {
+        ch := make(chan int)
+        go func() {
+            defer close(ch) // Channel is closed when the goroutine exits
+            for i := 0; i < n; i++ {
+                ch <- i
+            }
+        }()
+        return ch
+    }
+    ```
+    Always close channels when you're done sending values. This signals to receivers that no more values will be sent.
+  </Accordion>
+  
+  <Accordion title="Not Using Context Timeout" icon="warning">
+    ```go
+    // Anti-pattern: No timeout for external calls
+    func fetchData(ctx context.Context, url string) ([]byte, error) {
+        req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        resp, err := http.DefaultClient.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+        
+        return ioutil.ReadAll(resp.Body)
+    }
+    
+    // Better approach: Use context with timeout
+    func fetchData(url string) ([]byte, error) {
+        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+        
+        req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        resp, err := http.DefaultClient.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+        
+        return ioutil.ReadAll(resp.Body)
+    }
+    ```
+    Use `context.WithTimeout` to set timeouts for external calls to prevent your application from hanging indefinitely.
+  </Accordion>
+  
+  <Accordion title="Not Using sync.WaitGroup Correctly" icon="warning">
+    ```go
+    // Anti-pattern: Incorrect WaitGroup usage
+    func processItems(items []Item) {
+        var wg sync.WaitGroup
+        
+        for _, item := range items {
+            go func() { // Bug: item is captured by reference
+                wg.Add(1) // Bug: wg.Add should be called before the goroutine
+                defer wg.Done()
+                processItem(item)
+            }()
+        }
+        
+        wg.Wait()
+    }
+    
+    // Better approach: Correct WaitGroup usage
+    func processItems(items []Item) {
+        var wg sync.WaitGroup
+        wg.Add(len(items)) // Add before starting goroutines
+        
+        for _, item := range items {
+            item := item // Create a new variable for each iteration
+            go func() {
+                defer wg.Done()
+                processItem(item)
+            }()
+        }
+        
+        wg.Wait()
+    }
+    ```
+    Call `wg.Add` before starting goroutines and be careful with loop variables in goroutines.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Concurrency Patterns" icon="warning">
+    ```go
+    // Anti-pattern: Ad-hoc concurrency
+    func processItems(items []Item) []Result {
+        results := make([]Result, len(items))
+        var mu sync.Mutex
+        
+        var wg sync.WaitGroup
+        wg.Add(len(items))
+        
+        for i, item := range items {
+            i, item := i, item
+            go func() {
+                defer wg.Done()
+                result := processItem(item)
+                
+                mu.Lock()
+                results[i] = result
+                mu.Unlock()
+            }()
+        }
+        
+        wg.Wait()
+        return results
+    }
+    
+    // Better approach: Worker pool pattern
+    func processItems(items []Item) []Result {
+        numWorkers := runtime.NumCPU()
+        jobs := make(chan Job, len(items))
+        results := make(chan Result, len(items))
+        
+        // Start workers
+        var wg sync.WaitGroup
+        wg.Add(numWorkers)
+        for i := 0; i < numWorkers; i++ {
+            go func() {
+                defer wg.Done()
+                for job := range jobs {
+                    results <- processItem(job.Item)
+                }
+            }()
+        }
+        
+        // Send jobs
+        for _, item := range items {
+            jobs <- Job{Item: item}
+        }
+        close(jobs)
+        
+        // Wait for workers to finish
+        go func() {
+            wg.Wait()
+            close(results)
+        }()
+        
+        // Collect results
+        var allResults []Result
+        for result := range results {
+            allResults = append(allResults, result)
+        }
+        
+        return allResults
+    }
+    ```
+    Use established concurrency patterns like worker pools instead of ad-hoc concurrency.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Wrapping" icon="warning">
+    ```go
+    // Anti-pattern: Losing error context
+    func processFile(path string) error {
+        data, err := ioutil.ReadFile(path)
+        if err != nil {
+            return err // Original context is lost
+        }
+        
+        return processData(data)
+    }
+    
+    // Better approach: Wrap errors to add context
+    func processFile(path string) error {
+        data, err := ioutil.ReadFile(path)
+        if err != nil {
+            return fmt.Errorf("failed to read file %s: %w", path, err)
+        }
+        
+        if err := processData(data); err != nil {
+            return fmt.Errorf("failed to process data from %s: %w", path, err)
+        }
+        
+        return nil
+    }
+    ```
+    Use `fmt.Errorf` with the `%w` verb to wrap errors and add context while preserving the original error for checking with `errors.Is` and `errors.As`.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing Techniques" icon="warning">
+    ```go
+    // Anti-pattern: Monolithic tests
+    func TestUser(t *testing.T) {
+        // Test creation, validation, and persistence in one test
+        user := NewUser("John", 30)
+        if user.Name != "John" || user.Age != 30 {
+            t.Errorf("User not created correctly")
+        }
+        
+        err := validateUser(user)
+        if err != nil {
+            t.Errorf("Valid user failed validation: %v", err)
+        }
+        
+        err = saveUser(user)
+        if err != nil {
+            t.Errorf("Failed to save user: %v", err)
+        }
+    }
+    
+    // Better approach: Table-driven tests with subtests
+    func TestNewUser(t *testing.T) {
+        tests := []struct {
+            name     string
+            username string
+            age      int
+            want     User
+        }{
+            {"Valid user", "John", 30, User{"John", 30}},
+            {"Zero age", "Jane", 0, User{"Jane", 0}},
+        }
+        
+        for _, tt := range tests {
+            t.Run(tt.name, func(t *testing.T) {
+                got := NewUser(tt.username, tt.age)
+                if got != tt.want {
+                    t.Errorf("NewUser() = %v, want %v", got, tt.want)
+                }
+            })
+        }
+    }
+    ```
+    Use table-driven tests and subtests to make tests more maintainable and to test multiple cases easily.
+  </Accordion>
+  
+  <Accordion title="Not Using go.mod for Dependency Management" icon="warning">
+    ```go
+    // Anti-pattern: Not using go modules
+    // Relying on GOPATH or vendor directory
+    
+    // Better approach: Use go modules
+    // go.mod
+    module github.com/example/myproject
+    
+    go 1.16
+    
+    require (
+        github.com/pkg/errors v0.9.1
+        github.com/stretchr/testify v1.7.0
+    )
+    ```
+    Use Go modules (go.mod) for dependency management to ensure reproducible builds and explicit versioning.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,637 @@
+---
+title: 'Pascal'
+description: 'Pascal is a procedural programming language designed in 1968-1969 and published in 1970 by Niklaus Wirth as a small, efficient language intended to encourage good programming practices using structured programming and data structuring.'
+---
+
+<AccordionGroup>
+  <Accordion title="Pascal Anti-Patterns Overview" icon="pascal">
+    Pascal, despite being designed to encourage good programming practices, has several common anti-patterns that can lead to maintainability problems and bugs. Here are the most important anti-patterns to avoid when writing Pascal code.
+  </Accordion>
+  
+  <Accordion title="Using GOTO Statements" icon="warning">
+    ```pascal
+    (* Anti-pattern: Using GOTO statements *)
+    procedure ProcessData;
+var
+  i: Integer;
+begin
+  i := 1;
+StartLoop:
+  if i > 100 then
+    goto EndLoop;
+  
+  WriteLn('Processing item ', i);
+  i := i + 1;
+  goto StartLoop;
+  
+EndLoop:
+  WriteLn('Processing complete');
+end;
+
+(* Better approach: Use structured control flow *)
+procedure ProcessData;
+var
+  i: Integer;
+begin
+  for i := 1 to 100 do
+  begin
+    WriteLn('Processing item ', i);
+  end;
+  
+  WriteLn('Processing complete');
+end;
+    ```
+    Avoid using `GOTO` statements, which make code difficult to understand and maintain. Use structured control flow constructs like `for`, `while`, `repeat-until`, and `if-then-else` instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Strong Typing" icon="warning">
+    ```pascal
+    (* Anti-pattern: Weak typing with variant records *)
+type
+  DataKind = (IntKind, RealKind, StringKind);
+  DataRec = record
+    case Kind: DataKind of
+      IntKind: (IntValue: Integer);
+      RealKind: (RealValue: Real);
+      StringKind: (StringValue: String);
+  end;
+
+procedure ProcessData(var Data: DataRec);
+begin
+  (* Unsafe type handling *)
+  case Data.Kind of
+    IntKind: WriteLn('Integer: ', Data.IntValue);
+    RealKind: WriteLn('Real: ', Data.RealValue);
+    StringKind: WriteLn('String: ', Data.StringValue);
+  end;
+end;
+
+(* Better approach: Use object-oriented programming or generics *)
+(* In modern Object Pascal (e.g., Free Pascal, Delphi) *)
+type
+  IData = interface
+    procedure Display;
+  end;
+  
+  TIntegerData = class(TInterfacedObject, IData)
+  private
+    FValue: Integer;
+  public
+    constructor Create(AValue: Integer);
+    procedure Display;
+  end;
+  
+  TRealData = class(TInterfacedObject, IData)
+  private
+    FValue: Real;
+  public
+    constructor Create(AValue: Real);
+    procedure Display;
+  end;
+  
+  TStringData = class(TInterfacedObject, IData)
+  private
+    FValue: String;
+  public
+    constructor Create(AValue: String);
+    procedure Display;
+  end;
+
+procedure ProcessData(Data: IData);
+begin
+  Data.Display; (* Polymorphic call *)
+end;
+    ```
+    Leverage Pascal's strong typing system rather than using variant records or other techniques that circumvent type safety. In modern Object Pascal, use interfaces, classes, or generics for type-safe polymorphism.
+  </Accordion>
+  
+  <Accordion title="Using Global Variables" icon="warning">
+    ```pascal
+    (* Anti-pattern: Using global variables *)
+var
+  CurrentUser: String;
+  LoggedIn: Boolean;
+  ErrorCount: Integer;
+
+procedure Login(Username, Password: String);
+begin
+  if ValidateCredentials(Username, Password) then
+  begin
+    CurrentUser := Username;
+    LoggedIn := True;
+    ErrorCount := 0;
+  end
+  else
+  begin
+    LoggedIn := False;
+    Inc(ErrorCount);
+  end;
+end;
+
+procedure ProcessUserData;
+begin
+  if not LoggedIn then
+    Exit;
+  
+  (* Process data for CurrentUser *)
+end;
+
+(* Better approach: Use parameter passing and return values *)
+type
+  TUserSession = record
+    Username: String;
+    LoggedIn: Boolean;
+    ErrorCount: Integer;
+  end;
+
+function Login(Username, Password: String): TUserSession;
+var
+  Session: TUserSession;
+begin
+  Session.Username := '';
+  Session.LoggedIn := False;
+  Session.ErrorCount := 0;
+  
+  if ValidateCredentials(Username, Password) then
+  begin
+    Session.Username := Username;
+    Session.LoggedIn := True;
+  end
+  else
+  begin
+    Inc(Session.ErrorCount);
+  end;
+  
+  Result := Session;
+end;
+
+procedure ProcessUserData(const Session: TUserSession);
+begin
+  if not Session.LoggedIn then
+    Exit;
+  
+  (* Process data for Session.Username *)
+end;
+    ```
+    Avoid using global variables, which create hidden dependencies and make code harder to understand, test, and maintain. Pass data explicitly through parameters and return values.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```pascal
+    (* Anti-pattern: Poor error handling *)
+procedure ReadDataFromFile(FileName: String);
+var
+  F: TextFile;
+  Line: String;
+begin
+  AssignFile(F, FileName);
+  Reset(F); (* May raise an exception if file doesn't exist *)
+  
+  while not Eof(F) do
+  begin
+    ReadLn(F, Line);
+    ProcessLine(Line);
+  end;
+  
+  CloseFile(F);
+end;
+
+(* Better approach: Proper error handling *)
+procedure ReadDataFromFile(FileName: String);
+var
+  F: TextFile;
+  Line: String;
+begin
+  AssignFile(F, FileName);
+  try
+    Reset(F);
+    
+    while not Eof(F) do
+    begin
+      ReadLn(F, Line);
+      ProcessLine(Line);
+    end;
+  except
+    on E: EInOutError do
+      WriteLn('File error: ', E.Message);
+    on E: Exception do
+      WriteLn('Error: ', E.Message);
+  finally
+    CloseFile(F);
+  end;
+end;
+    ```
+    Use proper error handling with `try-except-finally` blocks (in modern Pascal) to handle exceptions and ensure resources are properly cleaned up, even when errors occur.
+  </Accordion>
+  
+  <Accordion title="Using Magic Numbers" icon="warning">
+    ```pascal
+    (* Anti-pattern: Using magic numbers *)
+procedure CalculateArea(Radius: Real);
+var
+  Area: Real;
+begin
+  Area := 3.14159 * Radius * Radius;
+  WriteLn('Area: ', Area:0:2);
+end;
+
+procedure ResizeArray(var Arr: array of Integer);
+var
+  NewArr: array of Integer;
+  i: Integer;
+begin
+  SetLength(NewArr, Length(Arr) * 2);
+  for i := 0 to Length(Arr) - 1 do
+    NewArr[i] := Arr[i];
+  Arr := NewArr;
+end;
+
+(* Better approach: Use named constants *)
+const
+  PI = 3.14159;
+  ARRAY_GROWTH_FACTOR = 2;
+
+procedure CalculateArea(Radius: Real);
+var
+  Area: Real;
+begin
+  Area := PI * Radius * Radius;
+  WriteLn('Area: ', Area:0:2);
+end;
+
+procedure ResizeArray(var Arr: array of Integer);
+var
+  NewArr: array of Integer;
+  i: Integer;
+begin
+  SetLength(NewArr, Length(Arr) * ARRAY_GROWTH_FACTOR);
+  for i := 0 to Length(Arr) - 1 do
+    NewArr[i] := Arr[i];
+  Arr := NewArr;
+end;
+    ```
+    Avoid using magic numbers (hardcoded numeric literals) in your code. Use named constants to make your code more readable and maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Resource Management" icon="warning">
+    ```pascal
+    (* Anti-pattern: Poor resource management *)
+procedure ProcessFile(FileName: String);
+var
+  F: TextFile;
+begin
+  AssignFile(F, FileName);
+  Reset(F);
+  
+  (* Process file... *)
+  
+  (* What if an exception occurs before this point? *)
+  CloseFile(F);
+end;
+
+(* Better approach: Proper resource management *)
+procedure ProcessFile(FileName: String);
+var
+  F: TextFile;
+begin
+  AssignFile(F, FileName);
+  try
+    Reset(F);
+    
+    (* Process file... *)
+  finally
+    CloseFile(F);
+  end;
+end;
+    ```
+    Always ensure that resources (files, memory, etc.) are properly released, even when exceptions occur. Use `try-finally` blocks to guarantee cleanup code is executed.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Data Structures" icon="warning">
+    ```pascal
+    (* Anti-pattern: Using arrays for dynamic collections *)
+procedure ProcessItems;
+var
+  Items: array[1..100] of String; (* Fixed size *)
+  Count: Integer;
+  i: Integer;
+begin
+  Count := 0;
+  
+  (* Add items *)
+  while not EndOfInput do
+  begin
+    Inc(Count);
+    if Count > 100 then
+    begin
+      WriteLn('Too many items!');
+      Exit;
+    end;
+    
+    Items[Count] := ReadItem();
+  end;
+  
+  (* Process items *)
+  for i := 1 to Count do
+    ProcessItem(Items[i]);
+end;
+
+(* Better approach: Use dynamic data structures *)
+procedure ProcessItems;
+var
+  Items: TStringList; (* Dynamic size *)
+  i: Integer;
+begin
+  Items := TStringList.Create;
+  try
+    (* Add items *)
+    while not EndOfInput do
+      Items.Add(ReadItem());
+    
+    (* Process items *)
+    for i := 0 to Items.Count - 1 do
+      ProcessItem(Items[i]);
+  finally
+    Items.Free;
+  end;
+end;
+    ```
+    Use appropriate data structures for your needs. In modern Pascal, use dynamic arrays, lists, dictionaries, and other collection classes instead of fixed-size arrays.
+  </Accordion>
+  
+  <Accordion title="Not Using Units for Code Organization" icon="warning">
+    ```pascal
+    (* Anti-pattern: Everything in one file *)
+program MonolithicApp;
+
+(* Hundreds of types, variables, and procedures all in one file *)
+
+begin
+  (* Main program code *)
+end.
+
+(* Better approach: Use units for modular code organization *)
+unit UserManagement;
+
+interface
+
+type
+  TUser = record
+    Username: String;
+    Email: String;
+  end;
+
+function CreateUser(const Username, Email: String): TUser;
+procedure SaveUser(const User: TUser);
+function FindUser(const Username: String): TUser;
+
+implementation
+
+(* Implementation of user management functions *)
+
+end.
+
+unit FileHandling;
+
+interface
+
+procedure SaveToFile(const FileName, Content: String);
+function LoadFromFile(const FileName: String): String;
+
+implementation
+
+(* Implementation of file handling functions *)
+
+end.
+
+program ModularApp;
+
+uses
+  UserManagement, FileHandling;
+
+begin
+  (* Main program code using the units *)
+end.
+    ```
+    Organize your code into units (modules) with clear responsibilities. This improves maintainability, reusability, and compilation times.
+  </Accordion>
+  
+  <Accordion title="Not Using Strong Type Definitions" icon="warning">
+    ```pascal
+    (* Anti-pattern: Weak type definitions *)
+procedure ProcessPerson(Name: String; Age: Integer; Height: Real);
+begin
+  (* What if parameters are passed in the wrong order? *)
+  WriteLn('Name: ', Name, ', Age: ', Age, ', Height: ', Height:0:2);
+end;
+
+(* Usage *)
+ProcessPerson('John', 25, 1.75); (* Correct *)
+ProcessPerson(25, 'John', 1.75); (* Compiler won't catch this error! *)
+
+(* Better approach: Use strong type definitions *)
+type
+  TPersonName = String;
+  TAge = Integer;
+  THeight = Real;
+  
+  TPerson = record
+    Name: TPersonName;
+    Age: TAge;
+    Height: THeight;
+  end;
+
+procedure ProcessPerson(const Person: TPerson);
+begin
+  WriteLn('Name: ', Person.Name, ', Age: ', Person.Age, ', Height: ', Person.Height:0:2);
+end;
+
+(* Usage *)
+var
+  Person: TPerson;
+begin
+  Person.Name := 'John';
+  Person.Age := 25;
+  Person.Height := 1.75;
+  ProcessPerson(Person);
+end;
+    ```
+    Use strong type definitions and structured data types to make your code more type-safe and self-documenting.
+  </Accordion>
+  
+  <Accordion title="Not Using Function Results" icon="warning">
+    ```pascal
+    (* Anti-pattern: Using var parameters instead of function results *)
+procedure CalculateSum(A, B: Integer; var Result: Integer);
+begin
+  Result := A + B;
+end;
+
+(* Usage *)
+var
+  X, Y, Sum: Integer;
+begin
+  X := 5;
+  Y := 10;
+  CalculateSum(X, Y, Sum);
+  WriteLn('Sum: ', Sum);
+end;
+
+(* Better approach: Use function results *)
+function CalculateSum(A, B: Integer): Integer;
+begin
+  Result := A + B;
+end;
+
+(* Usage *)
+var
+  X, Y: Integer;
+begin
+  X := 5;
+  Y := 10;
+  WriteLn('Sum: ', CalculateSum(X, Y));
+end;
+    ```
+    Use function return values instead of `var` parameters for outputs. This makes the code more readable and allows for function composition.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper String Handling" icon="warning">
+    ```pascal
+    (* Anti-pattern: Using fixed-length strings and manual concatenation *)
+type
+  TName = array[1..50] of Char;
+
+procedure FormatName(var FullName: TName; FirstName, LastName: TName);
+var
+  i, j: Integer;
+begin
+  (* Clear the destination *)
+  for i := 1 to 50 do
+    FullName[i] := ' ';
+  
+  (* Copy first name *)
+  i := 1;
+  while (i <= 50) and (FirstName[i] <> ' ') do
+  begin
+    FullName[i] := FirstName[i];
+    Inc(i);
+  end;
+  
+  (* Add space *)
+  FullName[i] := ' ';
+  Inc(i);
+  
+  (* Copy last name *)
+  j := 1;
+  while (i <= 50) and (j <= 50) and (LastName[j] <> ' ') do
+  begin
+    FullName[i] := LastName[j];
+    Inc(i);
+    Inc(j);
+  end;
+end;
+
+(* Better approach: Use dynamic strings *)
+function FormatName(const FirstName, LastName: String): String;
+begin
+  Result := FirstName + ' ' + LastName;
+end;
+    ```
+    Use modern string types and operations instead of fixed-length character arrays and manual string manipulation. This makes your code more readable and less error-prone.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```pascal
+    (* Anti-pattern: Poor or no documentation *)
+function CalculateValue(A, B, C: Integer): Integer;
+begin
+  Result := A * B + C;
+end;
+
+(* Better approach: Proper documentation *)
+(*
+ * Calculates a weighted sum of two values plus an offset.
+ *
+ * @param A The first value to be multiplied.
+ * @param B The second value to be multiplied.
+ * @param C The offset to be added after multiplication.
+ * @return The result of A * B + C.
+ *)
+function CalculateValue(A, B, C: Integer): Integer;
+begin
+  Result := A * B + C;
+end;
+    ```
+    Document your code with comments that explain the purpose, parameters, return values, and any important details or assumptions. This makes your code more maintainable and easier for others to understand.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Object-Oriented Design" icon="warning">
+    ```pascal
+    (* Anti-pattern: Procedural code with poor encapsulation *)
+type
+  TRectangle = record
+    X, Y, Width, Height: Integer;
+  end;
+
+procedure DrawRectangle(const R: TRectangle);
+begin
+  (* Drawing code *)
+end;
+
+procedure MoveRectangle(var R: TRectangle; DX, DY: Integer);
+begin
+  R.X := R.X + DX;
+  R.Y := R.Y + DY;
+end;
+
+procedure ResizeRectangle(var R: TRectangle; NewWidth, NewHeight: Integer);
+begin
+  R.Width := NewWidth;
+  R.Height := NewHeight;
+end;
+
+(* Better approach: Object-oriented design *)
+type
+  TRectangle = class
+  private
+    FX, FY, FWidth, FHeight: Integer;
+  public
+    constructor Create(X, Y, Width, Height: Integer);
+    procedure Draw;
+    procedure Move(DX, DY: Integer);
+    procedure Resize(NewWidth, NewHeight: Integer);
+    
+    property X: Integer read FX;
+    property Y: Integer read FY;
+    property Width: Integer read FWidth;
+    property Height: Integer read FHeight;
+  end;
+
+constructor TRectangle.Create(X, Y, Width, Height: Integer);
+begin
+  FX := X;
+  FY := Y;
+  FWidth := Width;
+  FHeight := Height;
+end;
+
+procedure TRectangle.Draw;
+begin
+  (* Drawing code *)
+end;
+
+procedure TRectangle.Move(DX, DY: Integer);
+begin
+  FX := FX + DX;
+  FY := FY + DY;
+end;
+
+procedure TRectangle.Resize(NewWidth, NewHeight: Integer);
+begin
+  FWidth := NewWidth;
+  FHeight := NewHeight;
+end;
+    ```
+    In modern Object Pascal, use object-oriented design principles like encapsulation, inheritance, and polymorphism to create more maintainable and extensible code.
+  </Accordion>
+</AccordionGroup>

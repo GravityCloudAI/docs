@@ -1,0 +1,490 @@
+---
+title: 'Clojure'
+description: 'Clojure is a dynamic, functional programming language that runs on the Java Virtual Machine (JVM). It emphasizes immutability and provides robust concurrency primitives.'
+---
+
+<AccordionGroup>
+  <Accordion title="Clojure Anti-Patterns Overview" icon="clojure">
+    Clojure, despite being a well-designed functional language, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing Clojure code.
+  </Accordion>
+  
+  <Accordion title="Using Mutable State Unnecessarily" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Using atoms when not needed
+    (def counter (atom 0))
+    
+    (defn process-items [items]
+      (doseq [item items]
+        (process-item item)
+        (swap! counter inc)))
+    
+    ;; Better approach: Use functional style
+    (defn process-items [items]
+      (count (map process-item items)))
+    ```
+    Avoid using mutable state (atoms, refs, agents) when pure functions would suffice. Embrace Clojure's functional programming paradigm and use immutable data structures by default.
+  </Accordion>
+  
+  <Accordion title="Not Using Threading Macros" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Nested function calls
+    (defn process-data [data]
+      (filter even?
+        (map #(* % 2)
+          (filter pos? data))))
+    
+    ;; Better approach: Use threading macros
+    (defn process-data [data]
+      (->> data
+           (filter pos?)
+           (map #(* % 2))
+           (filter even?)))
+    ```
+    Use threading macros (`->`, `->>`, `as->`, etc.) to make code more readable by avoiding deeply nested function calls. Threading macros make the data flow explicit and easier to follow.
+  </Accordion>
+  
+  <Accordion title="Using Java Collections Instead of Clojure Ones" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Using Java collections
+    (defn create-user-map [users]
+      (let [map (java.util.HashMap.)]
+        (doseq [user users]
+          (.put map (:id user) user))
+        map))
+    
+    ;; Better approach: Use Clojure's persistent collections
+    (defn create-user-map [users]
+      (reduce (fn [m user] (assoc m (:id user) user))
+              {}
+              users))
+    ```
+    Prefer Clojure's persistent collections over Java's mutable collections. Clojure's collections are immutable, thread-safe, and work seamlessly with the rest of the language.
+  </Accordion>
+  
+  <Accordion title="Using recur Instead of Higher-Order Functions" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Manual recursion with recur
+    (defn sum-even-numbers [numbers]
+      (loop [nums numbers
+             sum 0]
+        (if (empty? nums)
+          sum
+          (let [n (first nums)
+                remaining (rest nums)]
+            (if (even? n)
+              (recur remaining (+ sum n))
+              (recur remaining sum))))))
+    
+    ;; Better approach: Use higher-order functions
+    (defn sum-even-numbers [numbers]
+      (->> numbers
+           (filter even?)
+           (reduce +)))
+    ```
+    Prefer higher-order functions like `map`, `filter`, `reduce`, etc., over manual recursion with `loop`/`recur`. Higher-order functions are more declarative and often more readable.
+  </Accordion>
+  
+  <Accordion title="Not Using Destructuring" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Not using destructuring
+    (defn process-user [user]
+      (let [name (:name user)
+            email (:email user)
+            age (:age user)]
+        ;; Process user data
+        ))
+    
+    ;; Better approach: Use destructuring
+    (defn process-user [{:keys [name email age]}]
+      ;; Process user data
+      )
+    ```
+    Use destructuring to extract values from data structures. It makes code more concise and expressive, especially when working with nested data structures.
+  </Accordion>
+  
+  <Accordion title="Using Reflection" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Reflection (no type hints)
+    (defn add-numbers [a b]
+      (+ a b))
+    
+    ;; When called with primitive longs, this causes boxing/unboxing
+    
+    ;; Better approach: Use type hints
+    (defn add-numbers [^long a ^long b]
+      (+ a b))
+    ```
+    Avoid reflection by using type hints when working with Java interop or performance-critical code. Reflection is slow and can cause unexpected performance issues.
+  </Accordion>
+  
+  <Accordion title="Not Using Transducers for Composition" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Chaining collection operations
+    (defn process-data [data]
+      (->> data
+           (filter pos?)
+           (map #(* % 2))
+           (filter even?)
+           (reduce + 0)))
+    
+    ;; Better approach: Use transducers
+    (defn process-data [data]
+      (transduce (comp (filter pos?)
+                       (map #(* % 2))
+                       (filter even?))
+                 +
+                 0
+                 data))
+    ```
+    Use transducers when composing multiple transformations on a collection. Transducers avoid creating intermediate collections and can be more efficient.
+  </Accordion>
+  
+  <Accordion title="Using Dynamic Vars Unnecessarily" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Overusing dynamic vars
+    (def ^:dynamic *config* {:timeout 1000, :retries 3})
+    
+    (defn fetch-data [url]
+      (http/get url {:timeout (:timeout *config*)
+                     :retries (:retries *config*)}))
+    
+    ;; Better approach: Explicit parameters
+    (defn fetch-data 
+      ([url] (fetch-data url {:timeout 1000, :retries 3}))
+      ([url config]
+       (http/get url {:timeout (:timeout config)
+                      :retries (:retries config)})))
+    ```
+    Avoid using dynamic vars (`^:dynamic`) for configuration or state that could be passed explicitly. Dynamic vars make code harder to reason about and test.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Exception Handling" icon="warning">
+    ```clojure
+    ;; Anti-pattern: No exception handling
+    (defn read-config [file-path]
+      (edn/read-string (slurp file-path)))
+    
+    ;; Better approach: Proper exception handling
+    (defn read-config [file-path]
+      (try
+        (edn/read-string (slurp file-path))
+        (catch java.io.FileNotFoundException e
+          (println "Config file not found:" file-path)
+          {})
+        (catch Exception e
+          (println "Error reading config:" (.getMessage e))
+          {})))
+    ```
+    Use proper exception handling with `try`/`catch`/`finally` for operations that might fail, especially I/O operations. Consider using libraries like `ex-info` and `ex-data` for structured error handling.
+  </Accordion>
+  
+  <Accordion title="Not Using Specs for Validation" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Manual validation
+    (defn create-user [user-data]
+      (if (and (:name user-data) (:email user-data))
+        (db/insert-user user-data)
+        (throw (ex-info "Invalid user data" {:user-data user-data}))))
+    
+    ;; Better approach: Use clojure.spec
+    (require '[clojure.spec.alpha :as s])
+    
+    (s/def ::name string?)
+    (s/def ::email (s/and string? #(re-matches #".*@.*" %)))
+    (s/def ::user (s/keys :req-un [::name ::email]))
+    
+    (defn create-user [user-data]
+      (if (s/valid? ::user user-data)
+        (db/insert-user user-data)
+        (throw (ex-info "Invalid user data" 
+                        {:user-data user-data
+                         :problems (s/explain-data ::user user-data)}))))
+    ```
+    Use `clojure.spec` for data validation and documentation. Specs provide a declarative way to define the shape and constraints of your data.
+  </Accordion>
+  
+  <Accordion title="Using Keywords as Functions Excessively" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Excessive use of keywords as functions
+    (defn process-user [user]
+      (let [name (:name user)
+            email (:email user)
+            admin? (:admin user false)]
+        (if admin?
+          (process-admin {:name name :email email})
+          (process-regular {:name name :email email}))))
+    
+    ;; Better approach: Destructuring
+    (defn process-user [user]
+      (let [{:keys [name email admin]} user
+            admin? (boolean admin)]
+        (if admin?
+          (process-admin {:name name :email email})
+          (process-regular {:name name :email email}))))
+    ```
+    While using keywords as functions (e.g., `:name user`) is idiomatic in Clojure, excessive use can make code less readable. Consider using destructuring for clarity.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Namespaces" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Poor namespace organization
+    (ns my-app.core
+      (:require [clojure.string :as str]
+                [clojure.set :as set]
+                [my-app.utils :as utils]
+                [my-app.db :as db]
+                [my-app.api :as api]
+                [my-app.views :as views]))
+    
+    ;; Everything in one namespace
+    
+    ;; Better approach: Proper namespace organization
+    ;; my-app.core
+    (ns my-app.core
+      (:require [my-app.db :as db]
+                [my-app.api :as api]
+                [my-app.views :as views]))
+    
+    ;; my-app.db
+    (ns my-app.db
+      (:require [clojure.java.jdbc :as jdbc]))
+    
+    ;; my-app.api
+    (ns my-app.api
+      (:require [ring.adapter.jetty :as jetty]
+                [compojure.core :refer :all]))
+    ```
+    Organize your code into logical namespaces with clear responsibilities. Follow the principle of cohesion: each namespace should have a single, well-defined purpose.
+  </Accordion>
+  
+  <Accordion title="Using nil Punning" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Nil punning
+    (defn find-user [users id]
+      (first (filter #(= (:id %) id) users)))
+    
+    (defn get-user-name [users id]
+      (:name (find-user users id)))  ;; Returns nil if user not found
+    
+    ;; Better approach: Explicit handling
+    (defn find-user [users id]
+      (first (filter #(= (:id %) id) users)))
+    
+    (defn get-user-name [users id]
+      (if-let [user (find-user users id)]
+        (:name user)
+        (throw (ex-info "User not found" {:id id}))))
+    ```
+    Be careful with nil punning (relying on nil to propagate through a chain of operations). While it can be convenient, it can also hide bugs and make code harder to debug.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Manual testing or no testing
+    (defn add [a b]
+      (+ a b))
+    
+    (println "Testing add:" (= (add 2 3) 5))
+    
+    ;; Better approach: Use clojure.test
+    (ns my-app.core-test
+      (:require [clojure.test :refer :all]
+                [my-app.core :refer :all]))
+    
+    (deftest add-test
+      (testing "Addition of two numbers"
+        (is (= (add 2 3) 5))
+        (is (= (add -1 1) 0))
+        (is (= (add 0 0) 0))))
+    ```
+    Write proper tests using `clojure.test` or other testing libraries. Tests help ensure your code works as expected and catch regressions.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Poor or no documentation
+    (defn process-data [data options]
+      ;; Implementation...
+      )
+    
+    ;; Better approach: Proper documentation
+    (defn process-data
+      "Process the given data according to the specified options.
+      
+      Arguments:
+        data - The data to process, must be a collection of maps.
+        options - A map of options with the following keys:
+          :verbose - Whether to output verbose logs (default: false)
+          :max-items - Maximum number of items to process (default: all)
+      
+      Returns:
+        A vector of processed items.
+      
+      Example:
+        (process-data [{:id 1} {:id 2}] {:verbose true})
+      "
+      [data options]
+      ;; Implementation...
+      )
+    ```
+    Document your functions and namespaces with docstrings. Include descriptions of arguments, return values, and usage examples.
+  </Accordion>
+  
+  <Accordion title="Not Using Component Lifecycle Management" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Manual resource management
+    (def db-connection (atom nil))
+    
+    (defn init-db []
+      (reset! db-connection (db/connect {:host "localhost" :port 5432})))
+    
+    (defn close-db []
+      (when-let [conn @db-connection]
+        (db/disconnect conn)
+        (reset! db-connection nil)))
+    
+    ;; Better approach: Use component or mount
+    ;; With Component
+    (ns my-app.db
+      (:require [com.stuartsierra.component :as component]))
+    
+    (defrecord Database [host port connection]
+      component/Lifecycle
+      (start [this]
+        (if connection
+          this
+          (assoc this :connection (db/connect {:host host :port port}))))
+      (stop [this]
+        (when connection
+          (db/disconnect connection))
+        (assoc this :connection nil)))
+    
+    (defn new-database [config]
+      (map->Database {:host (:host config) :port (:port config)}))
+    ```
+    Use a component lifecycle management library like Component, Mount, or Integrant for managing stateful resources. These libraries help with initialization, shutdown, and dependency injection.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Messages" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Poor error messages
+    (defn divide [a b]
+      (if (zero? b)
+        (throw (Exception. "Error"))
+        (/ a b)))
+    
+    ;; Better approach: Descriptive error messages with ex-info
+    (defn divide [a b]
+      (if (zero? b)
+        (throw (ex-info "Division by zero" 
+                        {:operation :divide
+                         :args {:a a :b b}}))
+        (/ a b)))
+    ```
+    Provide descriptive error messages and use `ex-info` to include structured data with exceptions. This makes debugging easier and allows for programmatic handling of specific error conditions.
+  </Accordion>
+  
+  <Accordion title="Using def Inside Functions" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Using def inside functions
+    (defn process-config [config-path]
+      (let [config (read-config config-path)]
+        (def app-config config)  ;; Bad: modifies global state
+        config))
+    
+    ;; Better approach: Return values, don't modify globals
+    (defn process-config [config-path]
+      (read-config config-path))
+    
+    (def app-config (process-config "config.edn"))
+    ```
+    Avoid using `def` inside functions to create or modify global variables. This leads to side effects and makes code harder to reason about and test.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Dependency Management" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Hard-coded dependencies
+    (ns my-app.core
+      (:require [my-app.db :as db]))
+    
+    (defn get-user [id]
+      (db/find-user id))
+    
+    ;; Better approach: Dependency injection
+    (ns my-app.core)
+    
+    (defn get-user [db id]
+      (db/find-user db id))
+    
+    ;; Or with a component system
+    (ns my-app.core
+      (:require [com.stuartsierra.component :as component]))
+    
+    (defrecord UserService [db]
+      component/Lifecycle
+      (start [this] this)
+      (stop [this] this)
+      
+      UserServiceProtocol
+      (get-user [this id]
+        (db/find-user db id)))
+    ```
+    Use dependency injection or a component system to manage dependencies between parts of your application. This makes your code more modular, testable, and flexible.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Concurrency Primitives" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Using atoms for coordination
+    (def counter (atom 0))
+    (def done? (atom false))
+    
+    (defn worker []
+      (while (not @done?)
+        (swap! counter inc)
+        (Thread/sleep 100))
+      @counter)
+    
+    ;; Better approach: Use appropriate concurrency primitives
+    (def counter (atom 0))
+    
+    (defn worker [iterations]
+      (dotimes [_ iterations]
+        (swap! counter inc)
+        (Thread/sleep 100))
+      @counter)
+    
+    ;; For coordination between threads
+    (let [latch (java.util.concurrent.CountDownLatch. 1)]
+      (future
+        (let [result (worker 10)]
+          (println "Worker finished with result:" result)
+          (.countDown latch)))
+      
+      ;; Wait for worker to complete
+      (.await latch))
+    ```
+    Use the appropriate concurrency primitives for your use case. Atoms are good for independent values, refs for coordinated changes, agents for asynchronous updates, and Java's concurrency utilities for more complex coordination.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Performance Optimization" icon="warning">
+    ```clojure
+    ;; Anti-pattern: Premature optimization
+    (defn process-items [items]
+      (loop [remaining items
+             result []]
+        (if (empty? remaining)
+          result
+          (recur (rest remaining)
+                 (conj result (process-item (first remaining)))))))
+    
+    ;; Better approach: Start simple, profile, then optimize
+    (defn process-items [items]
+      (mapv process-item items))
+    
+    ;; After profiling, if needed:
+    (defn process-items [items]
+      (into [] (map process-item) items))
+    ```
+    Avoid premature optimization. Start with clear, simple code, then profile to identify actual bottlenecks. Use tools like `criterium` for benchmarking and YourKit or VisualVM for profiling.
+  </Accordion>
+</AccordionGroup>

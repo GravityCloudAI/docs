@@ -1,0 +1,446 @@
+---
+title: 'Bash'
+description: 'Bash (Bourne Again SHell) is a Unix shell and command language written by Brian Fox for the GNU Project as a free software replacement for the Bourne shell. It is widely used as the default login shell for most Linux distributions and Apple\'s macOS.'
+---
+
+<AccordionGroup>
+  <Accordion title="Bash Anti-Patterns Overview" icon="bash">
+    Bash, despite its ubiquity in system administration and automation, has several common anti-patterns that can lead to bugs, security vulnerabilities, and maintainability issues. Here are the most important anti-patterns to avoid when writing Bash scripts.
+  </Accordion>
+  
+  <Accordion title="Not Quoting Variables" icon="warning">
+    ```bash
+    # Anti-pattern: Unquoted variables
+    FILE_PATH=/path/with spaces/file.txt
+    
+    # This will fail because the spaces are treated as argument separators
+    cat $FILE_PATH
+    
+    # Better approach: Quote your variables
+    cat "$FILE_PATH"
+    ```
+    Always quote your variables in Bash to prevent word splitting and globbing. Unquoted variables can lead to unexpected behavior, especially when they contain spaces, wildcards, or special characters.
+  </Accordion>
+  
+  <Accordion title="Using ls in Scripts" icon="warning">
+    ```bash
+    # Anti-pattern: Parsing ls output
+    for file in $(ls /path/to/directory); do
+        echo "Processing $file"
+        # Do something with $file
+    done
+    
+    # Better approach: Use globbing or find
+    # Option 1: Globbing
+    for file in /path/to/directory/*; do
+        [ -f "$file" ] || continue  # Skip if not a regular file
+        echo "Processing $file"
+        # Do something with $file
+    done
+    
+    # Option 2: find with -exec
+    find /path/to/directory -type f -exec echo "Processing {}" \;
+    ```
+    Avoid parsing the output of `ls` in scripts. It can break when filenames contain spaces, newlines, or other special characters. Use shell globbing, `find`, or other more robust methods instead.
+  </Accordion>
+  
+  <Accordion title="Not Checking Command Exit Status" icon="warning">
+    ```bash
+    # Anti-pattern: Not checking command exit status
+    mkdir /path/to/directory
+    cd /path/to/directory
+    # If mkdir fails, the script continues and cd might fail too
+    
+    # Better approach: Check exit status
+    if ! mkdir /path/to/directory; then
+        echo "Failed to create directory" >&2
+        exit 1
+    fi
+    
+    if ! cd /path/to/directory; then
+        echo "Failed to change directory" >&2
+        exit 1
+    fi
+    
+    # Even better: Use set -e to exit on any error
+    set -e
+    mkdir /path/to/directory
+    cd /path/to/directory
+    # Script will automatically exit if any command fails
+    ```
+    Always check the exit status of commands, especially those that might fail. Use conditional statements, the `set -e` option to exit on any error, or combine both approaches for more robust error handling.
+  </Accordion>
+  
+  <Accordion title="Using eval" icon="warning">
+    ```bash
+    # Anti-pattern: Using eval with user input
+    read -p "Enter command: " user_command
+    eval "$user_command"  # Dangerous!
+    
+    # Better approach: Avoid eval or use it very carefully
+    # If you must use eval, validate input strictly
+    read -p "Enter command: " user_command
+    if [[ "$user_command" =~ ^[a-zA-Z0-9_]+$ ]]; then
+        eval "$user_command"
+    else
+        echo "Invalid command format" >&2
+        exit 1
+    fi
+    
+    # Even better: Avoid eval entirely
+    read -p "Choose an option (1-3): " option
+    case "$option" in
+        1) echo "Option 1 selected"; command1 ;;
+        2) echo "Option 2 selected"; command2 ;;
+        3) echo "Option 3 selected"; command3 ;;
+        *) echo "Invalid option" >&2; exit 1 ;;
+    esac
+    ```
+    Avoid using `eval` whenever possible, especially with user input. It can lead to code injection vulnerabilities. If you must use it, validate input strictly and consider alternatives like case statements or function dispatching.
+  </Accordion>
+  
+  <Accordion title="Command Injection Vulnerabilities" icon="warning">
+    ```bash
+    # Anti-pattern: Command injection vulnerability
+    filename="$(get_filename_from_user)"
+    grep "pattern" $filename  # Dangerous if filename contains shell metacharacters
+    
+    # Better approach: Use -- to indicate end of options
+    filename="$(get_filename_from_user)"
+    grep "pattern" -- "$filename"
+    
+    # For commands that don't support --, you can use other techniques
+    # For example, with find:
+    filename="$(get_filename_from_user)"
+    find . -name "$filename" -type f  # Still vulnerable!
+    
+    # Better approach for find:
+    filename="$(get_filename_from_user)"
+    find . -name "$(printf %q "$filename")" -type f
+    ```
+    Be careful with command arguments that come from user input or external sources. Use `--` to indicate the end of options when available, and consider using `printf %q` to properly quote arguments for commands that don't support `--`.
+  </Accordion>
+  
+  <Accordion title="Using Backticks Instead of $()" icon="warning">
+    ```bash
+    # Anti-pattern: Using backticks
+    files=`ls -la`
+    nested=`echo \`hostname\``  # Nested backticks are hard to read
+    
+    # Better approach: Use $() for command substitution
+    files=$(ls -la)
+    nested=$(echo $(hostname))  # Nested $() is much clearer
+    ```
+    Use `$()` for command substitution instead of backticks. It's more readable, especially when nested, and more consistent with other shell constructs.
+  </Accordion>
+  
+  <Accordion title="Not Setting IFS When Reading Lines" icon="warning">
+    ```bash
+    # Anti-pattern: Not setting IFS when reading lines
+    while read line; do
+        echo "Processing $line"
+    done < file.txt
+    # This will trim leading/trailing whitespace
+    
+    # Better approach: Set IFS to just newline
+    while IFS= read -r line; do
+        echo "Processing $line"
+    done < file.txt
+    ```
+    When reading lines from a file, set `IFS=` (empty) and use the `-r` flag with `read` to prevent backslash interpretation. This preserves leading and trailing whitespace and handles backslashes correctly.
+  </Accordion>
+  
+  <Accordion title="Using /bin/sh for Bash Scripts" icon="warning">
+    ```bash
+    # Anti-pattern: Using /bin/sh for Bash-specific features
+    #!/bin/sh
+    
+    # This might fail on systems where /bin/sh is not Bash
+    array=(1 2 3)
+    echo "${array[0]}"
+    
+    # Better approach: Use /bin/bash explicitly
+    #!/bin/bash
+    
+    # Now Bash-specific features will work
+    array=(1 2 3)
+    echo "${array[0]}"
+    ```
+    If your script uses Bash-specific features, use `#!/bin/bash` as the shebang, not `#!/bin/sh`. On many systems, `/bin/sh` might be a different shell (like dash) that doesn't support Bash features.
+  </Accordion>
+  
+  <Accordion title="Not Using set -u" icon="warning">
+    ```bash
+    # Anti-pattern: Not using set -u
+    echo "Home directory: $HOME"
+    echo "Undefined variable: $UNDEFINED_VARIABLE"  # Expands to empty string
+    
+    # Better approach: Use set -u to catch undefined variables
+    set -u  # or set -o nounset
+    echo "Home directory: $HOME"
+    echo "Undefined variable: $UNDEFINED_VARIABLE"  # Script will exit with an error
+    ```
+    Use `set -u` (or `set -o nounset`) to make your script exit when it tries to use an undefined variable. This helps catch typos and missing variables early.
+  </Accordion>
+  
+  <Accordion title="Not Using set -e" icon="warning">
+    ```bash
+    # Anti-pattern: Not using set -e
+    mkdir /path/that/might/not/exist
+    cd /path/that/might/not/exist
+    rm -rf *  # Dangerous if previous commands failed!
+    
+    # Better approach: Use set -e to exit on errors
+    set -e  # or set -o errexit
+    mkdir /path/that/might/not/exist
+    cd /path/that/might/not/exist
+    rm -rf *  # Script will exit if mkdir or cd fails
+    ```
+    Use `set -e` (or `set -o errexit`) to make your script exit immediately if any command fails. This prevents the script from continuing in an unexpected state after an error.
+  </Accordion>
+  
+  <Accordion title="Not Using Shellcheck" icon="warning">
+    ```bash
+    # Anti-pattern: Not using static analysis tools
+    # This script has several issues that Shellcheck would catch
+    for i in $(ls *.txt)
+    do
+      cp $i $i.bak
+    done
+    
+    # Better approach: Use Shellcheck to find issues
+    # After running shellcheck script.sh, you would fix it to:
+    for i in *.txt
+    do
+      cp "$i" "$i.bak"
+    done
+    ```
+    Use [Shellcheck](https://www.shellcheck.net/) to analyze your Bash scripts for common mistakes and pitfalls. It can catch many of the anti-patterns mentioned here and more.
+  </Accordion>
+  
+  <Accordion title="Using [ ] Instead of [[ ]]" icon="warning">
+    ```bash
+    # Anti-pattern: Using [ ] for complex conditions
+    if [ $a == $b ] && [ $c == $d ]; then
+        echo "Conditions met"
+    fi
+    
+    # This will fail if any variable is empty
+    if [ $filename == *.txt ]; then
+        echo "Text file"
+    fi
+    
+    # Better approach: Use [[ ]] for complex conditions
+    if [[ $a == $b && $c == $d ]]; then
+        echo "Conditions met"
+    fi
+    
+    # This works correctly with pattern matching
+    if [[ $filename == *.txt ]]; then
+        echo "Text file"
+    fi
+    ```
+    Use `[[ ]]` instead of `[ ]` for conditional tests in Bash. It's more powerful, safer with empty variables, supports logical operators directly, and provides pattern matching.
+  </Accordion>
+  
+  <Accordion title="Hardcoding Paths" icon="warning">
+    ```bash
+    # Anti-pattern: Hardcoding paths
+    cd /home/username/project
+    source /home/username/project/config.sh
+    
+    # Better approach: Use relative paths or variables
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR"
+    source "$SCRIPT_DIR/config.sh"
+    
+    # Even better: Use environment variables when appropriate
+    cd "${PROJECT_ROOT:-$SCRIPT_DIR}"
+    source "${CONFIG_FILE:-$SCRIPT_DIR/config.sh}"
+    ```
+    Avoid hardcoding absolute paths in your scripts. Use relative paths, determine paths dynamically, or use environment variables to make your scripts more portable and easier to maintain.
+  </Accordion>
+  
+  <Accordion title="Not Using Functions" icon="warning">
+    ```bash
+    # Anti-pattern: Repeated code without functions
+    echo "Processing file1.txt"
+    if [ -f "file1.txt" ]; then
+        grep "pattern" "file1.txt"
+        wc -l "file1.txt"
+        # More operations...
+    else
+        echo "file1.txt not found" >&2
+    fi
+    
+    echo "Processing file2.txt"
+    if [ -f "file2.txt" ]; then
+        grep "pattern" "file2.txt"
+        wc -l "file2.txt"
+        # More operations...
+    else
+        echo "file2.txt not found" >&2
+    fi
+    
+    # Better approach: Use functions
+    process_file() {
+        local file="$1"
+        echo "Processing $file"
+        if [ -f "$file" ]; then
+            grep "pattern" "$file"
+            wc -l "$file"
+            # More operations...
+        else
+            echo "$file not found" >&2
+            return 1
+        fi
+    }
+    
+    process_file "file1.txt"
+    process_file "file2.txt"
+    ```
+    Use functions to avoid code duplication and improve maintainability. Functions make your code more modular, easier to understand, and easier to test.
+  </Accordion>
+  
+  <Accordion title="Using echo for Printing to stderr" icon="warning">
+    ```bash
+    # Anti-pattern: Using echo for stderr
+    echo "Error: something went wrong" >&2
+    
+    # Better approach: Use printf for consistent behavior
+    printf "Error: something went wrong\n" >&2
+    
+    # Even better: Create an error function
+    error() {
+        printf "[ERROR] %s\n" "$1" >&2
+    }
+    
+    error "Something went wrong"
+    ```
+    Use `printf` instead of `echo` for more consistent behavior across different systems, especially when printing to stderr or when dealing with strings that start with options like `-n` or `-e`.
+  </Accordion>
+  
+  <Accordion title="Using Uppercase Variable Names" icon="warning">
+    ```bash
+    # Anti-pattern: Using uppercase for all variables
+    NAME="John"
+    AGE=30
+    GREETING="Hello, $NAME!"
+    
+    # Better approach: Use lowercase for local variables
+    name="John"
+    age=30
+    greeting="Hello, $name!"
+    
+    # Use uppercase only for environment variables and constants
+    export DATABASE_URL="postgres://localhost:5432/mydb"
+    readonly MAX_RETRIES=5
+    ```
+    Reserve uppercase variable names for environment variables and constants. Use lowercase for regular variables to avoid conflicts with environment variables and to follow convention.
+  </Accordion>
+  
+  <Accordion title="Not Using Local Variables in Functions" icon="warning">
+    ```bash
+    # Anti-pattern: Not using local variables in functions
+    counter=0
+    
+    increment_counter() {
+        counter=$((counter + 1))  # Modifies global variable
+    }
+    
+    increment_counter
+    echo "Counter: $counter"  # 1
+    
+    # Better approach: Use local variables
+    counter=0
+    
+    increment_counter() {
+        local counter=$1
+        echo $((counter + 1))
+    }
+    
+    counter=$(increment_counter "$counter")
+    echo "Counter: $counter"  # 1
+    ```
+    Use `local` to declare function-specific variables. This prevents unintended side effects and makes functions more self-contained and reusable.
+  </Accordion>
+  
+  <Accordion title="Using Temporary Files Insecurely" icon="warning">
+    ```bash
+    # Anti-pattern: Insecure temporary files
+    TEMP_FILE="/tmp/mydata.txt"
+    echo "sensitive data" > "$TEMP_FILE"
+    # Process the file...
+    rm "$TEMP_FILE"
+    
+    # Better approach: Use mktemp
+    TEMP_FILE=$(mktemp)
+    echo "sensitive data" > "$TEMP_FILE"
+    # Process the file...
+    rm "$TEMP_FILE"
+    
+    # Even better: Clean up on exit
+    TEMP_FILE=$(mktemp)
+    trap "rm -f '$TEMP_FILE'" EXIT
+    echo "sensitive data" > "$TEMP_FILE"
+    # Process the file...
+    ```
+    Use `mktemp` to create secure temporary files with unique names. Add a trap to clean up temporary files when the script exits, even if it exits due to an error.
+  </Accordion>
+  
+  <Accordion title="Not Using Double Brackets for Regex" icon="warning">
+    ```bash
+    # Anti-pattern: Using single brackets for regex
+    if [ "$input" = *[0-9]* ]; then  # This is a glob, not regex
+        echo "Input contains a number"
+    fi
+    
+    # Better approach: Use double brackets with =~ for regex
+    if [[ "$input" =~ [0-9] ]]; then
+        echo "Input contains a number"
+    fi
+    ```
+    Use double brackets `[[ ]]` with the `=~` operator for regular expression matching. Single brackets `[ ]` only support glob patterns, not regular expressions.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Shebang" icon="warning">
+    ```bash
+    # Anti-pattern: Missing or incorrect shebang
+    echo "Hello, World!"
+    
+    # Better approach: Use proper shebang
+    #!/usr/bin/env bash
+    echo "Hello, World!"
+    ```
+    Always include a proper shebang line at the beginning of your script. Using `#!/usr/bin/env bash` is more portable than `#!/bin/bash` because it will find the Bash interpreter in the user's PATH.
+  </Accordion>
+  
+  <Accordion title="Using Deprecated Syntax" icon="warning">
+    ```bash
+    # Anti-pattern: Using deprecated syntax
+    var=$[1 + 2]  # $[...] is deprecated
+    
+    # Better approach: Use modern syntax
+    var=$((1 + 2))  # $((...)) is the modern arithmetic expansion
+    ```
+    Avoid using deprecated syntax like `$[...]` for arithmetic expansion. Use the modern equivalents like `$((...))` instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Parameter Expansion" icon="warning">
+    ```bash
+    # Anti-pattern: Not using parameter expansion
+    if [ -z "$variable" ]; then
+        variable="default"
+    fi
+    
+    # Better approach: Use parameter expansion
+    variable=${variable:-default}
+    
+    # More examples of useful parameter expansion
+    echo "${filename%.txt}"  # Remove .txt extension
+    echo "${path##*/}"      # Get basename
+    echo "${path%/*}"       # Get dirname
+    ```
+    Use parameter expansion for default values, substring operations, and pattern matching. It's more concise and often more efficient than using conditional statements or external commands.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,689 @@
+---
+title: 'Elm'
+description: 'Elm is a functional programming language that compiles to JavaScript. It is known for its emphasis on simplicity, ease-of-use, and its ability to generate code with no runtime exceptions.'
+---
+
+<AccordionGroup>
+  <Accordion title="Elm Anti-Patterns Overview" icon="elm">
+    Elm, despite being designed to prevent many common programming errors, still has several anti-patterns that can lead to maintainability issues, performance problems, and code that doesn't follow the language's idioms. Here are the most important anti-patterns to avoid when writing Elm code.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Maybe.withDefault" icon="warning">
+    ```elm
+    -- Anti-pattern: Excessive use of Maybe.withDefault
+    viewUser : Maybe User -> Html msg
+    viewUser maybeUser =
+        div []
+            [ h1 [] [ text (Maybe.withDefault "Unknown" (Maybe.map .name maybeUser)) ]
+            , p [] [ text (Maybe.withDefault "No email" (Maybe.map .email maybeUser)) ]
+            , p [] [ text (Maybe.withDefault "No bio" (Maybe.map .bio maybeUser)) ]
+            ]
+    
+    -- Better approach: Use case expressions
+    viewUser : Maybe User -> Html msg
+    viewUser maybeUser =
+        case maybeUser of
+            Just user ->
+                div []
+                    [ h1 [] [ text user.name ]
+                    , p [] [ text user.email ]
+                    , p [] [ text user.bio ]
+                    ]
+            
+            Nothing ->
+                div []
+                    [ h1 [] [ text "Unknown" ]
+                    , p [] [ text "No email" ]
+                    , p [] [ text "No bio" ]
+                    ]
+    ```
+    Avoid excessive use of `Maybe.withDefault`. While it's convenient for simple cases, using case expressions provides more control and clarity, especially when dealing with multiple fields from the same Maybe value.
+  </Accordion>
+  
+  <Accordion title="Stringly-Typed Code" icon="warning">
+    ```elm
+    -- Anti-pattern: Stringly-typed code
+    type alias User =
+        { status : String  -- Could be "active", "inactive", "pending"
+        }
+    
+    isUserActive : User -> Bool
+    isUserActive user =
+        user.status == "active"
+    
+    -- Better approach: Use custom types
+    type UserStatus
+        = Active
+        | Inactive
+        | Pending
+    
+    type alias User =
+        { status : UserStatus
+        }
+    
+    isUserActive : User -> Bool
+    isUserActive user =
+        case user.status of
+            Active ->
+                True
+            
+            _ ->
+                False
+    ```
+    Avoid using strings to represent a fixed set of values. Use custom types instead, which provide type safety, better documentation, and exhaustive pattern matching.
+  </Accordion>
+  
+  <Accordion title="Nested Record Updates" icon="warning">
+    ```elm
+    -- Anti-pattern: Deeply nested record updates
+    type alias Address =
+        { street : String
+        , city : String
+        , zipCode : String
+        }
+    
+    type alias User =
+        { name : String
+        , address : Address
+        }
+    
+    updateZipCode : String -> User -> User
+    updateZipCode newZipCode user =
+        { user | address = { street = user.address.street
+                          , city = user.address.city
+                          , zipCode = newZipCode
+                          }
+        }
+    
+    -- Better approach: Use lenses or helper functions
+    updateAddress : (Address -> Address) -> User -> User
+    updateAddress updater user =
+        { user | address = updater user.address }
+    
+    updateZipCode : String -> User -> User
+    updateZipCode newZipCode =
+        updateAddress (\address -> { address | zipCode = newZipCode })
+    ```
+    Avoid deeply nested record updates, which are verbose and error-prone. Instead, create helper functions that focus on updating specific parts of your data structure.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of List" icon="warning">
+    ```elm
+    -- Anti-pattern: Using List for everything
+    type alias Model =
+        { users : List User
+        , selectedUserId : Maybe String
+        }
+    
+    getUserById : String -> Model -> Maybe User
+    getUserById id model =
+        List.filter (\user -> user.id == id) model.users
+            |> List.head
+    
+    -- Better approach: Use Dict for lookups
+    import Dict exposing (Dict)
+    
+    type alias Model =
+        { users : Dict String User
+        , selectedUserId : Maybe String
+        }
+    
+    getUserById : String -> Model -> Maybe User
+    getUserById id model =
+        Dict.get id model.users
+    ```
+    Don't use List for everything. Use appropriate data structures like Dict for lookups, Set for unique collections, and Array for indexed access. This improves performance and makes your code more expressive.
+  </Accordion>
+  
+  <Accordion title="Overusing Flags" icon="warning">
+    ```elm
+    -- Anti-pattern: Overusing flags for configuration
+    type alias Flags =
+        { apiUrl : String
+        , debugMode : Bool
+        , theme : String
+        , timeout : Int
+        , maxRetries : Int
+        , features : List String
+        -- Many more configuration options...
+        }
+    
+    init : Flags -> (Model, Cmd Msg)
+    init flags =
+        -- Initialize with all flag values
+    
+    -- Better approach: Use a combination of flags and remote configuration
+    type alias Flags =
+        { apiUrl : String
+        , initialTheme : String
+        }
+    
+    init : Flags -> (Model, Cmd Msg)
+    init flags =
+        ( initialModel flags
+        , fetchConfiguration flags.apiUrl
+        )
+    
+    -- Then load the rest of the configuration from the server
+    ```
+    Avoid overusing flags for application configuration. Flags should be used for essential startup information, but excessive flags make initialization complex and brittle. Consider loading configuration from a server or using reasonable defaults.
+  </Accordion>
+  
+  <Accordion title="Elm Architecture Violations" icon="warning">
+    ```elm
+    -- Anti-pattern: Violating The Elm Architecture
+    type alias Model =
+        { counter : Int
+        , message : String
+        }
+    
+    type Msg
+        = Increment
+        | Decrement
+    
+    update : Msg -> Model -> Model  -- No Cmd here!
+    update msg model =
+        case msg of
+            Increment ->
+                { model | counter = model.counter + 1, message = "Incremented" }
+            
+            Decrement ->
+                { model | counter = model.counter - 1, message = "Decremented" }
+    
+    -- Better approach: Follow The Elm Architecture
+    update : Msg -> Model -> (Model, Cmd Msg)
+    update msg model =
+        case msg of
+            Increment ->
+                ( { model | counter = model.counter + 1 }
+                , Cmd.none
+                )
+            
+            Decrement ->
+                ( { model | counter = model.counter - 1 }
+                , Cmd.none
+                )
+    ```
+    Always follow The Elm Architecture. Don't try to work around it by storing state outside the model, using ports for things that could be modeled in Elm, or ignoring the `Cmd` part of the update function.
+  </Accordion>
+  
+  <Accordion title="Not Using Type Annotations" icon="warning">
+    ```elm
+    -- Anti-pattern: Missing type annotations
+    add a b =
+        a + b
+    
+    view model =
+        div [] [ text model.message ]
+    
+    -- Better approach: Include type annotations
+    add : Int -> Int -> Int
+    add a b =
+        a + b
+    
+    view : Model -> Html Msg
+    view model =
+        div [] [ text model.message ]
+    ```
+    Always include type annotations for top-level functions. Type annotations serve as documentation, help catch errors earlier, and make refactoring safer.
+  </Accordion>
+  
+  <Accordion title="Excessive Nesting of HTML" icon="warning">
+    ```elm
+    -- Anti-pattern: Excessive nesting
+    view : Model -> Html Msg
+    view model =
+        div [ class "container" ]
+            [ div [ class "row" ]
+                [ div [ class "col" ]
+                    [ div [ class "card" ]
+                        [ div [ class "card-header" ]
+                            [ h2 [] [ text "User Profile" ]
+                            ]
+                        , div [ class "card-body" ]
+                            [ p [] [ text model.name ]
+                            , p [] [ text model.email ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+    
+    -- Better approach: Break into smaller functions
+    view : Model -> Html Msg
+    view model =
+        div [ class "container" ]
+            [ div [ class "row" ]
+                [ div [ class "col" ]
+                    [ viewCard model ]
+                ]
+            ]
+    
+    viewCard : Model -> Html Msg
+    viewCard model =
+        div [ class "card" ]
+            [ viewCardHeader
+            , viewCardBody model
+            ]
+    
+    viewCardHeader : Html Msg
+    viewCardHeader =
+        div [ class "card-header" ]
+            [ h2 [] [ text "User Profile" ] ]
+    
+    viewCardBody : Model -> Html Msg
+    viewCardBody model =
+        div [ class "card-body" ]
+            [ p [] [ text model.name ]
+            , p [] [ text model.email ]
+            ]
+    ```
+    Avoid excessive nesting of HTML elements. Break your view into smaller, focused functions to improve readability and maintainability.
+  </Accordion>
+  
+  <Accordion title="Not Using Opaque Types" icon="warning">
+    ```elm
+    -- Anti-pattern: Using type aliases for domain concepts
+    type alias UserId = String
+    type alias Email = String
+    
+    sendEmail : Email -> UserId -> Cmd Msg
+    sendEmail email userId =
+        -- Implementation
+    
+    -- Usage (can easily mix up parameters)
+    sendEmail userId email  -- Oops, parameters swapped!
+    
+    -- Better approach: Use opaque types
+    module UserId exposing (UserId, toString, fromString)
+    
+    type UserId = UserId String
+    
+    toString : UserId -> String
+    toString (UserId id) = id
+    
+    fromString : String -> UserId
+    fromString = UserId
+    
+    -- In another module
+    module Email exposing (Email, toString, fromString)
+    
+    type Email = Email String
+    
+    toString : Email -> String
+    toString (Email email) = email
+    
+    fromString : String -> Email
+    fromString = Email
+    
+    -- Usage (now type-safe)
+    sendEmail : Email -> UserId -> Cmd Msg
+    sendEmail email userId =
+        -- Implementation
+    
+    -- This would now be a compile error:
+    -- sendEmail userId email
+    ```
+    Use opaque types to represent domain concepts instead of type aliases. Opaque types provide better type safety and prevent accidental misuse of values.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Tuples" icon="warning">
+    ```elm
+    -- Anti-pattern: Excessive use of tuples
+    type alias Model =
+        { user : (String, String, Int)  -- (name, email, age)
+        , position : (Float, Float)    -- (x, y)
+        }
+    
+    updateUserAge : Int -> Model -> Model
+    updateUserAge newAge model =
+        let
+            (name, email, _) = model.user
+        in
+        { model | user = (name, email, newAge) }
+    
+    -- Better approach: Use records
+    type alias User =
+        { name : String
+        , email : String
+        , age : Int
+        }
+    
+    type alias Position =
+        { x : Float
+        , y : Float
+        }
+    
+    type alias Model =
+        { user : User
+        , position : Position
+        }
+    
+    updateUserAge : Int -> Model -> Model
+    updateUserAge newAge model =
+        { model | user = { model.user | age = newAge } }
+    ```
+    Avoid excessive use of tuples, especially for domain concepts with more than two values. Use records instead, which provide named fields and better documentation.
+  </Accordion>
+  
+  <Accordion title="Not Using Custom Types for Messages" icon="warning">
+    ```elm
+    -- Anti-pattern: Using strings or tuples for messages
+    type Msg
+        = UserAction String  -- "edit", "delete", "view"
+        | ItemSelected (Int, String)  -- (id, name)
+    
+    update : Msg -> Model -> (Model, Cmd Msg)
+    update msg model =
+        case msg of
+            UserAction action ->
+                case action of
+                    "edit" ->
+                        -- Handle edit
+                    "delete" ->
+                        -- Handle delete
+                    "view" ->
+                        -- Handle view
+                    _ ->
+                        (model, Cmd.none)  -- Unknown action
+            
+            ItemSelected (id, name) ->
+                -- Handle item selection
+    
+    -- Better approach: Use nested custom types
+    type UserAction
+        = Edit
+        | Delete
+        | View
+    
+    type Msg
+        = UserMsg UserAction
+        | ItemSelected { id : Int, name : String }
+    
+    update : Msg -> Model -> (Model, Cmd Msg)
+    update msg model =
+        case msg of
+            UserMsg action ->
+                case action of
+                    Edit ->
+                        -- Handle edit
+                    Delete ->
+                        -- Handle delete
+                    View ->
+                        -- Handle view
+            
+            ItemSelected item ->
+                -- Handle item selection with named fields
+    ```
+    Use custom types for messages instead of strings or tuples. Custom types provide better type safety, documentation, and exhaustive pattern matching.
+  </Accordion>
+  
+  <Accordion title="Not Using Modules Effectively" icon="warning">
+    ```elm
+    -- Anti-pattern: Everything in one module
+    module Main exposing (..)  -- Exposing everything
+    
+    -- Hundreds of types, functions, and helpers all in one file
+    
+    -- Better approach: Organize code into modules
+    -- Main.elm
+    module Main exposing (main)
+    
+    import Model exposing (Model, Msg, init, update)
+    import View exposing (view)
+    
+    main : Program Flags Model Msg
+    main =
+        Browser.element
+            { init = init
+            , update = update
+            , view = view
+            , subscriptions = subscriptions
+            }
+    
+    -- Model.elm
+    module Model exposing (Model, Msg(..), init, update)
+    
+    -- Types and logic
+    
+    -- View.elm
+    module View exposing (view)
+    
+    -- View functions
+    
+    -- Types.elm
+    module Types exposing (User, UserId, UserStatus(..))
+    
+    -- Domain types
+    ```
+    Organize your code into modules based on functionality. This improves maintainability, compilation times, and allows for better encapsulation of implementation details.
+  </Accordion>
+  
+  <Accordion title="Not Using Maybe and Result Properly" icon="warning">
+    ```elm
+    -- Anti-pattern: Not using Maybe for optional values
+    type alias User =
+        { name : String
+        , email : String
+        , phone : String  -- Empty string means no phone
+        }
+    
+    displayPhone : User -> Html msg
+    displayPhone user =
+        if String.isEmpty user.phone then
+            text "No phone number"
+        else
+            text user.phone
+    
+    -- Better approach: Use Maybe
+    type alias User =
+        { name : String
+        , email : String
+        , phone : Maybe String
+        }
+    
+    displayPhone : User -> Html msg
+    displayPhone user =
+        case user.phone of
+            Just phone ->
+                text phone
+            
+            Nothing ->
+                text "No phone number"
+    
+    -- Anti-pattern: Not using Result for operations that can fail
+    parseAge : String -> Int
+    parseAge input =
+        String.toInt input |> Maybe.withDefault 0  -- Default to 0 on failure
+    
+    -- Better approach: Use Result
+    parseAge : String -> Result String Int
+    parseAge input =
+        case String.toInt input of
+            Just age ->
+                if age >= 0 then
+                    Ok age
+                else
+                    Err "Age cannot be negative"
+            
+            Nothing ->
+                Err "Invalid age format"
+    ```
+    Use `Maybe` for optional values and `Result` for operations that can fail. These types make your code more expressive and force you to handle all possible cases.
+  </Accordion>
+  
+  <Accordion title="Not Using Decoders Properly" icon="warning">
+    ```elm
+    -- Anti-pattern: Manual JSON parsing
+    type alias User =
+        { id : Int
+        , name : String
+        , email : String
+        }
+    
+    decodeUser : Json.Decode.Value -> Maybe User
+    decodeUser json =
+        let
+            idMaybe = Json.Decode.decodeValue (Json.Decode.field "id" Json.Decode.int) json
+            nameMaybe = Json.Decode.decodeValue (Json.Decode.field "name" Json.Decode.string) json
+            emailMaybe = Json.Decode.decodeValue (Json.Decode.field "email" Json.Decode.string) json
+        in
+        case (idMaybe, nameMaybe, emailMaybe) of
+            (Ok id, Ok name, Ok email) ->
+                Just { id = id, name = name, email = email }
+            
+            _ ->
+                Nothing
+    
+    -- Better approach: Use the decoder pipeline
+    import Json.Decode as Decode exposing (Decoder)
+    import Json.Decode.Pipeline exposing (required, optional)
+    
+    userDecoder : Decoder User
+    userDecoder =
+        Decode.succeed User
+            |> required "id" Decode.int
+            |> required "name" Decode.string
+            |> required "email" Decode.string
+    
+    decodeUser : Json.Decode.Value -> Result Decode.Error User
+    decodeUser json =
+        Decode.decodeValue userDecoder json
+    ```
+    Use Elm's JSON decoders properly. Don't try to manually parse JSON; instead, build composable decoders using the decoder library. This approach is more maintainable and handles errors better.
+  </Accordion>
+  
+  <Accordion title="Not Using Subscriptions Properly" icon="warning">
+    ```elm
+    -- Anti-pattern: Using ports for things that could be subscriptions
+    port module Main exposing (..)
+    
+    port receiveTime : (Int -> msg) -> Sub msg
+    
+    -- JavaScript side:
+    // app.ports.receiveTime.send(Date.now());
+    // setInterval(() => app.ports.receiveTime.send(Date.now()), 1000);
+    
+    -- Better approach: Use built-in subscriptions
+    subscriptions : Model -> Sub Msg
+    subscriptions model =
+        Time.every 1000 Tick
+    ```
+    Use Elm's built-in subscriptions for things like time, animation frames, and keyboard events. Only use ports for functionality that truly can't be handled within Elm.
+  </Accordion>
+  
+  <Accordion title="Not Using the Debugger" icon="warning">
+    ```elm
+    -- Anti-pattern: Debug statements left in production code
+    update : Msg -> Model -> (Model, Cmd Msg)
+    update msg model =
+        case Debug.log "msg" msg of
+            Increment ->
+                ( { model | counter = Debug.log "new counter" (model.counter + 1) }
+                , Cmd.none
+                )
+    
+    -- Better approach: Use the Elm debugger during development
+    -- main =
+    --     Browser.element
+    --         { init = init
+    --         , update = update
+    --         , view = view
+    --         , subscriptions = subscriptions
+    --         }
+    
+    -- During development:
+    main =
+        Browser.document
+            { init = init
+            , update = updateWithLogging
+            , view = view
+            , subscriptions = subscriptions
+            }
+    
+    updateWithLogging : Msg -> Model -> (Model, Cmd Msg)
+    updateWithLogging msg model =
+        let
+            _ = Debug.log "msg" msg
+            (newModel, cmd) = update msg model
+            _ = Debug.log "new model" newModel
+        in
+        (newModel, cmd)
+    
+    -- For production, use a flag to disable logging
+    ```
+    Use the Elm debugger and time-traveling debugger during development instead of littering your code with Debug.log statements. For production, ensure all debug statements are removed.
+  </Accordion>
+  
+  <Accordion title="Not Writing Tests" icon="warning">
+    ```elm
+    -- Anti-pattern: No tests
+    
+    -- Better approach: Write tests
+    module Tests exposing (..)
+    
+    import Expect
+    import Fuzz exposing (int, string)
+    import Test exposing (Test, describe, fuzz, test)
+    
+    import MyModule exposing (addOne, validateEmail)
+    
+    suite : Test
+    suite =
+        describe "MyModule"
+            [ describe "addOne"
+                [ test "adds 1 to a positive number" <|
+                    \_ ->
+                        Expect.equal 43 (addOne 42)
+                , test "adds 1 to a negative number" <|
+                    \_ ->
+                        Expect.equal 0 (addOne -1)
+                ]
+            , describe "validateEmail"
+                [ fuzz string "rejects empty strings" <|
+                    \randomString ->
+                        if String.isEmpty (String.trim randomString) then
+                            Expect.equal False (validateEmail randomString)
+                        else
+                            Expect.pass
+                , test "accepts valid email" <|
+                    \_ ->
+                        Expect.equal True (validateEmail "user@example.com")
+                ]
+            ]
+    ```
+    Write tests for your Elm code. Elm's type system catches many errors, but tests are still important for verifying business logic, edge cases, and integration between components.
+  </Accordion>
+  
+  <Accordion title="Not Following Elm Formatting Conventions" icon="warning">
+    ```elm
+    -- Anti-pattern: Inconsistent formatting
+    type Msg = Increment|Decrement|Reset
+    
+    update msg model=
+      case msg of
+        Increment->{ model | count = model.count + 1 }
+        Decrement->{ model | count = model.count - 1 }
+        Reset->{ model | count = 0 }
+    
+    -- Better approach: Use elm-format
+    type Msg
+        = Increment
+        | Decrement
+        | Reset
+    
+    update : Msg -> Model -> Model
+    update msg model =
+        case msg of
+            Increment ->
+                { model | count = model.count + 1 }
+            
+            Decrement ->
+                { model | count = model.count - 1 }
+            
+            Reset ->
+                { model | count = 0 }
+    ```
+    Follow Elm's formatting conventions by using elm-format. Consistent formatting makes your code more readable and helps avoid trivial discussions about style in code reviews.
+  </Accordion>
+</AccordionGroup>

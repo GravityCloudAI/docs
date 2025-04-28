@@ -1,0 +1,599 @@
+---
+title: 'Assembly'
+description: 'Assembly language is a low-level programming language for a computer, or other programmable device, in which there is a very strong correspondence between the language and the architectures machine code instructions.'
+---
+
+<AccordionGroup>
+  <Accordion title="Assembly Anti-Patterns Overview" icon="assembly">
+    Assembly language, despite being the closest programming language to machine code, has several common anti-patterns that can lead to bugs, maintainability problems, and performance issues. Here are the most important anti-patterns to avoid when writing Assembly code.
+  </Accordion>
+  
+  <Accordion title="Hardcoded Memory Addresses" icon="warning">
+    ```assembly
+    ; Anti-pattern: Hardcoded memory addresses
+    section .text
+    global _start
+    
+    _start:
+        mov eax, [0x12345678]    ; Hardcoded memory address
+        add eax, 42
+        mov [0x12345678], eax    ; Store back to hardcoded address
+    
+    ; Better approach: Use labeled memory locations
+    section .data
+    my_variable dd 0
+    
+    section .text
+    global _start
+    
+    _start:
+        mov eax, [my_variable]   ; Use symbolic reference
+        add eax, 42
+        mov [my_variable], eax   ; Store back using symbolic reference
+    ```
+    Avoid using hardcoded memory addresses. Instead, use labels and let the assembler/linker calculate the actual addresses. This makes your code more maintainable and relocatable.
+  </Accordion>
+  
+  <Accordion title="Not Using Comments" icon="warning">
+    ```assembly
+    ; Anti-pattern: Insufficient comments
+    section .text
+    global _start
+    
+    _start:
+        mov eax, 1
+        mov ebx, 0
+        int 0x80
+    
+    ; Better approach: Well-commented code
+    section .text
+    global _start
+    
+    ; Entry point of the program
+    _start:
+        mov eax, 1      ; System call number for exit()
+        mov ebx, 0      ; Exit status code 0 (success)
+        int 0x80        ; Call kernel to execute exit()
+    ```
+    Assembly code can be difficult to understand without proper comments. Document your code thoroughly, explaining the purpose of registers, memory operations, and the overall logic of your routines.
+  </Accordion>
+  
+  <Accordion title="Self-Modifying Code" icon="warning">
+    ```assembly
+    ; Anti-pattern: Self-modifying code
+    section .text
+    global _start
+    
+    _start:
+        ; Modify the instruction at runtime
+        mov byte [instruction+1], 42  ; Change the immediate value
+    
+    instruction:
+        mov al, 10                    ; This will be modified to mov al, 42
+        ; Rest of the code...
+    
+    ; Better approach: Use data for configuration
+    section .data
+    config_value db 42
+    
+    section .text
+    global _start
+    
+    _start:
+        mov al, [config_value]        ; Load the value from data section
+        ; Rest of the code...
+    ```
+    Avoid self-modifying code, which changes instructions at runtime. It makes debugging difficult, can cause cache coherency issues, and may not work on systems with memory protection. Instead, use data structures to store configurable values.
+  </Accordion>
+  
+  <Accordion title="Not Preserving Registers" icon="warning">
+    ```assembly
+    ; Anti-pattern: Not preserving registers
+    calculate_sum:
+        mov eax, [ebx]        ; Load value from memory
+        add eax, [ebx+4]      ; Add next value
+        ret                   ; Return with sum in eax
+    
+    ; Better approach: Preserve registers according to calling convention
+    calculate_sum:
+        push ebx              ; Save registers that will be modified
+        push ecx
+        
+        mov eax, [ebx]        ; Load value from memory
+        add eax, [ebx+4]      ; Add next value
+        
+        pop ecx               ; Restore registers in reverse order
+        pop ebx
+        ret                   ; Return with sum in eax
+    ```
+    Follow the appropriate calling convention for your platform. Save and restore registers that your function modifies but are required to be preserved according to the calling convention.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Jumps" icon="warning">
+    ```assembly
+    ; Anti-pattern: Spaghetti code with excessive jumps
+    process_data:
+        cmp eax, 0
+        je zero_case
+        cmp eax, 1
+        je one_case
+        jmp default_case
+    
+    zero_case:
+        ; Handle zero case
+        jmp end_process
+    
+    one_case:
+        ; Handle one case
+        jmp end_process
+    
+    default_case:
+        ; Handle default case
+        jmp end_process
+    
+    end_process:
+        ret
+    
+    ; Better approach: Structured code with fewer jumps
+    process_data:
+        cmp eax, 0
+        je zero_case
+        cmp eax, 1
+        je one_case
+        
+        ; Handle default case inline
+        ; ...
+        jmp end_process
+    
+    zero_case:
+        ; Handle zero case
+        jmp end_process
+    
+    one_case:
+        ; Handle one case
+        ; Fall through to end_process
+    
+    end_process:
+        ret
+    ```
+    Minimize the use of jumps and labels to avoid creating "spaghetti code." Structure your code in a way that follows logical flow and makes it easier to understand.
+  </Accordion>
+  
+  <Accordion title="Not Using Stack Frames" icon="warning">
+    ```assembly
+    ; Anti-pattern: Not using stack frames
+    my_function:
+        ; Directly manipulate the stack
+        sub esp, 12           ; Allocate 12 bytes on stack
+        mov [esp], eax        ; Save parameter
+        mov [esp+4], ebx      ; Save another parameter
+        
+        ; Function body...
+        
+        add esp, 12           ; Deallocate stack space
+        ret
+    
+    ; Better approach: Use stack frames
+    my_function:
+        push ebp              ; Save old base pointer
+        mov ebp, esp          ; Set up new base pointer
+        sub esp, 12           ; Allocate local variables
+        
+        mov [ebp-4], eax      ; Store local variable
+        mov [ebp-8], ebx      ; Store another local variable
+        
+        ; Function body...
+        
+        mov esp, ebp          ; Restore stack pointer
+        pop ebp               ; Restore base pointer
+        ret
+    ```
+    Use proper stack frames (prologue and epilogue) for functions. This makes it easier to access parameters and local variables, and helps with debugging.
+  </Accordion>
+  
+  <Accordion title="Magic Numbers" icon="warning">
+    ```assembly
+    ; Anti-pattern: Using magic numbers
+    section .text
+    global _start
+    
+    _start:
+        mov eax, 4            ; What does 4 mean?
+        mov ebx, 1            ; What does 1 mean?
+        mov ecx, message
+        mov edx, 13           ; What does 13 mean?
+        int 0x80
+    
+    ; Better approach: Use constants or comments
+    section .text
+    global _start
+    
+    ; Constants
+    SYS_WRITE equ 4
+    STDOUT equ 1
+    
+    _start:
+        mov eax, SYS_WRITE    ; System call number for write()
+        mov ebx, STDOUT       ; File descriptor for standard output
+        mov ecx, message      ; Pointer to message
+        mov edx, message_len  ; Length of message
+        int 0x80
+    
+    section .data
+    message db "Hello, World!", 0
+    message_len equ $ - message
+    ```
+    Avoid using "magic numbers" in your code. Define constants with meaningful names to make your code more readable and maintainable.
+  </Accordion>
+  
+  <Accordion title="Inefficient Memory Access Patterns" icon="warning">
+    ```assembly
+    ; Anti-pattern: Cache-unfriendly memory access
+    process_matrix:
+        mov esi, matrix       ; Pointer to matrix
+        mov ecx, 1000         ; Number of rows
+    
+    row_loop:
+        mov edi, 0            ; Column index
+    
+    col_loop:
+        ; Access matrix in column-major order (cache-unfriendly)
+        mov eax, [esi + edi*4000]  ; Access element at [row, col]
+        ; Process element...
+        
+        add edi, 1            ; Next column
+        cmp edi, 1000
+        jl col_loop
+        
+        add esi, 4            ; Next row
+        dec ecx
+        jnz row_loop
+        ret
+    
+    ; Better approach: Cache-friendly memory access
+    process_matrix:
+        mov esi, matrix       ; Pointer to matrix
+        mov ecx, 1000         ; Number of rows
+    
+    row_loop:
+        mov edi, 0            ; Column index
+    
+    col_loop:
+        ; Access matrix in row-major order (cache-friendly)
+        mov eax, [esi + edi*4]  ; Access element at [row, col]
+        ; Process element...
+        
+        add edi, 1            ; Next column
+        cmp edi, 1000
+        jl col_loop
+        
+        add esi, 4000         ; Next row (assuming 1000 columns * 4 bytes)
+        dec ecx
+        jnz row_loop
+        ret
+    ```
+    Be mindful of memory access patterns. Access memory sequentially when possible to take advantage of CPU caching and prefetching mechanisms.
+  </Accordion>
+  
+  <Accordion title="Not Checking Return Values" icon="warning">
+    ```assembly
+    ; Anti-pattern: Not checking return values
+    open_file:
+        mov eax, 5            ; sys_open
+        mov ebx, filename
+        mov ecx, 0            ; O_RDONLY
+        int 0x80
+        ; No check if eax < 0 (error)
+        
+        mov [file_descriptor], eax
+        ret
+    
+    ; Better approach: Check return values
+    open_file:
+        mov eax, 5            ; sys_open
+        mov ebx, filename
+        mov ecx, 0            ; O_RDONLY
+        int 0x80
+        
+        cmp eax, 0
+        jl open_error         ; Jump if negative (error)
+        
+        mov [file_descriptor], eax
+        mov eax, 0            ; Return success
+        ret
+        
+    open_error:
+        mov eax, -1           ; Return error
+        ret
+    ```
+    Always check return values from system calls and functions to handle error conditions properly.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Instructions" icon="warning">
+    ```assembly
+    ; Anti-pattern: Using inefficient instructions
+    clear_register:
+        mov eax, 0            ; Clear eax
+        mov ebx, 0            ; Clear ebx
+        mov ecx, 0            ; Clear ecx
+        mov edx, 0            ; Clear edx
+        ret
+    
+    ; Better approach: Use appropriate instructions
+    clear_register:
+        xor eax, eax          ; Clear eax (faster and smaller)
+        xor ebx, ebx          ; Clear ebx
+        xor ecx, ecx          ; Clear ecx
+        xor edx, edx          ; Clear edx
+        ret
+    ```
+    Use the most appropriate instructions for each task. For example, `xor reg, reg` is faster and smaller than `mov reg, 0` for clearing a register.
+  </Accordion>
+  
+  <Accordion title="Not Using Macros for Common Patterns" icon="warning">
+    ```assembly
+    ; Anti-pattern: Repeating common code patterns
+    function1:
+        push ebp
+        mov ebp, esp
+        ; Function body...
+        mov esp, ebp
+        pop ebp
+        ret
+    
+    function2:
+        push ebp
+        mov ebp, esp
+        ; Function body...
+        mov esp, ebp
+        pop ebp
+        ret
+    
+    ; Better approach: Use macros
+    %macro FUNCTION_PROLOGUE 0
+        push ebp
+        mov ebp, esp
+    %endmacro
+    
+    %macro FUNCTION_EPILOGUE 0
+        mov esp, ebp
+        pop ebp
+        ret
+    %endmacro
+    
+    function1:
+        FUNCTION_PROLOGUE
+        ; Function body...
+        FUNCTION_EPILOGUE
+    
+    function2:
+        FUNCTION_PROLOGUE
+        ; Function body...
+        FUNCTION_EPILOGUE
+    ```
+    Use macros to encapsulate common code patterns. This reduces duplication and makes your code more maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Data Alignment" icon="warning">
+    ```assembly
+    ; Anti-pattern: Unaligned data
+    section .data
+    value1 db 42
+    value2 dd 12345           ; Might be unaligned
+    
+    ; Better approach: Aligned data
+    section .data
+    value1 db 42
+    align 4                   ; Align to 4-byte boundary
+    value2 dd 12345           ; Now properly aligned
+    ```
+    Ensure proper alignment of data structures. Unaligned memory access can cause performance penalties or even crashes on some architectures.
+  </Accordion>
+  
+  <Accordion title="Not Using SIMD Instructions When Appropriate" icon="warning">
+    ```assembly
+    ; Anti-pattern: Scalar operations for vector data
+    process_array:
+        mov ecx, 4            ; Process 4 elements
+        mov esi, array
+    
+    loop_start:
+        mov eax, [esi]        ; Load element
+        add eax, 10           ; Add 10
+        mov [esi], eax        ; Store result
+        add esi, 4            ; Next element
+        dec ecx
+        jnz loop_start
+        ret
+    
+    ; Better approach: Use SIMD instructions
+    process_array:
+        movdqa xmm0, [array]  ; Load 4 integers at once
+        paddd xmm0, [ten_vector] ; Add 10 to each integer
+        movdqa [array], xmm0  ; Store results
+        ret
+    
+    section .data
+    align 16
+    ten_vector dd 10, 10, 10, 10
+    ```
+    Use SIMD (Single Instruction, Multiple Data) instructions like SSE, AVX, or NEON when processing multiple data elements in parallel.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Segmentation" icon="warning">
+    ```assembly
+    ; Anti-pattern: Mixing code and data
+    section .text
+    global _start
+    
+    _start:
+        ; Code...
+        jmp after_data
+    
+    message db "Hello, World!", 0  ; Data in code section
+    
+    after_data:
+        ; More code...
+    
+    ; Better approach: Proper segmentation
+    section .data
+    message db "Hello, World!", 0  ; Data in data section
+    
+    section .text
+    global _start
+    
+    _start:
+        ; Code that uses message...
+    ```
+    Use proper segmentation to separate code, data, and uninitialized data. This improves memory management and can help with security features like non-executable data.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Stack Management" icon="warning">
+    ```assembly
+    ; Anti-pattern: Unbalanced stack
+    process_data:
+        push eax
+        push ebx
+        push ecx
+        
+        ; Process data...
+        
+        pop ebx        ; Oops, stack is now unbalanced
+        ret            ; Will return to wrong address
+    
+    ; Better approach: Balanced stack
+    process_data:
+        push eax
+        push ebx
+        push ecx
+        
+        ; Process data...
+        
+        pop ecx        ; Restore in reverse order
+        pop ebx
+        pop eax
+        ret            ; Stack is balanced
+    ```
+    Maintain proper stack balance. Every `push` should have a corresponding `pop`, and they should be in the correct order.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Function Documentation" icon="warning">
+    ```assembly
+    ; Anti-pattern: Undocumented function
+    calculate_checksum:
+        xor eax, eax
+        mov ecx, [esp+4]
+        mov edx, [esp+8]
+    loop_start:
+        add al, [ecx]
+        inc ecx
+        dec edx
+        jnz loop_start
+        ret
+    
+    ; Better approach: Well-documented function
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ; calculate_checksum - Calculates a simple checksum
+    ;
+    ; Input:
+    ;   [esp+4] - Pointer to data buffer
+    ;   [esp+8] - Size of buffer in bytes
+    ;
+    ; Output:
+    ;   eax - 8-bit checksum (sum of all bytes mod 256)
+    ;
+    ; Destroys: eax, ecx, edx
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    calculate_checksum:
+        xor eax, eax          ; Initialize checksum to 0
+        mov ecx, [esp+4]      ; Get pointer to buffer
+        mov edx, [esp+8]      ; Get buffer size
+    loop_start:
+        add al, [ecx]         ; Add byte to checksum
+        inc ecx               ; Move to next byte
+        dec edx               ; Decrement counter
+        jnz loop_start        ; Continue if not done
+        ret                   ; Return with checksum in eax
+    ```
+    Document your functions thoroughly, including input parameters, output values, and any registers that are modified.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```assembly
+    ; Anti-pattern: No testing infrastructure
+    ; Code is written and assembled without testing
+    
+    ; Better approach: Include test code
+    section .text
+    global _start
+    
+    _start:
+    %ifdef TESTING
+        ; Run tests
+        call test_calculate_checksum
+        ; More tests...
+        
+        ; Exit with test result
+        mov eax, 1            ; sys_exit
+        mov ebx, [test_failures] ; Exit code = number of failures
+        int 0x80
+    %else
+        ; Normal program execution
+        ; ...
+    %endif
+    
+    ; Test functions
+    test_calculate_checksum:
+        push ebp
+        mov ebp, esp
+        
+        ; Test case 1: Empty buffer
+        push dword 0          ; Size
+        push test_buffer      ; Buffer
+        call calculate_checksum
+        add esp, 8            ; Clean up stack
+        
+        cmp eax, 0
+        jne test_failure
+        
+        ; Test case 2: Known values
+        ; ...
+        
+        pop ebp
+        ret
+        
+    test_failure:
+        inc dword [test_failures]
+        ret
+        
+    section .data
+    test_buffer db 1, 2, 3, 4, 5
+    test_failures dd 0
+    ```
+    Include testing infrastructure in your assembly code. This helps catch bugs early and ensures your code works as expected.
+  </Accordion>
+  
+  <Accordion title="Not Using Version Control" icon="warning">
+    ```assembly
+    ; Anti-pattern: No version information
+    section .text
+    global _start
+    
+    _start:
+        ; Program code...
+    
+    ; Better approach: Include version information
+    section .data
+    version_info db "MyProgram v1.2.3", 0
+    build_date db __DATE__, 0
+    build_time db __TIME__, 0
+    
+    section .text
+    global _start
+    
+    _start:
+        ; Program code...
+    ```
+    Include version information in your code and use a version control system like Git. This helps track changes and manage different versions of your code.
+  </Accordion>
+</AccordionGroup>

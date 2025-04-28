@@ -1,0 +1,666 @@
+---
+title: 'Dart'
+description: 'Dart is a client-optimized programming language for fast apps on multiple platforms. It is developed by Google and is used to build mobile, desktop, server, and web applications.'
+---
+
+<AccordionGroup>
+  <Accordion title="Dart Anti-Patterns Overview" icon="dart">
+    Dart, despite being a modern and well-designed language, has several common anti-patterns that can lead to performance issues, maintenance problems, and bugs. Here are the most important anti-patterns to avoid when writing Dart code.
+  </Accordion>
+  
+  <Accordion title="Not Using Null Safety" icon="warning">
+    ```dart
+    // Anti-pattern: Not using null safety (pre-Dart 2.12)
+    String getName(User user) {
+      return user.name; // Might crash if user or user.name is null
+    }
+    
+    // Better approach: Use null safety (Dart 2.12+)
+    String getName(User user) {
+      return user.name ?? 'Unknown'; // Safe, returns 'Unknown' if name is null
+    }
+    
+    // Even better with sound null safety
+    String getName(User? user) {
+      return user?.name ?? 'Unknown'; // Safe, handles null user and null name
+    }
+    ```
+    Always use Dart's null safety features to prevent null reference exceptions. With sound null safety (Dart 2.12+), you can catch null reference errors at compile time rather than runtime.
+  </Accordion>
+  
+  <Accordion title="Using Too Many Callbacks" icon="warning">
+    ```dart
+    // Anti-pattern: Callback hell
+    void fetchUserData() {
+      fetchUser((user) {
+        fetchUserPosts(user, (posts) {
+          fetchPostComments(posts[0], (comments) {
+            // Process data...
+            // Deeply nested and hard to follow
+          });
+        });
+      });
+    }
+    
+    // Better approach: Use async/await
+    Future<void> fetchUserData() async {
+      final user = await fetchUser();
+      final posts = await fetchUserPosts(user);
+      final comments = await fetchPostComments(posts[0]);
+      // Process data...
+      // Linear and easy to follow
+    }
+    ```
+    Avoid excessive nesting of callbacks. Use `async`/`await` for more readable and maintainable asynchronous code.
+  </Accordion>
+  
+  <Accordion title="Not Using const for Immutable Objects" icon="warning">
+    ```dart
+    // Anti-pattern: Not using const for immutable objects
+    Widget build(BuildContext context) {
+      return Container(
+        padding: EdgeInsets.all(16.0), // Creates a new instance each build
+        child: Text('Hello'), // Creates a new instance each build
+      );
+    }
+    
+    // Better approach: Use const constructors
+    Widget build(BuildContext context) {
+      return Container(
+        padding: const EdgeInsets.all(16.0), // Reused instance
+        child: const Text('Hello'), // Reused instance
+      );
+    }
+    ```
+    Use `const` constructors for immutable objects to improve performance by reusing instances rather than creating new ones each time.
+  </Accordion>
+  
+  <Accordion title="Using setState() Excessively" icon="warning">
+    ```dart
+    // Anti-pattern: Excessive setState calls
+    void updateUserData() {
+      setState(() {
+        user.name = 'John';
+      });
+      setState(() {
+        user.age = 30;
+      });
+      setState(() {
+        user.email = 'john@example.com';
+      });
+    }
+    
+    // Better approach: Batch setState calls
+    void updateUserData() {
+      setState(() {
+        user.name = 'John';
+        user.age = 30;
+        user.email = 'john@example.com';
+      });
+    }
+    ```
+    Avoid calling `setState()` multiple times in succession. Batch your state changes into a single `setState()` call to reduce unnecessary rebuilds.
+  </Accordion>
+  
+  <Accordion title="Not Using Key in Lists" icon="warning">
+    ```dart
+    // Anti-pattern: Not using keys in lists
+    ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        return ListTile(
+          title: Text(items[index].title),
+        );
+      },
+    );
+    
+    // Better approach: Use keys for list items
+    ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        return ListTile(
+          key: ValueKey(items[index].id), // Unique key based on item identity
+          title: Text(items[index].title),
+        );
+      },
+    );
+    ```
+    Always use keys when building lists of widgets to help Flutter efficiently update the UI when the list changes.
+  </Accordion>
+  
+  <Accordion title="Ignoring Future Results" icon="warning">
+    ```dart
+    // Anti-pattern: Ignoring Future results
+    void saveData() {
+      uploadData(); // Future result ignored, no error handling
+    }
+    
+    // Better approach: Properly handle Futures
+    Future<void> saveData() async {
+      try {
+        await uploadData();
+        // Handle success
+      } catch (e) {
+        // Handle error
+        print('Error uploading data: $e');
+      }
+    }
+    ```
+    Don't ignore the results of `Future`s. Either `await` them and handle errors, or use `.then()` and `.catchError()` to process results and handle errors.
+  </Accordion>
+  
+  <Accordion title="Using Dynamic Type Excessively" icon="warning">
+    ```dart
+    // Anti-pattern: Excessive use of dynamic
+    dynamic processData(dynamic data) {
+      return data['result'] * 2; // No type checking, potential runtime errors
+    }
+    
+    // Better approach: Use specific types
+    int processData(Map<String, int> data) {
+      return data['result']! * 2; // Type-safe, compiler can catch errors
+    }
+    ```
+    Avoid using `dynamic` type excessively. Use specific types to catch errors at compile time and make your code more self-documenting.
+  </Accordion>
+  
+  <Accordion title="Not Using Named Parameters for Clarity" icon="warning">
+    ```dart
+    // Anti-pattern: Using positional parameters for complex functions
+    Widget createButton(String text, Color color, double width, double height, VoidCallback onPressed) {
+      return ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(primary: color),
+        child: Container(
+          width: width,
+          height: height,
+          child: Text(text),
+        ),
+      );
+    }
+    
+    // Usage is unclear
+    createButton('Save', Colors.blue, 100, 50, () => saveData());
+    
+    // Better approach: Use named parameters
+    Widget createButton({
+      required String text,
+      required Color color,
+      required double width,
+      required double height,
+      required VoidCallback onPressed,
+    }) {
+      return ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(primary: color),
+        child: Container(
+          width: width,
+          height: height,
+          child: Text(text),
+        ),
+      );
+    }
+    
+    // Usage is clear
+    createButton(
+      text: 'Save',
+      color: Colors.blue,
+      width: 100,
+      height: 50,
+      onPressed: () => saveData(),
+    );
+    ```
+    Use named parameters for functions with multiple parameters to make your code more readable and self-documenting.
+  </Accordion>
+  
+  <Accordion title="Not Using Late Initialization Properly" icon="warning">
+    ```dart
+    // Anti-pattern: Unsafe late initialization
+    class UserViewModel {
+      late User user; // Might be accessed before initialization
+      
+      Future<void> loadUser() async {
+        user = await fetchUser();
+      }
+      
+      String getUserName() {
+        return user.name; // Might throw if loadUser hasn't completed
+      }
+    }
+    
+    // Better approach: Safe initialization with null safety
+    class UserViewModel {
+      User? user; // Explicitly nullable
+      
+      Future<void> loadUser() async {
+        user = await fetchUser();
+      }
+      
+      String getUserName() {
+        return user?.name ?? 'Unknown'; // Safe access
+      }
+    }
+    ```
+    Be careful with `late` initialization. Only use `late` when you're certain the variable will be initialized before it's accessed.
+  </Accordion>
+  
+  <Accordion title="Not Using Factory Constructors" icon="warning">
+    ```dart
+    // Anti-pattern: Not using factory constructors for caching
+    class Configuration {
+      final String apiKey;
+      final String baseUrl;
+      
+      Configuration(this.apiKey, this.baseUrl);
+    }
+    
+    // Creates new instance each time
+    var config1 = Configuration('key', 'https://api.example.com');
+    var config2 = Configuration('key', 'https://api.example.com');
+    
+    // Better approach: Use factory constructor for caching
+    class Configuration {
+      final String apiKey;
+      final String baseUrl;
+      
+      static final Map<String, Configuration> _cache = {};
+      
+      factory Configuration(String apiKey, String baseUrl) {
+        final key = '$apiKey-$baseUrl';
+        return _cache.putIfAbsent(
+          key, 
+          () => Configuration._internal(apiKey, baseUrl)
+        );
+      }
+      
+      Configuration._internal(this.apiKey, this.baseUrl);
+    }
+    ```
+    Use factory constructors when you need to control instance creation, such as for caching or returning instances of subclasses.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Stream Management" icon="warning">
+    ```dart
+    // Anti-pattern: Not cancelling stream subscriptions
+    class DataService {
+      StreamSubscription? _subscription;
+      
+      void startListening() {
+        _subscription = dataStream.listen((data) {
+          // Process data
+        });
+      }
+      
+      // No cleanup method
+    }
+    
+    // Better approach: Properly manage stream subscriptions
+    class DataService {
+      StreamSubscription? _subscription;
+      
+      void startListening() {
+        // Cancel existing subscription if any
+        _subscription?.cancel();
+        
+        _subscription = dataStream.listen((data) {
+          // Process data
+        });
+      }
+      
+      void dispose() {
+        _subscription?.cancel();
+        _subscription = null;
+      }
+    }
+    ```
+    Always cancel stream subscriptions when they're no longer needed to prevent memory leaks and unexpected behavior.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```dart
+    // Anti-pattern: Inadequate error handling
+    Future<void> fetchData() async {
+      final response = await http.get(Uri.parse('https://api.example.com/data'));
+      final data = jsonDecode(response.body); // Might throw
+      // Process data...
+    }
+    
+    // Better approach: Comprehensive error handling
+    Future<void> fetchData() async {
+      try {
+        final response = await http.get(Uri.parse('https://api.example.com/data'));
+        
+        if (response.statusCode != 200) {
+          throw HttpException('Failed to fetch data: ${response.statusCode}');
+        }
+        
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        // Process data...
+      } on SocketException catch (e) {
+        // Handle network errors
+        print('Network error: $e');
+      } on FormatException catch (e) {
+        // Handle JSON parsing errors
+        print('Invalid response format: $e');
+      } catch (e) {
+        // Handle other errors
+        print('Error fetching data: $e');
+      }
+    }
+    ```
+    Implement comprehensive error handling to make your code more robust. Handle specific exceptions separately and provide meaningful error messages.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Dependency Injection" icon="warning">
+    ```dart
+    // Anti-pattern: Hard-coded dependencies
+    class UserRepository {
+      final ApiClient apiClient = ApiClient();
+      
+      Future<User> getUser(int id) async {
+        final data = await apiClient.get('/users/$id');
+        return User.fromJson(data);
+      }
+    }
+    
+    // Better approach: Dependency injection
+    class UserRepository {
+      final ApiClient apiClient;
+      
+      UserRepository(this.apiClient);
+      
+      Future<User> getUser(int id) async {
+        final data = await apiClient.get('/users/$id');
+        return User.fromJson(data);
+      }
+    }
+    ```
+    Use dependency injection to make your code more testable and flexible. Pass dependencies to classes rather than creating them internally.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Code Organization" icon="warning">
+    ```dart
+    // Anti-pattern: Everything in one file
+    // main.dart with hundreds of lines of code
+    
+    // Better approach: Proper code organization
+    // main.dart
+    import 'package:my_app/screens/home_screen.dart';
+    
+    void main() {
+      runApp(MyApp());
+    }
+    
+    // screens/home_screen.dart
+    import 'package:my_app/widgets/user_list.dart';
+    import 'package:my_app/repositories/user_repository.dart';
+    
+    class HomeScreen extends StatelessWidget {
+      // ...
+    }
+    ```
+    Organize your code into separate files and folders based on functionality. Follow a consistent project structure to make your codebase more maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Extension Methods" icon="warning">
+    ```dart
+    // Anti-pattern: Utility functions
+    String capitalize(String s) {
+      if (s.isEmpty) return s;
+      return s[0].toUpperCase() + s.substring(1);
+    }
+    
+    // Usage
+    final name = capitalize(user.name);
+    
+    // Better approach: Extension methods
+    extension StringExtensions on String {
+      String capitalize() {
+        if (isEmpty) return this;
+        return this[0].toUpperCase() + substring(1);
+      }
+    }
+    
+    // Usage
+    final name = user.name.capitalize();
+    ```
+    Use extension methods to add functionality to existing classes in a clean and type-safe way.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper State Management" icon="warning">
+    ```dart
+    // Anti-pattern: Passing data through deep widget trees
+    class GrandparentWidget extends StatefulWidget {
+      @override
+      _GrandparentWidgetState createState() => _GrandparentWidgetState();
+    }
+    
+    class _GrandparentWidgetState extends State<GrandparentWidget> {
+      String userData = 'User data';
+      
+      @override
+      Widget build(BuildContext context) {
+        return ParentWidget(userData: userData);
+      }
+    }
+    
+    class ParentWidget extends StatelessWidget {
+      final String userData;
+      
+      ParentWidget({required this.userData});
+      
+      @override
+      Widget build(BuildContext context) {
+        return ChildWidget(userData: userData);
+      }
+    }
+    
+    class ChildWidget extends StatelessWidget {
+      final String userData;
+      
+      ChildWidget({required this.userData});
+      
+      @override
+      Widget build(BuildContext context) {
+        return Text(userData);
+      }
+    }
+    
+    // Better approach: Use proper state management
+    // Using Provider as an example
+    void main() {
+      runApp(
+        ChangeNotifierProvider(
+          create: (context) => UserModel(),
+          child: MyApp(),
+        ),
+      );
+    }
+    
+    class UserModel extends ChangeNotifier {
+      String _userData = 'User data';
+      String get userData => _userData;
+      
+      void updateUserData(String newData) {
+        _userData = newData;
+        notifyListeners();
+      }
+    }
+    
+    class ChildWidget extends StatelessWidget {
+      @override
+      Widget build(BuildContext context) {
+        final userData = context.watch<UserModel>().userData;
+        return Text(userData);
+      }
+    }
+    ```
+    Use proper state management solutions like Provider, Riverpod, Bloc, or GetX instead of passing data through deep widget trees.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Immutability" icon="warning">
+    ```dart
+    // Anti-pattern: Mutable model classes
+    class User {
+      String name;
+      int age;
+      
+      User(this.name, this.age);
+      
+      void updateAge(int newAge) {
+        age = newAge;
+      }
+    }
+    
+    // Usage
+    final user = User('John', 30);
+    user.updateAge(31); // Mutating the object
+    
+    // Better approach: Immutable model classes
+    class User {
+      final String name;
+      final int age;
+      
+      const User(this.name, this.age);
+      
+      User copyWith({String? name, int? age}) {
+        return User(
+          name ?? this.name,
+          age ?? this.age,
+        );
+      }
+    }
+    
+    // Usage
+    final user = User('John', 30);
+    final updatedUser = user.copyWith(age: 31); // Creating a new object
+    ```
+    Use immutable model classes with `copyWith` methods to create modified copies instead of mutating objects directly.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Code Generation" icon="warning">
+    ```dart
+    // Anti-pattern: Manual JSON serialization
+    class User {
+      final String name;
+      final int age;
+      
+      User(this.name, this.age);
+      
+      factory User.fromJson(Map<String, dynamic> json) {
+        return User(
+          json['name'] as String,
+          json['age'] as int,
+        );
+      }
+      
+      Map<String, dynamic> toJson() {
+        return {
+          'name': name,
+          'age': age,
+        };
+      }
+    }
+    
+    // Better approach: Use code generation
+    // user.dart
+    import 'package:json_annotation/json_annotation.dart';
+    
+    part 'user.g.dart';
+    
+    @JsonSerializable()
+    class User {
+      final String name;
+      final int age;
+      
+      User(this.name, this.age);
+      
+      factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
+      Map<String, dynamic> toJson() => _$UserToJson(this);
+    }
+    ```
+    Use code generation for repetitive tasks like JSON serialization, immutable classes, and equality implementations.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Widget Composition" icon="warning">
+    ```dart
+    // Anti-pattern: Monolithic widgets
+    class ProfileScreen extends StatelessWidget {
+      @override
+      Widget build(BuildContext context) {
+        return Scaffold(
+          appBar: AppBar(title: Text('Profile')),
+          body: Column(
+            children: [
+              // User header with avatar and name
+              Container(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    CircleAvatar(backgroundImage: NetworkImage('...')),
+                    SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('John Doe', style: TextStyle(fontSize: 20)),
+                        Text('john@example.com'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Stats section
+              // ... many more nested widgets
+            ],
+          ),
+        );
+      }
+    }
+    
+    // Better approach: Proper widget composition
+    class ProfileScreen extends StatelessWidget {
+      @override
+      Widget build(BuildContext context) {
+        return Scaffold(
+          appBar: AppBar(title: Text('Profile')),
+          body: Column(
+            children: [
+              UserHeader(name: 'John Doe', email: 'john@example.com'),
+              UserStats(),
+              RecentActivity(),
+            ],
+          ),
+        );
+      }
+    }
+    
+    class UserHeader extends StatelessWidget {
+      final String name;
+      final String email;
+      
+      const UserHeader({required this.name, required this.email});
+      
+      @override
+      Widget build(BuildContext context) {
+        return Container(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(backgroundImage: NetworkImage('...')),
+              SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: TextStyle(fontSize: 20)),
+                  Text(email),
+                ],
+              ),
+            ],
+          ),
+        );
+      }
+    }
+    ```
+    Break down large widgets into smaller, reusable components to improve readability, maintainability, and testability.
+  </Accordion>
+</AccordionGroup>

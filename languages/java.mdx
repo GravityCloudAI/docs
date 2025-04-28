@@ -1,0 +1,542 @@
+---
+title: 'Java'
+description: 'Java is a class-based, object-oriented programming language designed for portability and cross-platform compatibility. It is known for its "write once, run anywhere" capability and is widely used for enterprise applications.'
+---
+
+<AccordionGroup>
+  <Accordion title="Java Anti-Patterns Overview" icon="java">
+    Java, despite its robustness and maturity, has several common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing Java code.
+  </Accordion>
+  
+  <Accordion title="Not Closing Resources Properly" icon="warning">
+    ```java
+    // Anti-pattern: Not closing resources
+    public void readFile(String path) throws IOException {
+        FileReader reader = new FileReader(path);
+        BufferedReader bufferedReader = new BufferedReader(reader);
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+            System.out.println(line);
+        }
+        // What if an exception occurs? Resources might not be closed
+    }
+    
+    // Better approach: Use try-with-resources
+    public void readFile(String path) throws IOException {
+        try (FileReader reader = new FileReader(path);
+             BufferedReader bufferedReader = new BufferedReader(reader)) {
+            String line;
+            while ((line = bufferedReader.readLine()) != null) {
+                System.out.println(line);
+            }
+        }
+        // Resources are automatically closed
+    }
+    ```
+    Always use try-with-resources (Java 7+) for automatic resource management to ensure resources are properly closed, even if exceptions occur.
+  </Accordion>
+  
+  <Accordion title="Using Raw Types Instead of Generics" icon="warning">
+    ```java
+    // Anti-pattern: Using raw types
+    List myList = new ArrayList();
+    myList.add("string");
+    myList.add(42);  // No compile-time type checking
+    String s = (String) myList.get(1);  // ClassCastException at runtime
+    
+    // Better approach: Use generics
+    List<String> myList = new ArrayList<>();
+    myList.add("string");
+    // myList.add(42);  // Compile-time error
+    String s = myList.get(0);  // No cast needed
+    ```
+    Raw types bypass the compile-time type safety that generics provide. Always use proper generic types to catch type errors at compile time.
+  </Accordion>
+  
+  <Accordion title="Excessive Null Checks" icon="warning">
+    ```java
+    // Anti-pattern: Excessive null checking
+    public String getUserCity(User user) {
+        if (user != null) {
+            Address address = user.getAddress();
+            if (address != null) {
+                City city = address.getCity();
+                if (city != null) {
+                    return city.getName();
+                }
+            }
+        }
+        return "Unknown";
+    }
+    
+    // Better approach: Use Optional (Java 8+)
+    public String getUserCity(User user) {
+        return Optional.ofNullable(user)
+                .map(User::getAddress)
+                .map(Address::getCity)
+                .map(City::getName)
+                .orElse("Unknown");
+    }
+    ```
+    Excessive null checks lead to deeply nested code that's hard to read and maintain. Use Optional (Java 8+) for cleaner handling of potentially null values.
+  </Accordion>
+  
+  <Accordion title="Using Exceptions for Flow Control" icon="warning">
+    ```java
+    // Anti-pattern: Using exceptions for flow control
+    public boolean isInteger(String s) {
+        try {
+            Integer.parseInt(s);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+    
+    // Better approach: Use validation
+    public boolean isInteger(String s) {
+        if (s == null || s.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            if (!Character.isDigit(s.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+    ```
+    Exceptions are for exceptional conditions, not normal flow control. They have performance overhead and make code harder to understand.
+  </Accordion>
+  
+  <Accordion title="Mutable Public Fields" icon="warning">
+    ```java
+    // Anti-pattern: Public mutable fields
+    public class User {
+        public List<String> roles = new ArrayList<>();
+    }
+    
+    // Anyone can modify the list
+    user.roles.clear();
+    
+    // Better approach: Encapsulation
+    public class User {
+        private final List<String> roles = new ArrayList<>();
+        
+        public List<String> getRoles() {
+            return Collections.unmodifiableList(roles);
+        }
+        
+        public void addRole(String role) {
+            roles.add(role);
+        }
+        
+        public void removeRole(String role) {
+            roles.remove(role);
+        }
+    }
+    ```
+    Public mutable fields break encapsulation and can lead to unexpected state changes. Use proper encapsulation with getters and setters.
+  </Accordion>
+  
+  <Accordion title="Returning Null Instead of Empty Collections" icon="warning">
+    ```java
+    // Anti-pattern: Returning null instead of empty collection
+    public List<Customer> getCustomers() {
+        if (customers.isEmpty()) {
+            return null;
+        }
+        return customers;
+    }
+    
+    // Client code needs null check
+    List<Customer> customers = getCustomers();
+    if (customers != null) {
+        for (Customer customer : customers) {
+            // Process customer
+        }
+    }
+    
+    // Better approach: Return empty collections
+    public List<Customer> getCustomers() {
+        return new ArrayList<>(customers); // Returns empty list if customers is empty
+    }
+    
+    // Client code is simpler
+    for (Customer customer : getCustomers()) {
+        // Process customer
+    }
+    ```
+    Returning null instead of empty collections forces clients to add null checks. Return empty collections instead of null to simplify client code.
+  </Accordion>
+  
+  <Accordion title="Using == Instead of equals() for Objects" icon="warning">
+    ```java
+    // Anti-pattern: Using == for object comparison
+    String a = new String("test");
+    String b = new String("test");
+    if (a == b) { // Always false
+        // This code never executes
+    }
+    
+    // Better approach: Use equals() for object comparison
+    if (a.equals(b)) { // True
+        // This code executes
+    }
+    ```
+    The `==` operator compares object references, not their contents. Use `equals()` to compare object values.
+  </Accordion>
+  
+  <Accordion title="Not Using StringBuilder for String Concatenation" icon="warning">
+    ```java
+    // Anti-pattern: String concatenation in loops
+    String result = "";
+    for (int i = 0; i < 1000; i++) {
+        result += i; // Creates a new String object each time
+    }
+    
+    // Better approach: Use StringBuilder
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < 1000; i++) {
+        sb.append(i);
+    }
+    String result = sb.toString();
+    ```
+    String concatenation in loops creates many temporary String objects, impacting performance. Use StringBuilder for efficient string building.
+  </Accordion>
+  
+  <Accordion title="Using Singleton Pattern Incorrectly" icon="warning">
+    ```java
+    // Anti-pattern: Non-thread-safe singleton
+    public class Singleton {
+        private static Singleton instance;
+        
+        private Singleton() {}
+        
+        public static Singleton getInstance() {
+            if (instance == null) {
+                instance = new Singleton(); // Not thread-safe
+            }
+            return instance;
+        }
+    }
+    
+    // Better approach: Thread-safe singleton
+    public class Singleton {
+        private static volatile Singleton instance;
+        
+        private Singleton() {}
+        
+        public static Singleton getInstance() {
+            if (instance == null) {
+                synchronized (Singleton.class) {
+                    if (instance == null) {
+                        instance = new Singleton();
+                    }
+                }
+            }
+            return instance;
+        }
+    }
+    
+    // Or even better: Enum singleton
+    public enum Singleton {
+        INSTANCE;
+        
+        public void doSomething() {
+            // Implementation
+        }
+    }
+    ```
+    Incorrectly implemented singletons can lead to thread safety issues or multiple instances. Use enum singletons or proper double-checked locking.
+  </Accordion>
+  
+  <Accordion title="Not Using Interface for Type" icon="warning">
+    ```java
+    // Anti-pattern: Using concrete class for type
+    public ArrayList<Customer> getCustomers() {
+        return new ArrayList<>(customers);
+    }
+    
+    // Better approach: Use interface for type
+    public List<Customer> getCustomers() {
+        return new ArrayList<>(customers);
+    }
+    ```
+    Program to interfaces, not implementations. This allows you to change the implementation without affecting client code.
+  </Accordion>
+  
+  <Accordion title="Not Using try-catch-finally Correctly" icon="warning">
+    ```java
+    // Anti-pattern: Incorrect exception handling
+    public void processFile(String path) {
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(path);
+            // Process file
+            fis.close(); // Won't be called if an exception occurs
+        } catch (IOException e) {
+            e.printStackTrace(); // Just printing stack trace
+        }
+    }
+    
+    // Better approach: Proper exception handling
+    public void processFile(String path) {
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(path);
+            // Process file
+        } catch (IOException e) {
+            // Log the exception
+            logger.error("Error processing file: " + path, e);
+            // Rethrow or handle appropriately
+            throw new ApplicationException("Could not process file", e);
+        } finally {
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    logger.error("Error closing file", e);
+                }
+            }
+        }
+    }
+    
+    // Even better: Use try-with-resources (Java 7+)
+    public void processFile(String path) {
+        try (FileInputStream fis = new FileInputStream(path)) {
+            // Process file
+        } catch (IOException e) {
+            logger.error("Error processing file: " + path, e);
+            throw new ApplicationException("Could not process file", e);
+        }
+    }
+    ```
+    Proper exception handling includes resource cleanup in finally blocks or using try-with-resources, meaningful error messages, and appropriate exception handling strategies.
+  </Accordion>
+  
+  <Accordion title="Not Using Java 8+ Features" icon="warning">
+    ```java
+    // Anti-pattern: Not using modern Java features
+    List<String> filtered = new ArrayList<>();
+    for (String s : strings) {
+        if (s.length() > 3) {
+            filtered.add(s.toUpperCase());
+        }
+    }
+    
+    // Better approach: Use streams and lambdas
+    List<String> filtered = strings.stream()
+            .filter(s -> s.length() > 3)
+            .map(String::toUpperCase)
+            .collect(Collectors.toList());
+    ```
+    Modern Java (8+) provides many features like streams, lambdas, and method references that can make code more concise and readable.
+  </Accordion>
+  
+  <Accordion title="Using Checked Exceptions Excessively" icon="warning">
+    ```java
+    // Anti-pattern: Excessive checked exceptions
+    public void doSomething() throws IOException, SQLException, ParseException {
+        // Implementation
+    }
+    
+    // Client code has to handle or propagate all exceptions
+    try {
+        doSomething();
+    } catch (IOException e) {
+        // Handle IOException
+    } catch (SQLException e) {
+        // Handle SQLException
+    } catch (ParseException e) {
+        // Handle ParseException
+    }
+    
+    // Better approach: Use unchecked exceptions for non-recoverable errors
+    public void doSomething() {
+        try {
+            // Implementation
+        } catch (IOException | SQLException | ParseException e) {
+            throw new ServiceException("Operation failed", e);
+        }
+    }
+    
+    // Client code is simpler
+    try {
+        doSomething();
+    } catch (ServiceException e) {
+        // Handle service exception
+    }
+    ```
+    Excessive use of checked exceptions can lead to cluttered code. Use unchecked exceptions for non-recoverable errors and checked exceptions only when the caller can reasonably recover.
+  </Accordion>
+  
+  <Accordion title="Not Using Immutable Objects" icon="warning">
+    ```java
+    // Anti-pattern: Mutable value objects
+    public class Point {
+        private int x;
+        private int y;
+        
+        public Point(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+        
+        public int getX() { return x; }
+        public void setX(int x) { this.x = x; }
+        public int getY() { return y; }
+        public void setY(int y) { this.y = y; }
+    }
+    
+    // Better approach: Immutable value objects
+    public final class Point {
+        private final int x;
+        private final int y;
+        
+        public Point(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+        
+        public int getX() { return x; }
+        public int getY() { return y; }
+        
+        public Point withX(int x) {
+            return new Point(x, this.y);
+        }
+        
+        public Point withY(int y) {
+            return new Point(this.x, y);
+        }
+    }
+    ```
+    Immutable objects are thread-safe, simpler to reason about, and prevent unexpected state changes. Make value objects immutable when possible.
+  </Accordion>
+  
+  <Accordion title="Using System.out.println for Logging" icon="warning">
+    ```java
+    // Anti-pattern: Using System.out for logging
+    public void processOrder(Order order) {
+        System.out.println("Processing order: " + order.getId());
+        // Process order
+        System.out.println("Order processed successfully");
+    }
+    
+    // Better approach: Use a proper logging framework
+    private static final Logger logger = LoggerFactory.getLogger(OrderProcessor.class);
+    
+    public void processOrder(Order order) {
+        logger.info("Processing order: {}", order.getId());
+        // Process order
+        logger.info("Order processed successfully");
+    }
+    ```
+    Using `System.out.println` for logging doesn't provide features like log levels, formatting, and output configuration. Use a proper logging framework like SLF4J with Logback or Log4j.
+  </Accordion>
+  
+  <Accordion title="Not Using Dependency Injection" icon="warning">
+    ```java
+    // Anti-pattern: Hard-coded dependencies
+    public class OrderService {
+        private final CustomerRepository customerRepository = new CustomerRepositoryImpl();
+        private final EmailService emailService = new EmailServiceImpl();
+        
+        public void placeOrder(Order order) {
+            // Use customerRepository and emailService
+        }
+    }
+    
+    // Better approach: Dependency injection
+    public class OrderService {
+        private final CustomerRepository customerRepository;
+        private final EmailService emailService;
+        
+        public OrderService(CustomerRepository customerRepository, EmailService emailService) {
+            this.customerRepository = customerRepository;
+            this.emailService = emailService;
+        }
+        
+        public void placeOrder(Order order) {
+            // Use customerRepository and emailService
+        }
+    }
+    ```
+    Hard-coded dependencies make code hard to test and maintain. Use dependency injection to provide dependencies from outside the class.
+  </Accordion>
+  
+  <Accordion title="Not Using Java Collections Framework Correctly" icon="warning">
+    ```java
+    // Anti-pattern: Using wrong collection types
+    // Using ArrayList when frequent insertions/deletions in the middle
+    List<String> items = new ArrayList<>();
+    // Frequent insertions at the beginning
+    items.add(0, "newItem"); // O(n) operation
+    
+    // Better approach: Choose appropriate collection types
+    // For frequent insertions/deletions, use LinkedList
+    List<String> items = new LinkedList<>();
+    items.add(0, "newItem"); // O(1) operation
+    
+    // For fast lookups by key, use HashMap
+    Map<String, Customer> customerMap = new HashMap<>();
+    
+    // For sorted data, use TreeMap or TreeSet
+    SortedMap<String, Customer> sortedCustomers = new TreeMap<>();
+    ```
+    Choosing the wrong collection type can lead to performance issues. Understand the characteristics of different collection types and choose the appropriate one for your use case.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Concurrency Utilities" icon="warning">
+    ```java
+    // Anti-pattern: Using low-level synchronization
+    public class Counter {
+        private int count = 0;
+        
+        public synchronized void increment() {
+            count++;
+        }
+        
+        public synchronized int getCount() {
+            return count;
+        }
+    }
+    
+    // Better approach: Use appropriate concurrency utilities
+    import java.util.concurrent.atomic.AtomicInteger;
+    
+    public class Counter {
+        private final AtomicInteger count = new AtomicInteger(0);
+        
+        public void increment() {
+            count.incrementAndGet();
+        }
+        
+        public int getCount() {
+            return count.get();
+        }
+    }
+    ```
+    Java provides many high-level concurrency utilities like AtomicInteger, ConcurrentHashMap, and ExecutorService that are more efficient and easier to use correctly than low-level synchronization.
+  </Accordion>
+  
+  <Accordion title="Not Using Java Time API (Java 8+)" icon="warning">
+    ```java
+    // Anti-pattern: Using old date/time APIs
+    Date date = new Date();
+    Calendar calendar = Calendar.getInstance();
+    calendar.setTime(date);
+    calendar.add(Calendar.DAY_OF_MONTH, 1);
+    Date tomorrow = calendar.getTime();
+    
+    // Better approach: Use Java Time API
+    LocalDate today = LocalDate.now();
+    LocalDate tomorrow = today.plusDays(1);
+    
+    // Working with time zones
+    ZonedDateTime nowInNewYork = ZonedDateTime.now(ZoneId.of("America/New_York"));
+    ZonedDateTime nowInTokyo = nowInNewYork.withZoneSameInstant(ZoneId.of("Asia/Tokyo"));
+    ```
+    The old date/time APIs (Date, Calendar) are error-prone and hard to use correctly. Java 8+ provides a much better date/time API that is immutable, thread-safe, and more intuitive.
+  </Accordion>
+</AccordionGroup>

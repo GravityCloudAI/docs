@@ -1,0 +1,551 @@
+---
+title: 'C++'
+description: 'C++ is a high-performance, general-purpose programming language created as an extension of the C programming language. It provides object-oriented features, generic programming, and low-level memory manipulation.'
+---
+
+<AccordionGroup>
+  <Accordion title="C++ Anti-Patterns Overview" icon="cpp">
+    C++, despite its power and flexibility, has several common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing C++ code.
+  </Accordion>
+  
+  <Accordion title="Raw Pointer Ownership" icon="warning">
+    ```cpp
+    // Anti-pattern: Unclear raw pointer ownership
+    void processData() {
+        MyClass* obj = new MyClass();
+        doSomething(obj);
+        // Who deletes obj? This function? The doSomething function?
+        // What if an exception occurs?
+        delete obj;
+    }
+    
+    // Better approach: Use smart pointers
+    void processData() {
+        auto obj = std::make_unique<MyClass>();
+        doSomething(obj.get());
+        // No need to delete - unique_ptr handles it automatically
+    }
+    ```
+    Raw pointers don't express ownership, leading to memory leaks or double-free errors. Use smart pointers (`std::unique_ptr`, `std::shared_ptr`) to clearly express ownership semantics.
+  </Accordion>
+  
+  <Accordion title="Manual Resource Management" icon="warning">
+    ```cpp
+    // Anti-pattern: Manual resource management
+    void processFile(const std::string& filename) {
+        FILE* file = fopen(filename.c_str(), "r");
+        if (!file) {
+            return;
+        }
+        
+        // Process file...
+        
+        // What if an exception occurs here?
+        fclose(file);
+    }
+    
+    // Better approach: RAII (Resource Acquisition Is Initialization)
+    void processFile(const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file) {
+            return;
+        }
+        
+        // Process file...
+        
+        // No need to close - ifstream's destructor handles it
+    }
+    ```
+    Manual resource management is error-prone. Use RAII (Resource Acquisition Is Initialization) to automatically manage resources through object lifetimes.
+  </Accordion>
+  
+  <Accordion title="Not Using const Correctly" icon="warning">
+    ```cpp
+    // Anti-pattern: Missing const
+    class Vector {
+    public:
+        float getLength() { return std::sqrt(x*x + y*y); }
+        float getX() { return x; }
+        float getY() { return y; }
+    
+    private:
+        float x, y;
+    };
+    
+    // Better approach: Use const for methods that don't modify state
+    class Vector {
+    public:
+        float getLength() const { return std::sqrt(x*x + y*y); }
+        float getX() const { return x; }
+        float getY() const { return y; }
+    
+    private:
+        float x, y;
+    };
+    ```
+    Use `const` for methods that don't modify object state, parameters that shouldn't be modified, and return values that shouldn't be modified.
+  </Accordion>
+  
+  <Accordion title="Using Raw Loops Instead of Algorithms" icon="warning">
+    ```cpp
+    // Anti-pattern: Raw loops
+    bool containsValue(const std::vector<int>& vec, int value) {
+        for (size_t i = 0; i < vec.size(); ++i) {
+            if (vec[i] == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // Better approach: Use standard algorithms
+    bool containsValue(const std::vector<int>& vec, int value) {
+        return std::find(vec.begin(), vec.end(), value) != vec.end();
+    }
+    ```
+    Standard algorithms are more expressive, less error-prone, and often more efficient than raw loops. Use them whenever possible.
+  </Accordion>
+  
+  <Accordion title="Premature Optimization" icon="warning">
+    ```cpp
+    // Anti-pattern: Premature optimization
+    void processData(const std::vector<int>& data) {
+        // Micro-optimization without profiling
+        int* buffer = static_cast<int*>(malloc(data.size() * sizeof(int)));
+        for (size_t i = 0; i < data.size(); ++i) {
+            buffer[i] = data[i] * 2;
+        }
+        // Process buffer...
+        free(buffer);
+    }
+    
+    // Better approach: Write clear code first, then optimize if needed
+    void processData(const std::vector<int>& data) {
+        std::vector<int> result;
+        result.reserve(data.size()); // Still reasonably efficient
+        
+        for (int value : data) {
+            result.push_back(value * 2);
+        }
+        // Process result...
+    }
+    ```
+    Write clear, maintainable code first, then optimize only after profiling identifies bottlenecks.
+  </Accordion>
+  
+  <Accordion title="Not Using Modern C++ Features" icon="warning">
+    ```cpp
+    // Anti-pattern: Old C-style code
+    char* createMessage(const char* name, int age) {
+        char* buffer = new char[100];
+        sprintf(buffer, "Name: %s, Age: %d", name, age);
+        return buffer; // Caller must delete this!
+    }
+    
+    // Better approach: Modern C++ features
+    std::string createMessage(std::string_view name, int age) {
+        return fmt::format("Name: {}, Age: {}", name, age);
+    }
+    ```
+    Use modern C++ features like `std::string`, `std::string_view`, `std::optional`, `std::variant`, and others to write safer, more expressive code.
+  </Accordion>
+  
+  <Accordion title="Not Using nullptr" icon="warning">
+    ```cpp
+    // Anti-pattern: Using NULL or 0 for pointers
+    void processData(MyClass* ptr) {
+        if (ptr == NULL) {
+            return;
+        }
+        // Process data...
+    }
+    
+    // Better approach: Use nullptr
+    void processData(MyClass* ptr) {
+        if (ptr == nullptr) {
+            return;
+        }
+        // Process data...
+    }
+    ```
+    Use `nullptr` instead of `NULL` or `0` for null pointers. It's type-safe and avoids ambiguity with integer literals.
+  </Accordion>
+  
+  <Accordion title="Not Using auto for Complex Types" icon="warning">
+    ```cpp
+    // Anti-pattern: Verbose type declarations
+    std::map<std::string, std::vector<std::pair<int, std::string>>>::iterator it = myMap.begin();
+    
+    // Better approach: Use auto
+    auto it = myMap.begin();
+    ```
+    Use `auto` for complex types to improve readability and maintainability, especially for iterators and lambda types.
+  </Accordion>
+  
+  <Accordion title="Not Using Range-Based For Loops" icon="warning">
+    ```cpp
+    // Anti-pattern: Traditional for loop
+    std::vector<int> numbers = {1, 2, 3, 4, 5};
+    for (std::vector<int>::iterator it = numbers.begin(); it != numbers.end(); ++it) {
+        std::cout << *it << std::endl;
+    }
+    
+    // Better approach: Range-based for loop
+    std::vector<int> numbers = {1, 2, 3, 4, 5};
+    for (const auto& num : numbers) {
+        std::cout << num << std::endl;
+    }
+    ```
+    Use range-based for loops for cleaner, more readable iteration over containers.
+  </Accordion>
+  
+  <Accordion title="Not Using Structured Bindings" icon="warning">
+    ```cpp
+    // Anti-pattern: Manual tuple unpacking
+    std::map<std::string, int> ages = {/* ... */};
+    for (const auto& pair : ages) {
+        const std::string& name = pair.first;
+        int age = pair.second;
+        std::cout << name << ": " << age << std::endl;
+    }
+    
+    // Better approach: Structured bindings (C++17)
+    std::map<std::string, int> ages = {/* ... */};
+    for (const auto& [name, age] : ages) {
+        std::cout << name << ": " << age << std::endl;
+    }
+    ```
+    Use structured bindings (C++17) to unpack tuples, pairs, and other structured data more cleanly.
+  </Accordion>
+  
+  <Accordion title="Not Using std::optional" icon="warning">
+    ```cpp
+    // Anti-pattern: Special values for "no result"
+    int findValue(const std::vector<int>& vec, int target) {
+        for (int val : vec) {
+            if (val == target) {
+                return val;
+            }
+        }
+        return -1; // Special value to indicate "not found"
+    }
+    
+    // Better approach: Use std::optional (C++17)
+    std::optional<int> findValue(const std::vector<int>& vec, int target) {
+        for (int val : vec) {
+            if (val == target) {
+                return val;
+            }
+        }
+        return std::nullopt;
+    }
+    ```
+    Use `std::optional` (C++17) to represent values that may or may not be present, instead of using special values or output parameters.
+  </Accordion>
+  
+  <Accordion title="Not Using std::variant" icon="warning">
+    ```cpp
+    // Anti-pattern: Type-unsafe unions
+    union Value {
+        int intValue;
+        double doubleValue;
+        char* stringValue;
+    };
+    
+    struct Variant {
+        Value value;
+        enum { INT, DOUBLE, STRING } type;
+    };
+    
+    // Better approach: Use std::variant (C++17)
+    using Value = std::variant<int, double, std::string>;
+    
+    void processValue(const Value& value) {
+        std::visit(overloaded {
+            [](int i) { std::cout << "Int: " << i; },
+            [](double d) { std::cout << "Double: " << d; },
+            [](const std::string& s) { std::cout << "String: " << s; }
+        }, value);
+    }
+    ```
+    Use `std::variant` (C++17) for type-safe unions, and `std::visit` with overloaded lambdas for processing.
+  </Accordion>
+  
+  <Accordion title="Not Using Move Semantics" icon="warning">
+    ```cpp
+    // Anti-pattern: Unnecessary copying
+    std::vector<int> createLargeVector() {
+        std::vector<int> result;
+        // Fill result...
+        return result;
+    }
+    
+    void processVector() {
+        std::vector<int> vec = createLargeVector(); // Copy?
+        // Process vec...
+    }
+    
+    // Better approach: Use move semantics
+    std::vector<int> createLargeVector() {
+        std::vector<int> result;
+        // Fill result...
+        return result; // RVO/NRVO may apply
+    }
+    
+    void processVector() {
+        std::vector<int> vec = createLargeVector(); // Move if RVO/NRVO doesn't apply
+        // Or explicitly move if needed:
+        std::vector<int> vec2 = std::move(vec); // vec is now in a valid but unspecified state
+        // Process vec2...
+    }
+    ```
+    Use move semantics to avoid unnecessary copying of large objects, especially when transferring ownership.
+  </Accordion>
+  
+  <Accordion title="Not Using std::string_view" icon="warning">
+    ```cpp
+    // Anti-pattern: Unnecessary string copies
+    bool startsWith(const std::string& str, const std::string& prefix) {
+        return str.substr(0, prefix.size()) == prefix;
+    }
+    
+    // Better approach: Use std::string_view (C++17)
+    bool startsWith(std::string_view str, std::string_view prefix) {
+        return str.substr(0, prefix.size()) == prefix;
+    }
+    ```
+    Use `std::string_view` (C++17) for functions that only need to read string data, to avoid unnecessary copies.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Exception Handling" icon="warning">
+    ```cpp
+    // Anti-pattern: Ignoring exceptions
+    void processFile(const std::string& filename) {
+        std::ifstream file(filename);
+        // No check if file opened successfully
+        std::string line;
+        while (std::getline(file, line)) {
+            // Process line...
+        }
+    }
+    
+    // Better approach: Proper exception handling
+    void processFile(const std::string& filename) {
+        try {
+            std::ifstream file(filename);
+            if (!file) {
+                throw std::runtime_error("Failed to open file: " + filename);
+            }
+            
+            std::string line;
+            while (std::getline(file, line)) {
+                // Process line...
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+            // Handle error appropriately
+        }
+    }
+    ```
+    Use proper exception handling to deal with errors, and consider using the "Resource Acquisition Is Initialization" (RAII) pattern to ensure resources are properly cleaned up.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Memory Management" icon="warning">
+    ```cpp
+    // Anti-pattern: Manual memory management
+    class MyClass {
+    public:
+        MyClass() {
+            data = new int[100];
+        }
+        
+        ~MyClass() {
+            delete[] data; // What if constructor throws before this is set?
+        }
+        
+        MyClass(const MyClass& other) {
+            data = new int[100];
+            // Copy data...
+        }
+        
+        MyClass& operator=(const MyClass& other) {
+            if (this != &other) {
+                delete[] data;
+                data = new int[100];
+                // Copy data...
+            }
+            return *this;
+        }
+        
+    private:
+        int* data;
+    };
+    
+    // Better approach: Use smart pointers and containers
+    class MyClass {
+    public:
+        MyClass() = default; // No manual resource management needed
+        
+    private:
+        std::vector<int> data{100}; // Automatically managed
+    };
+    ```
+    Use containers and smart pointers instead of manual memory management to avoid memory leaks and other memory-related bugs.
+  </Accordion>
+  
+  <Accordion title="Not Using Rule of Zero/Three/Five" icon="warning">
+    ```cpp
+    // Anti-pattern: Incomplete rule of three
+    class Resource {
+    public:
+        Resource() { data = new int[100]; }
+        ~Resource() { delete[] data; }
+        // Missing copy constructor and assignment operator
+        
+    private:
+        int* data;
+    };
+    
+    // Better approach: Rule of zero
+    class Resource {
+    private:
+        std::vector<int> data{100}; // Use standard containers
+    };
+    
+    // Or rule of five (C++11)
+    class LowLevelResource {
+    public:
+        LowLevelResource() : data(new int[100]) {}
+        ~LowLevelResource() { delete[] data; }
+        
+        // Copy operations
+        LowLevelResource(const LowLevelResource& other) : data(new int[100]) {
+            std::copy(other.data, other.data + 100, data);
+        }
+        
+        LowLevelResource& operator=(const LowLevelResource& other) {
+            if (this != &other) {
+                std::copy(other.data, other.data + 100, data);
+            }
+            return *this;
+        }
+        
+        // Move operations
+        LowLevelResource(LowLevelResource&& other) noexcept : data(other.data) {
+            other.data = nullptr;
+        }
+        
+        LowLevelResource& operator=(LowLevelResource&& other) noexcept {
+            if (this != &other) {
+                delete[] data;
+                data = other.data;
+                other.data = nullptr;
+            }
+            return *this;
+        }
+        
+    private:
+        int* data;
+    };
+    ```
+    Follow the Rule of Zero (use standard containers and smart pointers), or the Rule of Five (define all special member functions) to properly manage resources.
+  </Accordion>
+  
+  <Accordion title="Not Using Forward Declarations" icon="warning">
+    ```cpp
+    // Anti-pattern: Unnecessary includes
+    // file: widget.h
+    #include "window.h" // Heavy include
+    
+    class Widget {
+    public:
+        void setWindow(Window* window);
+        
+    private:
+        Window* window;
+    };
+    
+    // Better approach: Forward declarations
+    // file: widget.h
+    class Window; // Forward declaration
+    
+    class Widget {
+    public:
+        void setWindow(Window* window);
+        
+    private:
+        Window* window;
+    };
+    
+    // file: widget.cpp
+    #include "widget.h"
+    #include "window.h" // Include only in implementation file
+    
+    void Widget::setWindow(Window* window) {
+        this->window = window;
+    }
+    ```
+    Use forward declarations instead of including headers when you only need to refer to a class by pointer or reference, to reduce compilation dependencies and build times.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Initialization" icon="warning">
+    ```cpp
+    // Anti-pattern: Uninitialized variables
+    void processData() {
+        int x; // Uninitialized
+        if (someCondition()) {
+            x = 42;
+        }
+        // x might be uninitialized here
+        std::cout << x << std::endl;
+    }
+    
+    // Better approach: Proper initialization
+    void processData() {
+        int x = 0; // Default initialization
+        if (someCondition()) {
+            x = 42;
+        }
+        std::cout << x << std::endl;
+    }
+    ```
+    Always initialize variables to avoid undefined behavior. Use uniform initialization (curly braces) when appropriate.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```cpp
+    // Anti-pattern: Error codes
+    int processFile(const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file) {
+            return -1; // Error code
+        }
+        // Process file...
+        return 0; // Success
+    }
+    
+    // Usage
+    if (processFile("data.txt") != 0) {
+        // Handle error
+    }
+    
+    // Better approach: Exceptions for exceptional conditions
+    void processFile(const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file) {
+            throw std::runtime_error("Failed to open file: " + filename);
+        }
+        // Process file...
+    }
+    
+    // Usage
+    try {
+        processFile("data.txt");
+    } catch (const std::exception& e) {
+        // Handle error
+        std::cerr << "Error: " << e.what() << std::endl;
+    }
+    ```
+    Use exceptions for exceptional conditions, and consider using `std::expected` (C++23) or similar for expected failures.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,670 @@
+---
+title: 'C#'
+description: 'C# is a modern, object-oriented programming language developed by Microsoft. It is designed for building a variety of applications that run on the .NET platform, combining the power of C++ with the simplicity of Visual Basic.'
+---
+
+<AccordionGroup>
+  <Accordion title="C# Anti-Patterns Overview" icon="csharp">
+    C#, despite being a well-designed language with strong typing and modern features, still has common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing C# code.
+  </Accordion>
+  
+  <Accordion title="Using Exception Handling for Control Flow" icon="warning">
+    ```csharp
+    // Anti-pattern: Using exceptions for control flow
+    public bool IsValidNumber(string input)
+    {
+        try
+        {
+            int.Parse(input);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+    
+    // Better approach: Use TryParse
+    public bool IsValidNumber(string input)
+    {
+        return int.TryParse(input, out _);
+    }
+    ```
+    Exceptions should be used for exceptional conditions, not for normal control flow. Use methods like `TryParse` that are specifically designed for validation.
+  </Accordion>
+  
+  <Accordion title="Not Disposing IDisposable Objects" icon="warning">
+    ```csharp
+    // Anti-pattern: Not disposing IDisposable objects
+    public void ReadFile(string path)
+    {
+        FileStream fs = new FileStream(path, FileMode.Open);
+        // Read from file
+        // fs is never disposed if an exception occurs
+    }
+    
+    // Better approach: Use using statement
+    public void ReadFile(string path)
+    {
+        using (FileStream fs = new FileStream(path, FileMode.Open))
+        {
+            // Read from file
+        } // fs is automatically disposed here
+    }
+    
+    // Even better in C# 8+: Using declaration
+    public void ReadFile(string path)
+    {
+        using FileStream fs = new FileStream(path, FileMode.Open);
+        // Read from file
+        // fs is disposed when the method exits
+    }
+    ```
+    Always dispose `IDisposable` objects to release unmanaged resources. The `using` statement ensures proper disposal even if exceptions occur.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Null Checks" icon="warning">
+    ```csharp
+    // Anti-pattern: Excessive null checks
+    public string GetCityName(Person person)
+    {
+        if (person != null)
+        {
+            if (person.Address != null)
+            {
+                if (person.Address.City != null)
+                {
+                    return person.Address.City.Name;
+                }
+            }
+        }
+        return "Unknown";
+    }
+    
+    // Better approach in C# 6+: Null conditional operator
+    public string GetCityName(Person person)
+    {
+        return person?.Address?.City?.Name ?? "Unknown";
+    }
+    ```
+    Excessive null checks lead to deeply nested code. Use the null conditional operator (`?.`) and null coalescing operator (`??`) for cleaner code.
+  </Accordion>
+  
+  <Accordion title="Not Using async/await Correctly" icon="warning">
+    ```csharp
+    // Anti-pattern: Blocking on async code
+    public string GetDataSync()
+    {
+        // Blocking the thread, can lead to deadlocks
+        return GetDataAsync().Result;
+    }
+    
+    // Anti-pattern: async void
+    public async void ProcessDataFireAndForget() // Can't be awaited, exceptions are lost
+    {
+        await Task.Delay(1000);
+        throw new Exception("This exception is lost");
+    }
+    
+    // Better approach: Proper async/await
+    public async Task<string> GetDataAsync()
+    {
+        // Asynchronous code
+        return await httpClient.GetStringAsync("https://example.com");
+    }
+    
+    // Caller awaits the task
+    public async Task ProcessDataAsync()
+    {
+        string data = await GetDataAsync();
+        // Process data
+    }
+    ```
+    Avoid blocking on async code with `.Result` or `.Wait()` as it can lead to deadlocks. Also avoid `async void` except for event handlers as exceptions can't be caught.
+  </Accordion>
+  
+  <Accordion title="Using Public Fields Instead of Properties" icon="warning">
+    ```csharp
+    // Anti-pattern: Public fields
+    public class Person
+    {
+        public string Name; // Public field
+        public int Age;     // Public field
+    }
+    
+    // Better approach: Properties
+    public class Person
+    {
+        public string Name { get; set; } // Property
+        public int Age { get; set; }     // Property
+        
+        // With validation
+        private int _age;
+        public int ValidatedAge
+        {
+            get => _age;
+            set
+            {
+                if (value < 0)
+                    throw new ArgumentException("Age cannot be negative");
+                _age = value;
+            }
+        }
+    }
+    ```
+    Public fields break encapsulation. Use properties to encapsulate fields, allowing for validation, lazy loading, and change notification.
+  </Accordion>
+  
+  <Accordion title="Not Using LINQ When Appropriate" icon="warning">
+    ```csharp
+    // Anti-pattern: Manual iteration and filtering
+    public List<Person> GetAdults(List<Person> people)
+    {
+        List<Person> adults = new List<Person>();
+        foreach (var person in people)
+        {
+            if (person.Age >= 18)
+            {
+                adults.Add(person);
+            }
+        }
+        return adults;
+    }
+    
+    // Better approach: Use LINQ
+    public List<Person> GetAdults(List<Person> people)
+    {
+        return people.Where(p => p.Age >= 18).ToList();
+    }
+    
+    // Even more complex operations become simple
+    public List<string> GetAdultNames(List<Person> people)
+    {
+        return people
+            .Where(p => p.Age >= 18)
+            .OrderBy(p => p.LastName)
+            .ThenBy(p => p.FirstName)
+            .Select(p => $"{p.FirstName} {p.LastName}")
+            .ToList();
+    }
+    ```
+    LINQ provides a concise, readable way to query and transform data. Use it for filtering, projecting, and aggregating data.
+  </Accordion>
+  
+  <Accordion title="Using Strings for Sensitive Data" icon="warning">
+    ```csharp
+    // Anti-pattern: Storing passwords as strings
+    public class User
+    {
+        public string Username { get; set; }
+        public string Password { get; set; } // Plain text password as string
+    }
+    
+    // Better approach: Use SecureString and proper hashing
+    using System.Security;
+    
+    public class User
+    {
+        public string Username { get; set; }
+        private byte[] _passwordHash;
+        private byte[] _passwordSalt;
+        
+        public void SetPassword(SecureString password)
+        {
+            // Convert SecureString to byte[] safely and generate salt
+            _passwordSalt = GenerateSalt();
+            _passwordHash = HashPassword(password, _passwordSalt);
+        }
+        
+        public bool VerifyPassword(SecureString password)
+        {
+            byte[] hash = HashPassword(password, _passwordSalt);
+            return CompareHash(_passwordHash, hash);
+        }
+    }
+    ```
+    Strings are immutable and can't be securely cleared from memory. Use `SecureString` for sensitive data in memory and proper hashing for storage.
+  </Accordion>
+  
+  <Accordion title="Not Using C# Features Appropriately" icon="warning">
+    ```csharp
+    // Anti-pattern: Not using modern C# features
+    public class Person
+    {
+        private string _firstName;
+        private string _lastName;
+        
+        public Person(string firstName, string lastName)
+        {
+            _firstName = firstName;
+            _lastName = lastName;
+        }
+        
+        public string GetFullName()
+        {
+            return _firstName + " " + _lastName;
+        }
+        
+        public override bool Equals(object obj)
+        {
+            if (obj == null || GetType() != obj.GetType())
+                return false;
+            
+            Person other = (Person)obj;
+            return _firstName == other._firstName && _lastName == other._lastName;
+        }
+        
+        public override int GetHashCode()
+        {
+            return _firstName.GetHashCode() ^ _lastName.GetHashCode();
+        }
+    }
+    
+    // Better approach: Use modern C# features
+    public record Person(string FirstName, string LastName)
+    {
+        public string FullName => $"{FirstName} {LastName}";
+    }
+    ```
+    Modern C# provides many features like records, pattern matching, and expression-bodied members that can make code more concise and readable.
+  </Accordion>
+  
+  <Accordion title="Using Magic Strings and Numbers" icon="warning">
+    ```csharp
+    // Anti-pattern: Magic strings and numbers
+    public void ProcessOrder(Order order)
+    {
+        if (order.Status == "completed")
+        {
+            // Process completed order
+        }
+        else if (order.Status == "pending")
+        {
+            // Process pending order
+        }
+        
+        if (order.Amount > 1000) // Magic number
+        {
+            ApplyDiscount(order, 0.1); // Another magic number
+        }
+    }
+    
+    // Better approach: Use constants or enums
+    public enum OrderStatus
+    {
+        Pending,
+        Processing,
+        Completed,
+        Cancelled
+    }
+    
+    public static class Constants
+    {
+        public const decimal LargeOrderThreshold = 1000m;
+        public const decimal LargeOrderDiscountRate = 0.1m;
+    }
+    
+    public void ProcessOrder(Order order)
+    {
+        if (order.Status == OrderStatus.Completed)
+        {
+            // Process completed order
+        }
+        else if (order.Status == OrderStatus.Pending)
+        {
+            // Process pending order
+        }
+        
+        if (order.Amount > Constants.LargeOrderThreshold)
+        {
+            ApplyDiscount(order, Constants.LargeOrderDiscountRate);
+        }
+    }
+    ```
+    Magic strings and numbers make code hard to maintain and understand. Use constants, enums, or static readonly fields to give meaning to these values.
+  </Accordion>
+  
+  <Accordion title="Not Using Dependency Injection" icon="warning">
+    ```csharp
+    // Anti-pattern: Hardcoded dependencies
+    public class OrderService
+    {
+        private readonly CustomerRepository _customerRepository = new CustomerRepository();
+        private readonly EmailService _emailService = new EmailService();
+        
+        public void PlaceOrder(Order order)
+        {
+            var customer = _customerRepository.GetById(order.CustomerId);
+            // Process order
+            _emailService.SendOrderConfirmation(customer.Email, order);
+        }
+    }
+    
+    // Better approach: Dependency injection
+    public class OrderService
+    {
+        private readonly ICustomerRepository _customerRepository;
+        private readonly IEmailService _emailService;
+        
+        public OrderService(ICustomerRepository customerRepository, IEmailService emailService)
+        {
+            _customerRepository = customerRepository;
+            _emailService = emailService;
+        }
+        
+        public void PlaceOrder(Order order)
+        {
+            var customer = _customerRepository.GetById(order.CustomerId);
+            // Process order
+            _emailService.SendOrderConfirmation(customer.Email, order);
+        }
+    }
+    ```
+    Hardcoded dependencies make code hard to test and maintain. Use dependency injection to provide dependencies from outside the class.
+  </Accordion>
+  
+  <Accordion title="Not Using IEnumerable<T> for Method Returns" icon="warning">
+    ```csharp
+    // Anti-pattern: Returning concrete collection types
+    public List<Customer> GetCustomers()
+    {
+        // Implementation
+        return customers;
+    }
+    
+    // Better approach: Return IEnumerable<T> for read-only access
+    public IEnumerable<Customer> GetCustomers()
+    {
+        // Implementation
+        return customers;
+    }
+    ```
+    Returning `IEnumerable<T>` instead of concrete collection types gives you more flexibility to change the implementation and prevents callers from modifying the collection.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Exception Handling" icon="warning">
+    ```csharp
+    // Anti-pattern: Poor exception handling
+    public void ProcessFile(string path)
+    {
+        try
+        {
+            // Process file
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message); // Just writing to console
+            // Swallowing the exception
+        }
+    }
+    
+    // Better approach: Proper exception handling
+    public void ProcessFile(string path)
+    {
+        try
+        {
+            // Process file
+        }
+        catch (FileNotFoundException ex)
+        {
+            _logger.LogError(ex, $"File not found: {path}");
+            throw new BusinessException("The specified file could not be found.", ex);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, $"Access denied to file: {path}");
+            throw new BusinessException("You don't have permission to access this file.", ex);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Unexpected error processing file: {path}");
+            throw; // Rethrow to preserve stack trace
+        }
+    }
+    ```
+    Proper exception handling includes catching specific exceptions, logging with context, and either handling the exception appropriately or rethrowing it.
+  </Accordion>
+  
+  <Accordion title="Not Using Object Initializers" icon="warning">
+    ```csharp
+    // Anti-pattern: Not using object initializers
+    public Person CreatePerson()
+    {
+        Person person = new Person();
+        person.FirstName = "John";
+        person.LastName = "Doe";
+        person.Age = 30;
+        return person;
+    }
+    
+    // Better approach: Use object initializers
+    public Person CreatePerson()
+    {
+        return new Person
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            Age = 30
+        };
+    }
+    ```
+    Object initializers make code more concise and readable when creating and initializing objects.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Collection Types" icon="warning">
+    ```csharp
+    // Anti-pattern: Using wrong collection types
+    public void ProcessItems()
+    {
+        // Using List<T> when you only need to enumerate
+        List<int> items = GetItems();
+        foreach (var item in items)
+        {
+            // Process item
+        }
+        
+        // Using List<T> for lookups
+        List<Customer> customers = GetCustomers();
+        Customer customer = customers.FirstOrDefault(c => c.Id == customerId); // O(n) operation
+    }
+    
+    // Better approach: Use appropriate collection types
+    public void ProcessItems()
+    {
+        // Use IEnumerable<T> when you only need to enumerate
+        IEnumerable<int> items = GetItems();
+        foreach (var item in items)
+        {
+            // Process item
+        }
+        
+        // Use Dictionary<TKey, TValue> for lookups
+        Dictionary<int, Customer> customerDict = GetCustomers().ToDictionary(c => c.Id);
+        Customer customer = customerDict.TryGetValue(customerId, out var c) ? c : null; // O(1) operation
+    }
+    ```
+    Choose the appropriate collection type based on how you'll use it. Use `IEnumerable<T>` for simple iteration, `List<T>` when you need to modify the collection, `Dictionary<TKey, TValue>` for lookups, etc.
+  </Accordion>
+  
+  <Accordion title="Not Using Nullable Reference Types" icon="warning">
+    ```csharp
+    // Anti-pattern: Not using nullable reference types (C# 8+)
+    // In a project without nullable reference types enabled
+    public string GetUpperCase(string text)
+    {
+        return text.ToUpper(); // Potential NullReferenceException
+    }
+    
+    // Better approach: Enable nullable reference types
+    // In .csproj: <Nullable>enable</Nullable>
+    
+    // Non-nullable parameter (compiler enforced)
+    public string GetUpperCase(string text)
+    {
+        return text.ToUpper(); // Compiler ensures text is not null
+    }
+    
+    // Nullable parameter (requires null check)
+    public string? GetUpperCaseOrNull(string? text)
+    {
+        return text?.ToUpper(); // Null-conditional operator handles null
+    }
+    ```
+    In C# 8+, enable nullable reference types to catch potential null reference exceptions at compile time rather than runtime.
+  </Accordion>
+  
+  <Accordion title="Not Using Expression-Bodied Members" icon="warning">
+    ```csharp
+    // Anti-pattern: Verbose property and method definitions
+    public class Person
+    {
+        private string _firstName;
+        private string _lastName;
+        
+        public string FirstName
+        {
+            get { return _firstName; }
+            set { _firstName = value; }
+        }
+        
+        public string FullName
+        {
+            get
+            {
+                return $"{_firstName} {_lastName}";
+            }
+        }
+        
+        public string GetGreeting()
+        {
+            return $"Hello, {FullName}!";
+        }
+    }
+    
+    // Better approach: Use expression-bodied members
+    public class Person
+    {
+        private string _firstName;
+        private string _lastName;
+        
+        public string FirstName
+        {
+            get => _firstName;
+            set => _firstName = value;
+        }
+        
+        public string FullName => $"{_firstName} {_lastName}";
+        
+        public string GetGreeting() => $"Hello, {FullName}!";
+    }
+    ```
+    Expression-bodied members make simple properties and methods more concise and readable.
+  </Accordion>
+  
+  <Accordion title="Not Using Pattern Matching" icon="warning">
+    ```csharp
+    // Anti-pattern: Not using pattern matching
+    public string Describe(object obj)
+    {
+        if (obj is int)
+        {
+            int number = (int)obj;
+            return $"Integer: {number}";
+        }
+        else if (obj is string)
+        {
+            string text = (string)obj;
+            return $"String: {text}";
+        }
+        else if (obj is Person)
+        {
+            Person person = (Person)obj;
+            return $"Person: {person.FullName}";
+        }
+        else
+        {
+            return "Unknown";
+        }
+    }
+    
+    // Better approach: Use pattern matching
+    public string Describe(object obj)
+    {
+        return obj switch
+        {
+            int number => $"Integer: {number}",
+            string text => $"String: {text}",
+            Person { Age: >= 18 } person => $"Adult: {person.FullName}",
+            Person person => $"Minor: {person.FullName}",
+            _ => "Unknown"
+        };
+    }
+    ```
+    Pattern matching (introduced in C# 7 and enhanced in later versions) provides a more concise and powerful way to check types and extract values.
+  </Accordion>
+  
+  <Accordion title="Using Mutable Collections for Public Properties" icon="warning">
+    ```csharp
+    // Anti-pattern: Exposing mutable collections
+    public class Customer
+    {
+        public List<Order> Orders { get; set; } = new List<Order>();
+    }
+    
+    // Client can modify the collection directly
+    customer.Orders.Clear(); // Unexpected side effect
+    
+    // Better approach: Return read-only collections
+    public class Customer
+    {
+        private readonly List<Order> _orders = new List<Order>();
+        
+        public IReadOnlyCollection<Order> Orders => _orders.AsReadOnly();
+        
+        public void AddOrder(Order order)
+        {
+            _orders.Add(order);
+        }
+        
+        public void RemoveOrder(Order order)
+        {
+            _orders.Remove(order);
+        }
+    }
+    ```
+    Exposing mutable collections as public properties breaks encapsulation. Return read-only collections and provide methods to modify the collection.
+  </Accordion>
+  
+  <Accordion title="Not Using Tuple Deconstruction" icon="warning">
+    ```csharp
+    // Anti-pattern: Not using tuple deconstruction
+    public (string, int) GetPersonInfo()
+    {
+        return ("John Doe", 30);
+    }
+    
+    public void ProcessPerson()
+    {
+        var info = GetPersonInfo();
+        string name = info.Item1;
+        int age = info.Item2;
+        // Process name and age
+    }
+    
+    // Better approach: Use tuple deconstruction
+    public (string Name, int Age) GetPersonInfo()
+    {
+        return ("John Doe", 30);
+    }
+    
+    public void ProcessPerson()
+    {
+        var (name, age) = GetPersonInfo();
+        // Or
+        (string name, int age) = GetPersonInfo();
+        // Process name and age
+    }
+    ```
+    Tuple deconstruction makes working with tuples more readable and intuitive.
+  </Accordion>
+</AccordionGroup>

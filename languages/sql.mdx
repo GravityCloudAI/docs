@@ -1,0 +1,498 @@
+---
+title: 'SQL'
+description: 'SQL (Structured Query Language) is a domain-specific language used for managing and manipulating relational databases. It is particularly useful for handling structured data where there are relations between different entities/variables of the data.'
+---
+
+<AccordionGroup>
+  <Accordion title="SQL Anti-Patterns Overview" icon="sql">
+    SQL, despite being a powerful language for database operations, has several common anti-patterns that can lead to performance issues, security vulnerabilities, and maintainability problems. Here are the most important anti-patterns to avoid when writing SQL code.
+  </Accordion>
+  
+  <Accordion title="Using SELECT *" icon="warning">
+    ```sql
+    -- Anti-pattern: Using SELECT *
+    SELECT * FROM customers
+    JOIN orders ON customers.customer_id = orders.customer_id;
+    
+    -- Better approach: Specify only needed columns
+    SELECT 
+        customers.customer_id,
+        customers.first_name,
+        customers.last_name,
+        orders.order_id,
+        orders.order_date,
+        orders.total_amount
+    FROM customers
+    JOIN orders ON customers.customer_id = orders.customer_id;
+    ```
+    Avoid using `SELECT *` in production code. Instead, explicitly list the columns you need. This improves performance by reducing I/O and network traffic, prevents issues when table schemas change, and makes your code more maintainable by clearly showing which columns are being used.
+  </Accordion>
+  
+  <Accordion title="Not Using Parameterized Queries" icon="warning">
+    ```sql
+    -- Anti-pattern: String concatenation for dynamic SQL
+    -- (Pseudocode mixing application code and SQL)
+    query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
+    
+    -- Better approach: Use parameterized queries
+    -- In a prepared statement (syntax varies by language/framework)
+    query = "SELECT * FROM users WHERE username = ? AND password = ?";
+    execute_query(query, [username, password]);
+    
+    -- Or using stored procedures
+    CREATE PROCEDURE authenticate_user
+        @username VARCHAR(50),
+        @password VARCHAR(100)
+    AS
+    BEGIN
+        SELECT * FROM users WHERE username = @username AND password = @password;
+    END;
+    ```
+    Always use parameterized queries or prepared statements instead of concatenating strings to build SQL queries. This prevents SQL injection attacks and improves performance through query plan caching.
+  </Accordion>
+  
+  <Accordion title="Inefficient Joins" icon="warning">
+    ```sql
+    -- Anti-pattern: Cartesian product (implicit cross join)
+    SELECT customers.name, orders.order_id
+    FROM customers, orders
+    WHERE customers.customer_id = orders.customer_id;
+    
+    -- Better approach: Explicit JOIN syntax
+    SELECT customers.name, orders.order_id
+    FROM customers
+    JOIN orders ON customers.customer_id = orders.customer_id;
+    
+    -- Anti-pattern: Joining unnecessary tables
+    SELECT customers.name, orders.order_id
+    FROM customers
+    JOIN orders ON customers.customer_id = orders.customer_id
+    JOIN order_items ON orders.order_id = order_items.order_id
+    JOIN products ON order_items.product_id = products.product_id;
+    -- ^ Products table isn't needed if we're not using any columns from it
+    
+    -- Better approach: Only join necessary tables
+    SELECT customers.name, orders.order_id
+    FROM customers
+    JOIN orders ON customers.customer_id = orders.customer_id;
+    ```
+    Use explicit JOIN syntax instead of implicit joins in the WHERE clause. Only join tables that are necessary for your query. Unnecessary joins can dramatically decrease performance, especially with large tables.
+  </Accordion>
+  
+  <Accordion title="Not Using Indexes Properly" icon="warning">
+    ```sql
+    -- Anti-pattern: Not indexing columns used in WHERE, JOIN, or ORDER BY
+    SELECT * FROM orders WHERE customer_id = 123;
+    -- If customer_id isn't indexed, this will perform a full table scan
+    
+    -- Better approach: Create appropriate indexes
+    CREATE INDEX idx_orders_customer_id ON orders(customer_id);
+    
+    -- Anti-pattern: Using functions on indexed columns
+    SELECT * FROM customers WHERE LOWER(email) = 'user@example.com';
+    -- Index on email won't be used because of the LOWER function
+    
+    -- Better approach: Avoid functions on indexed columns
+    SELECT * FROM customers WHERE email = 'user@example.com';
+    -- Or create a functional index if your DBMS supports it
+    CREATE INDEX idx_customers_email_lower ON customers(LOWER(email));
+    ```
+    Create appropriate indexes for columns used in WHERE clauses, JOIN conditions, and ORDER BY statements. Avoid using functions on indexed columns in WHERE conditions, as this can prevent the optimizer from using the index.
+  </Accordion>
+  
+  <Accordion title="Using DISTINCT Unnecessarily" icon="warning">
+    ```sql
+    -- Anti-pattern: Using DISTINCT to hide join problems
+    SELECT DISTINCT customers.customer_id, customers.name
+    FROM customers
+    JOIN orders ON customers.customer_id = orders.customer_id;
+    
+    -- Better approach: Fix the join to avoid duplicates
+    SELECT customers.customer_id, customers.name
+    FROM customers
+    JOIN (
+        SELECT DISTINCT customer_id FROM orders
+    ) o ON customers.customer_id = o.customer_id;
+    
+    -- Or even better, if you just want customers who have orders:
+    SELECT customers.customer_id, customers.name
+    FROM customers
+    WHERE EXISTS (
+        SELECT 1 FROM orders WHERE orders.customer_id = customers.customer_id
+    );
+    ```
+    Avoid using DISTINCT as a quick fix for duplicate rows. It can hide join problems and hurt performance. Instead, fix the underlying issue by using the correct join type or restructuring your query.
+  </Accordion>
+  
+  <Accordion title="Using Cursors Instead of Set-Based Operations" icon="warning">
+    ```sql
+    -- Anti-pattern: Using cursors for row-by-row processing
+    DECLARE @customer_id INT;
+    DECLARE @total_spent DECIMAL(10, 2);
+    
+    DECLARE customer_cursor CURSOR FOR
+    SELECT customer_id FROM customers;
+    
+    OPEN customer_cursor;
+    FETCH NEXT FROM customer_cursor INTO @customer_id;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SELECT @total_spent = SUM(total_amount)
+        FROM orders
+        WHERE customer_id = @customer_id;
+        
+        UPDATE customers
+        SET total_spent = @total_spent
+        WHERE customer_id = @customer_id;
+        
+        FETCH NEXT FROM customer_cursor INTO @customer_id;
+    END
+    
+    CLOSE customer_cursor;
+    DEALLOCATE customer_cursor;
+    
+    -- Better approach: Use set-based operations
+    UPDATE customers
+    SET total_spent = (
+        SELECT SUM(total_amount)
+        FROM orders
+        WHERE orders.customer_id = customers.customer_id
+    );
+    ```
+    Avoid using cursors for row-by-row processing when set-based operations can accomplish the same task. Set-based operations are typically much faster and more efficient in SQL.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Data Types" icon="warning">
+    ```sql
+    -- Anti-pattern: Using inappropriate data types
+    CREATE TABLE products (
+        product_id VARCHAR(50),  -- Using VARCHAR for a numeric ID
+        price VARCHAR(10),       -- Using VARCHAR for a numeric price
+        created_at VARCHAR(20)   -- Using VARCHAR for a date/time
+    );
+    
+    -- Better approach: Use appropriate data types
+    CREATE TABLE products (
+        product_id INT PRIMARY KEY,
+        price DECIMAL(10, 2),
+        created_at TIMESTAMP
+    );
+    ```
+    Use appropriate data types for your columns. Using the wrong data type can lead to unexpected behavior, poor performance, and increased storage requirements. For example, use numeric types for numbers, date/time types for dates, and VARCHAR only for variable-length strings.
+  </Accordion>
+  
+  <Accordion title="Storing Comma-Separated Values" icon="warning">
+    ```sql
+    -- Anti-pattern: Storing comma-separated values
+    CREATE TABLE users (
+        user_id INT PRIMARY KEY,
+        name VARCHAR(100),
+        roles VARCHAR(255)  -- Stores roles like 'admin,editor,viewer'
+    );
+    
+    -- Querying for users with a specific role is difficult
+    SELECT * FROM users WHERE roles LIKE '%admin%';
+    -- This could match 'admin', but also 'administrator' or 'badmin'
+    
+    -- Better approach: Normalize the data
+    CREATE TABLE users (
+        user_id INT PRIMARY KEY,
+        name VARCHAR(100)
+    );
+    
+    CREATE TABLE roles (
+        role_id INT PRIMARY KEY,
+        role_name VARCHAR(50)
+    );
+    
+    CREATE TABLE user_roles (
+        user_id INT,
+        role_id INT,
+        PRIMARY KEY (user_id, role_id),
+        FOREIGN KEY (user_id) REFERENCES users(user_id),
+        FOREIGN KEY (role_id) REFERENCES roles(role_id)
+    );
+    
+    -- Now querying for users with a specific role is straightforward
+    SELECT u.user_id, u.name
+    FROM users u
+    JOIN user_roles ur ON u.user_id = ur.user_id
+    JOIN roles r ON ur.role_id = r.role_id
+    WHERE r.role_name = 'admin';
+    ```
+    Avoid storing comma-separated values in a single column. This violates first normal form and makes it difficult to query, update, and maintain data integrity. Instead, normalize your data by creating appropriate related tables.
+  </Accordion>
+  
+  <Accordion title="Not Using Transactions" icon="warning">
+    ```sql
+    -- Anti-pattern: Not using transactions for multi-statement operations
+    UPDATE accounts SET balance = balance - 100 WHERE account_id = 123;
+    UPDATE accounts SET balance = balance + 100 WHERE account_id = 456;
+    -- If the second statement fails, the first one still goes through
+    
+    -- Better approach: Use transactions
+    BEGIN TRANSACTION;
+    
+    UPDATE accounts SET balance = balance - 100 WHERE account_id = 123;
+    UPDATE accounts SET balance = balance + 100 WHERE account_id = 456;
+    
+    -- Check if both updates succeeded
+    IF @@ROWCOUNT > 0
+        COMMIT TRANSACTION;
+    ELSE
+        ROLLBACK TRANSACTION;
+    ```
+    Use transactions for operations that require multiple statements to be executed as a single unit. This ensures data consistency and integrity, especially for operations like transfers or complex updates.
+  </Accordion>
+  
+  <Accordion title="Using NOT IN with NULL Values" icon="warning">
+    ```sql
+    -- Anti-pattern: Using NOT IN with a subquery that might return NULL
+    SELECT * FROM customers
+    WHERE customer_id NOT IN (SELECT customer_id FROM orders WHERE total_amount > 1000);
+    
+    -- Better approach: Use NOT EXISTS or LEFT JOIN / IS NULL
+    -- Option 1: NOT EXISTS
+    SELECT * FROM customers c
+    WHERE NOT EXISTS (
+        SELECT 1 FROM orders o
+        WHERE o.customer_id = c.customer_id AND o.total_amount > 1000
+    );
+    
+    -- Option 2: LEFT JOIN / IS NULL
+    SELECT c.*
+    FROM customers c
+    LEFT JOIN orders o ON c.customer_id = o.customer_id AND o.total_amount > 1000
+    WHERE o.order_id IS NULL;
+    ```
+    Avoid using NOT IN with a subquery that might return NULL values. In SQL, comparing anything to NULL using NOT IN returns UNKNOWN, which is treated as FALSE in a WHERE clause. Use NOT EXISTS or LEFT JOIN / IS NULL instead.
+  </Accordion>
+  
+  <Accordion title="Using COUNT(*) to Check Existence" icon="warning">
+    ```sql
+    -- Anti-pattern: Using COUNT(*) to check existence
+    IF (SELECT COUNT(*) FROM orders WHERE customer_id = 123) > 0
+        -- Customer has orders
+    ELSE
+        -- Customer has no orders
+    
+    -- Better approach: Use EXISTS
+    IF EXISTS (SELECT 1 FROM orders WHERE customer_id = 123)
+        -- Customer has orders
+    ELSE
+        -- Customer has no orders
+    ```
+    Use EXISTS instead of COUNT(*) to check if records exist. EXISTS is more efficient because it stops scanning as soon as it finds a matching record, while COUNT(*) needs to scan all matching records.
+  </Accordion>
+  
+  <Accordion title="Using OFFSET for Pagination" icon="warning">
+    ```sql
+    -- Anti-pattern: Using OFFSET for pagination with large offsets
+    SELECT * FROM products
+    ORDER BY product_id
+    LIMIT 10 OFFSET 10000;
+    
+    -- Better approach: Use keyset pagination
+    -- Assuming the last product_id from the previous page was 10000
+    SELECT * FROM products
+    WHERE product_id > 10000
+    ORDER BY product_id
+    LIMIT 10;
+    ```
+    Avoid using OFFSET for pagination with large offset values. OFFSET requires the database to scan and discard all rows up to the offset, which becomes increasingly inefficient as the offset grows. Use keyset pagination (also known as cursor-based pagination) instead, which uses a filter on the last seen value.
+  </Accordion>
+  
+  <Accordion title="Using OR Conditions on Different Columns" icon="warning">
+    ```sql
+    -- Anti-pattern: Using OR conditions on different columns
+    SELECT * FROM products
+    WHERE category = 'Electronics' OR brand = 'Samsung';
+    
+    -- Better approach: Use UNION
+    SELECT * FROM products WHERE category = 'Electronics'
+    UNION
+    SELECT * FROM products WHERE brand = 'Samsung';
+    ```
+    Consider using UNION instead of OR conditions on different columns, especially if you have indexes on those columns. The optimizer can use different indexes for each part of the UNION, potentially improving performance.
+  </Accordion>
+  
+  <Accordion title="Not Using Common Table Expressions (CTEs)" icon="warning">
+    ```sql
+    -- Anti-pattern: Repeating complex subqueries
+    SELECT
+        customer_id,
+        (
+            SELECT COUNT(*) FROM orders
+            WHERE orders.customer_id = customers.customer_id
+        ) AS order_count,
+        (
+            SELECT SUM(total_amount) FROM orders
+            WHERE orders.customer_id = customers.customer_id
+        ) AS total_spent
+    FROM customers;
+    
+    -- Better approach: Use Common Table Expressions (CTEs)
+    WITH customer_orders AS (
+        SELECT
+            customer_id,
+            COUNT(*) AS order_count,
+            SUM(total_amount) AS total_spent
+        FROM orders
+        GROUP BY customer_id
+    )
+    SELECT
+        c.customer_id,
+        co.order_count,
+        co.total_spent
+    FROM customers c
+    LEFT JOIN customer_orders co ON c.customer_id = co.customer_id;
+    ```
+    Use Common Table Expressions (CTEs) to simplify complex queries, improve readability, and avoid repeating subqueries. CTEs can also be recursive, which is useful for hierarchical data.
+  </Accordion>
+  
+  <Accordion title="Using Implicit Conversions" icon="warning">
+    ```sql
+    -- Anti-pattern: Implicit conversions
+    SELECT * FROM orders WHERE order_id = '1000';
+    -- order_id is an INT, but we're comparing it to a string
+    
+    -- Better approach: Use explicit conversions or correct types
+    SELECT * FROM orders WHERE order_id = 1000;
+    -- Or if you need to convert
+    SELECT * FROM orders WHERE order_id = CAST('1000' AS INT);
+    ```
+    Avoid implicit conversions between different data types. They can prevent the optimizer from using indexes and lead to unexpected results. Use the correct data type in your queries or explicit conversions when necessary.
+  </Accordion>
+  
+  <Accordion title="Using Scalar User-Defined Functions in WHERE Clauses" icon="warning">
+    ```sql
+    -- Anti-pattern: Using scalar UDFs in WHERE clauses
+    CREATE FUNCTION dbo.GetFullName(@FirstName VARCHAR(50), @LastName VARCHAR(50))
+    RETURNS VARCHAR(101)
+    AS
+    BEGIN
+        RETURN @FirstName + ' ' + @LastName;
+    END;
+    
+    SELECT * FROM employees
+    WHERE dbo.GetFullName(first_name, last_name) = 'John Doe';
+    
+    -- Better approach: Inline the function logic
+    SELECT * FROM employees
+    WHERE first_name + ' ' + last_name = 'John Doe';
+    ```
+    Avoid using scalar user-defined functions in WHERE clauses. They can prevent the optimizer from using indexes and are executed once per row, which can severely impact performance. Inline the function logic directly in your query when possible.
+  </Accordion>
+  
+  <Accordion title="Not Using Schema Names" icon="warning">
+    ```sql
+    -- Anti-pattern: Not using schema names
+    SELECT * FROM customers;
+    
+    -- Better approach: Always use schema names
+    SELECT * FROM dbo.customers;
+    ```
+    Always use schema names when referencing database objects. This improves query plan caching, prevents ambiguity if multiple schemas have objects with the same name, and makes your code more maintainable.
+  </Accordion>
+  
+  <Accordion title="Using Table Variables When Temporary Tables Would Be Better" icon="warning">
+    ```sql
+    -- Anti-pattern: Using table variables for large result sets
+    DECLARE @LargeResults TABLE (
+        ID INT,
+        Name VARCHAR(100),
+        Value DECIMAL(10, 2)
+    );
+    
+    INSERT INTO @LargeResults
+    SELECT ID, Name, Value FROM SomeLargeTable;
+    
+    -- Better approach: Use temporary tables for large result sets
+    CREATE TABLE #LargeResults (
+        ID INT,
+        Name VARCHAR(100),
+        Value DECIMAL(10, 2)
+    );
+    
+    CREATE INDEX IX_LargeResults_ID ON #LargeResults(ID);
+    
+    INSERT INTO #LargeResults
+    SELECT ID, Name, Value FROM SomeLargeTable;
+    ```
+    Use temporary tables (#temp) instead of table variables (@table) for large result sets or when you need indexes. Table variables store statistics only when they're created and don't support indexes (in most database systems), which can lead to poor query plans for large datasets.
+  </Accordion>
+  
+  <Accordion title="Using DELETE Without WHERE" icon="warning">
+    ```sql
+    -- Anti-pattern: Using DELETE without WHERE
+    DELETE FROM orders;
+    
+    -- Better approach: Always include a WHERE clause
+    DELETE FROM orders WHERE order_date < '2020-01-01';
+    
+    -- If you really want to delete all rows, be explicit
+    TRUNCATE TABLE orders; -- Faster than DELETE without WHERE
+    ```
+    Always include a WHERE clause with DELETE statements unless you explicitly want to delete all rows. If you do want to delete all rows, use TRUNCATE TABLE, which is faster and uses fewer system resources.
+  </Accordion>
+  
+  <Accordion title="Not Using MERGE for Upserts" icon="warning">
+    ```sql
+    -- Anti-pattern: Using separate INSERT/UPDATE for upserts
+    IF EXISTS (SELECT 1 FROM customers WHERE customer_id = 123)
+        UPDATE customers
+        SET name = 'John Doe', email = 'john@example.com'
+        WHERE customer_id = 123;
+    ELSE
+        INSERT INTO customers (customer_id, name, email)
+        VALUES (123, 'John Doe', 'john@example.com');
+    
+    -- Better approach: Use MERGE for upserts
+    MERGE INTO customers AS target
+    USING (SELECT 123 AS customer_id, 'John Doe' AS name, 'john@example.com' AS email) AS source
+    ON target.customer_id = source.customer_id
+    WHEN MATCHED THEN
+        UPDATE SET name = source.name, email = source.email
+    WHEN NOT MATCHED THEN
+        INSERT (customer_id, name, email)
+        VALUES (source.customer_id, source.name, source.email);
+    ```
+    Use the MERGE statement for upsert operations (insert if not exists, update if exists) instead of separate INSERT and UPDATE statements. MERGE is more efficient and atomic, reducing the risk of race conditions.
+  </Accordion>
+  
+  <Accordion title="Using Non-Standard SQL" icon="warning">
+    ```sql
+    -- Anti-pattern: Using database-specific features without necessity
+    -- SQL Server specific:
+    SELECT TOP 10 * FROM products ORDER BY price DESC;
+    
+    -- Better approach: Use standard SQL when possible
+    -- Standard SQL (works in most databases):
+    SELECT * FROM products ORDER BY price DESC LIMIT 10;
+    ```
+    Use standard SQL features when possible to make your code more portable across different database systems. If you do need to use database-specific features, document them clearly and consider abstracting them in a way that makes them easier to change if needed.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Constraints" icon="warning">
+    ```sql
+    -- Anti-pattern: Not using appropriate constraints
+    CREATE TABLE orders (
+        order_id INT,
+        customer_id INT,
+        order_date DATE,
+        total_amount DECIMAL(10, 2)
+    );
+    
+    -- Better approach: Use appropriate constraints
+    CREATE TABLE orders (
+        order_id INT PRIMARY KEY,
+        customer_id INT NOT NULL,
+        order_date DATE NOT NULL,
+        total_amount DECIMAL(10, 2) NOT NULL CHECK (total_amount >= 0),
+        FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+    );
+    ```
+    Use appropriate constraints (PRIMARY KEY, FOREIGN KEY, NOT NULL, UNIQUE, CHECK) to enforce data integrity at the database level. This prevents invalid data from being inserted and makes your database more reliable.
+  </Accordion>
+</AccordionGroup>

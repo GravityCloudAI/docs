@@ -1,0 +1,543 @@
+---
+title: 'ABAP'
+description: 'ABAP (Advanced Business Application Programming) is a high-level programming language created by SAP. It is primarily used for developing business applications for SAP\'s enterprise software and is the main programming language for SAP\'s R/3 system.'
+---
+
+<AccordionGroup>
+  <Accordion title="ABAP Anti-Patterns Overview" icon="abap">
+    ABAP, despite being a powerful language for SAP development, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing ABAP code.
+  </Accordion>
+  
+  <Accordion title="SELECT * FROM Database Tables" icon="warning">
+    ```abap
+    " Anti-pattern: Using SELECT *
+    SELECT * FROM scarr INTO TABLE lt_carriers.
+    
+    " Better approach: Select only needed fields
+    SELECT carrid carrname currcode
+      FROM scarr
+      INTO TABLE lt_carriers.
+    ```
+    Avoid using `SELECT *` to retrieve all fields from database tables. This increases network traffic, memory usage, and processing time. Instead, explicitly list only the fields you need for your application logic.
+  </Accordion>
+  
+  <Accordion title="Not Using WHERE Clause in Database Queries" icon="warning">
+    ```abap
+    " Anti-pattern: No WHERE clause, filtering in ABAP
+    SELECT carrid carrname currcode
+      FROM scarr
+      INTO TABLE lt_carriers.
+    
+    LOOP AT lt_carriers INTO ls_carrier
+      WHERE currcode = 'USD'.
+      " Process USD carriers
+    ENDLOOP.
+    
+    " Better approach: Filter at database level
+    SELECT carrid carrname currcode
+      FROM scarr
+      INTO TABLE lt_carriers
+      WHERE currcode = 'USD'.
+    
+    LOOP AT lt_carriers INTO ls_carrier.
+      " Process USD carriers
+    ENDLOOP.
+    ```
+    Always use appropriate WHERE clauses in your database queries to filter data at the database level. Retrieving all records and then filtering them in ABAP is inefficient, especially for large tables.
+  </Accordion>
+  
+  <Accordion title="Using SELECT Inside Loops" icon="warning">
+    ```abap
+    " Anti-pattern: SELECT inside loop
+    SELECT carrid carrname
+      FROM scarr
+      INTO TABLE lt_carriers.
+    
+    LOOP AT lt_carriers INTO ls_carrier.
+      SELECT COUNT(*)
+        FROM spfli
+        WHERE carrid = ls_carrier-carrid
+        INTO lv_count.
+      
+      ls_carrier-flight_count = lv_count.
+      MODIFY lt_carriers FROM ls_carrier.
+    ENDLOOP.
+    
+    " Better approach: Use JOIN or nested SELECT
+    SELECT s~carrid s~carrname COUNT(*) AS flight_count
+      FROM scarr AS s
+      LEFT OUTER JOIN spfli AS p ON s~carrid = p~carrid
+      GROUP BY s~carrid s~carrname
+      INTO TABLE lt_carriers.
+    ```
+    Avoid executing database queries inside loops. This can lead to the "N+1 query problem" and severely impact performance. Instead, use JOINs, nested SELECTs, or FOR ALL ENTRIES to retrieve related data in a single query.
+  </Accordion>
+  
+  <Accordion title="Not Using Internal Tables Effectively" icon="warning">
+    ```abap
+    " Anti-pattern: Inefficient internal table operations
+    DATA: lt_data TYPE TABLE OF ty_data,
+          ls_data TYPE ty_data.
+    
+    " Inefficient: Appending in a loop
+    DO 1000 TIMES.
+      ls_data-id = sy-index.
+      ls_data-value = 'Value'.
+      APPEND ls_data TO lt_data.
+    ENDDO.
+    
+    " Better approach: Use APPEND INITIAL LINE or table expressions
+    DO 1000 TIMES.
+      APPEND INITIAL LINE TO lt_data ASSIGNING <fs_data>.
+      <fs_data>-id = sy-index.
+      <fs_data>-value = 'Value'.
+    ENDDO.
+    
+    " Or even better in modern ABAP
+    lt_data = VALUE #( FOR i = 1 UNTIL i > 1000 ( id = i value = 'Value' ) ).
+    ```
+    Use internal tables efficiently. Avoid operations like APPEND inside loops for large datasets. Instead, use APPEND INITIAL LINE with field symbols, table expressions, or modern ABAP constructs like VALUE operator for better performance.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Global Variables" icon="warning">
+    ```abap
+    " Anti-pattern: Using global variables
+    REPORT zprogram.
+    
+    DATA: gv_id TYPE i,
+          gv_name TYPE string,
+          gt_data TYPE TABLE OF ty_data.
+    
+    START-OF-SELECTION.
+      PERFORM get_data.
+      PERFORM process_data.
+      PERFORM display_results.
+    
+    FORM get_data.
+      SELECT * FROM ztable INTO TABLE gt_data.
+    ENDFORM.
+    
+    FORM process_data.
+      " Uses global gt_data
+    ENDFORM.
+    
+    " Better approach: Pass parameters between procedures
+    REPORT zprogram.
+    
+    START-OF-SELECTION.
+      DATA: lt_data TYPE TABLE OF ty_data.
+      
+      PERFORM get_data CHANGING lt_data.
+      PERFORM process_data USING lt_data.
+      PERFORM display_results USING lt_data.
+    
+    FORM get_data CHANGING pt_data TYPE ty_table.
+      SELECT * FROM ztable INTO TABLE pt_data.
+    ENDFORM.
+    
+    FORM process_data USING pt_data TYPE ty_table.
+      " Uses parameter pt_data
+    ENDFORM.
+    ```
+    Avoid excessive use of global variables. They create hidden dependencies between procedures, make code harder to test and maintain, and can lead to unexpected behavior. Instead, pass parameters between procedures and use local variables when possible.
+  </Accordion>
+  
+  <Accordion title="Not Using ABAP Objects" icon="warning">
+    ```abap
+    " Anti-pattern: Procedural programming for complex logic
+    REPORT zprogram.
+    
+    DATA: gt_data TYPE TABLE OF ty_data.
+    
+    START-OF-SELECTION.
+      PERFORM get_data.
+      PERFORM process_data.
+      PERFORM display_results.
+    
+    " Many FORM routines with complex logic
+    
+    " Better approach: Use ABAP Objects
+    REPORT zprogram.
+    
+    START-OF-SELECTION.
+      DATA(lo_data_processor) = NEW zcl_data_processor( ).
+      
+      lo_data_processor->get_data( ).
+      lo_data_processor->process( ).
+      lo_data_processor->display_results( ).
+    
+    " Class implementation
+    CLASS zcl_data_processor DEFINITION.
+      PUBLIC SECTION.
+        METHODS: constructor,
+                 get_data,
+                 process,
+                 display_results.
+      
+      PRIVATE SECTION.
+        DATA: mt_data TYPE TABLE OF ty_data.
+    ENDCLASS.
+    
+    CLASS zcl_data_processor IMPLEMENTATION.
+      " Method implementations
+    ENDCLASS.
+    ```
+    Use ABAP Objects (classes and interfaces) for complex applications instead of procedural programming with FORM routines. Object-oriented programming provides better encapsulation, reusability, and maintainability.
+  </Accordion>
+  
+  <Accordion title="Hardcoding Values" icon="warning">
+    ```abap
+    " Anti-pattern: Hardcoding values
+    SELECT * FROM sflight
+      INTO TABLE lt_flights
+      WHERE carrid = 'LH'
+        AND connid = '0400'.
+    
+    IF sy-subrc = 0.
+      " Process flights
+    ENDIF.
+    
+    " Better approach: Use constants and configuration
+    CONSTANTS: lc_carrier_id TYPE s_carr_id VALUE 'LH',
+               lc_connection_id TYPE s_conn_id VALUE '0400'.
+    
+    " Even better: Use customizing tables
+    SELECT single carrier connection
+      FROM zconfig
+      INTO (lv_carrier, lv_connection)
+      WHERE config_id = 'DEFAULT'.
+    
+    SELECT * FROM sflight
+      INTO TABLE lt_flights
+      WHERE carrid = lv_carrier
+        AND connid = lv_connection.
+    ```
+    Avoid hardcoding values in your code. Use constants, configuration tables, or customizing settings instead. This makes your code more maintainable and adaptable to different environments or requirements.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Exception Handling" icon="warning">
+    ```abap
+    " Anti-pattern: No exception handling
+    METHOD create_order.
+      DATA: lo_order TYPE REF TO cl_order.
+      
+      CREATE OBJECT lo_order.
+      lo_order->set_customer( iv_customer ).
+      lo_order->add_items( it_items ).
+      lo_order->save( ).
+    ENDMETHOD.
+    
+    " Better approach: Use exception handling
+    METHOD create_order.
+      DATA: lo_order TYPE REF TO cl_order.
+      
+      TRY.
+          CREATE OBJECT lo_order.
+          lo_order->set_customer( iv_customer ).
+          lo_order->add_items( it_items ).
+          lo_order->save( ).
+        CATCH cx_order_creation INTO DATA(lx_creation).
+          RAISE EXCEPTION TYPE cx_process_error
+            EXPORTING
+              previous = lx_creation
+              textid   = cx_process_error=>order_creation_failed.
+        CATCH cx_system_error INTO DATA(lx_system).
+          " Log system error
+          RAISE RESUMABLE EXCEPTION TYPE cx_process_error
+            EXPORTING
+              previous = lx_system.
+      ENDTRY.
+    ENDMETHOD.
+    ```
+    Use proper exception handling in your code. Catch specific exceptions rather than generic ones, and handle them appropriately. Use class-based exceptions (CX_* classes) for better error information and propagation.
+  </Accordion>
+  
+  <Accordion title="Not Using Modern ABAP Syntax" icon="warning">
+    ```abap
+    " Anti-pattern: Old ABAP syntax
+    DATA: lv_value TYPE string,
+          lt_table TYPE TABLE OF ty_data,
+          ls_data TYPE ty_data.
+    
+    SELECT * FROM ztable INTO TABLE lt_table.
+    
+    LOOP AT lt_table INTO ls_data WHERE id > 100.
+      CONCATENATE 'Value:' ls_data-value INTO lv_value.
+      WRITE: / lv_value.
+    ENDLOOP.
+    
+    " Better approach: Use modern ABAP syntax
+    DATA(lt_table) = VALUE ty_table( ).
+    
+    SELECT * FROM ztable INTO TABLE @lt_table.
+    
+    LOOP AT lt_table ASSIGNING FIELD-SYMBOL(<ls_data>) WHERE id > 100.
+      DATA(lv_value) = |Value: { <ls_data>-value }|.
+      WRITE: / lv_value.
+    ENDLOOP.
+    ```
+    Use modern ABAP syntax features like inline declarations, string templates, table expressions, and field symbols. Modern syntax is often more concise, readable, and can improve performance.
+  </Accordion>
+  
+  <Accordion title="Inefficient String Handling" icon="warning">
+    ```abap
+    " Anti-pattern: Inefficient string concatenation
+    DATA: lv_result TYPE string.
+    
+    DO 100 TIMES.
+      CONCATENATE lv_result 'Item' sy-index INTO lv_result.
+    ENDDO.
+    
+    " Better approach: Use string templates and efficient concatenation
+    DATA: lv_result TYPE string,
+          lt_parts TYPE TABLE OF string.
+    
+    DO 100 TIMES.
+      APPEND |Item{ sy-index }| TO lt_parts.
+    ENDDO.
+    
+    CONCATENATE LINES OF lt_parts INTO lv_result.
+    
+    " Or use string templates directly
+    lv_result = |Item1Item2Item3...|.
+    ```
+    Use efficient string handling techniques. Avoid repeated CONCATENATE operations in loops. Instead, collect strings in a table and concatenate them at once, or use string templates (|...|) for simple concatenations.
+  </Accordion>
+  
+  <Accordion title="Not Using Code Inspector and ATC" icon="warning">
+    ```abap
+    " Anti-pattern: Not checking code quality
+    " Writing code without static analysis
+    
+    " Better approach: Use Code Inspector and ATC
+    " Run Code Inspector checks regularly
+    " Set up ATC (ABAP Test Cockpit) for continuous code quality checks
+    ```
+    Always use Code Inspector and ABAP Test Cockpit (ATC) to check your code for performance issues, security vulnerabilities, and adherence to coding standards. These tools can identify many common anti-patterns automatically.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Authorization Checks" icon="warning">
+    ```abap
+    " Anti-pattern: Missing or improper authorization checks
+    METHOD display_employee_data.
+      SELECT * FROM zemployees
+        INTO TABLE @DATA(lt_employees).
+      
+      " Display sensitive data without authorization check
+    ENDMETHOD.
+    
+    " Better approach: Implement proper authorization checks
+    METHOD display_employee_data.
+      AUTHORITY-CHECK OBJECT 'ZEMPLOYEE'
+        ID 'ACTVT' FIELD '03'.
+      
+      IF sy-subrc <> 0.
+        RAISE EXCEPTION TYPE cx_no_authority.
+      ENDIF.
+      
+      SELECT * FROM zemployees
+        INTO TABLE @DATA(lt_employees).
+      
+      " Display data
+    ENDMETHOD.
+    ```
+    Always implement proper authorization checks in your code, especially when accessing sensitive data or performing critical operations. Use AUTHORITY-CHECK statements and check the results before proceeding.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Modularization" icon="warning">
+    ```abap
+    " Anti-pattern: Large, monolithic methods
+    METHOD process_sales_order.
+      " 200+ lines of code doing many different things:
+      " - Validating input
+      " - Reading master data
+      " - Calculating prices
+      " - Creating order
+      " - Updating inventory
+      " - Sending notifications
+    ENDMETHOD.
+    
+    " Better approach: Proper modularization
+    METHOD process_sales_order.
+      validate_input( is_order_data ).
+      
+      DATA(lt_master_data) = read_master_data( is_order_data ).
+      
+      DATA(ls_pricing) = calculate_pricing(
+        is_order_data = is_order_data
+        it_master_data = lt_master_data
+      ).
+      
+      DATA(lv_order_id) = create_order(
+        is_order_data = is_order_data
+        is_pricing = ls_pricing
+      ).
+      
+      update_inventory( is_order_data ).
+      
+      send_notifications( lv_order_id ).
+    ENDMETHOD.
+    ```
+    Break down large, monolithic methods into smaller, focused methods with clear responsibilities. Each method should do one thing well. This improves readability, maintainability, and testability of your code.
+  </Accordion>
+  
+  <Accordion title="Not Using SAP Standard Code" icon="warning">
+    ```abap
+    " Anti-pattern: Reinventing the wheel
+    METHOD convert_date.
+      DATA: lv_day TYPE c LENGTH 2,
+            lv_month TYPE c LENGTH 2,
+            lv_year TYPE c LENGTH 4,
+            lv_result TYPE string.
+      
+      lv_day = iv_date+6(2).
+      lv_month = iv_date+4(2).
+      lv_year = iv_date(4).
+      
+      CONCATENATE lv_day '.' lv_month '.' lv_year INTO lv_result.
+      
+      rv_formatted_date = lv_result.
+    ENDMETHOD.
+    
+    " Better approach: Use SAP standard functionality
+    METHOD convert_date.
+      CALL FUNCTION 'CONVERT_DATE_TO_EXTERNAL'
+        EXPORTING
+          date_internal            = iv_date
+        IMPORTING
+          date_external            = rv_formatted_date
+        EXCEPTIONS
+          date_internal_is_invalid = 1
+          OTHERS                   = 2.
+      
+      IF sy-subrc <> 0.
+        RAISE EXCEPTION TYPE cx_invalid_date.
+      ENDIF.
+    ENDMETHOD.
+    ```
+    Leverage SAP standard functionality instead of reinventing the wheel. SAP provides many standard function modules, classes, and APIs for common tasks. Using them ensures consistency, reduces bugs, and saves development time.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Naming Conventions" icon="warning">
+    ```abap
+    " Anti-pattern: Poor naming conventions
+    DATA: x TYPE i,
+          y TYPE string,
+          z TYPE TABLE OF ty_data.
+    
+    METHOD m1.
+      " Method implementation
+    ENDMETHOD.
+    
+    " Better approach: Use descriptive names and conventions
+    DATA: lv_counter TYPE i,
+          lv_employee_name TYPE string,
+          lt_sales_data TYPE TABLE OF ty_sales_data.
+    
+    METHOD calculate_sales_statistics.
+      " Method implementation
+    ENDMETHOD.
+    ```
+    Follow proper naming conventions for variables, methods, and classes. Use prefixes to indicate variable scope and type (e.g., lv_ for local variables, lt_ for local tables). Use descriptive names that clearly indicate the purpose of the entity.
+  </Accordion>
+  
+  <Accordion title="Not Using ABAP Unit Tests" icon="warning">
+    ```abap
+    " Anti-pattern: No unit tests
+    CLASS zcl_calculator DEFINITION.
+      PUBLIC SECTION.
+        METHODS: add IMPORTING iv_a TYPE i iv_b TYPE i RETURNING VALUE(rv_result) TYPE i.
+    ENDCLASS.
+    
+    CLASS zcl_calculator IMPLEMENTATION.
+      METHOD add.
+        rv_result = iv_a + iv_b.
+      ENDMETHOD.
+    ENDCLASS.
+    
+    " Better approach: Include unit tests
+    CLASS zcl_calculator_test DEFINITION FOR TESTING
+      DURATION SHORT
+      RISK LEVEL HARMLESS.
+      
+      PRIVATE SECTION.
+        DATA: mo_cut TYPE REF TO zcl_calculator.  " Class Under Test
+        
+        METHODS:
+          setup,
+          test_add FOR TESTING.
+    ENDCLASS.
+    
+    CLASS zcl_calculator_test IMPLEMENTATION.
+      METHOD setup.
+        CREATE OBJECT mo_cut.
+      ENDMETHOD.
+      
+      METHOD test_add.
+        DATA(lv_result) = mo_cut->add( iv_a = 2 iv_b = 3 ).
+        
+        cl_abap_unit_assert=>assert_equals(
+          act = lv_result
+          exp = 5
+          msg = 'Addition calculation is wrong'
+        ).
+      ENDMETHOD.
+    ENDCLASS.
+    ```
+    Write ABAP Unit tests for your code. Unit tests help catch bugs early, document expected behavior, and make it safer to refactor code. Follow test-driven development (TDD) principles when possible.
+  </Accordion>
+  
+  <Accordion title="Not Considering Performance in Loops" icon="warning">
+    ```abap
+    " Anti-pattern: Inefficient operations in loops
+    LOOP AT lt_data INTO ls_data.
+      CLEAR lt_temp.
+      
+      " Inefficient: Database access in loop
+      SELECT * FROM ztable
+        INTO TABLE lt_temp
+        WHERE id = ls_data-id.
+      
+      " Inefficient: Nested loops
+      LOOP AT lt_temp INTO ls_temp.
+        " Process data
+      ENDLOOP.
+    ENDLOOP.
+    
+    " Better approach: Optimize loop operations
+    " Get all data at once before the loop
+    SELECT * FROM ztable
+      INTO TABLE @DATA(lt_all_temp)
+      FOR ALL ENTRIES IN @lt_data
+      WHERE id = @lt_data-id.
+    
+    " Use efficient loops
+    LOOP AT lt_data INTO ls_data.
+      LOOP AT lt_all_temp INTO ls_temp WHERE id = ls_data-id.
+        " Process data
+      ENDLOOP.
+    ENDLOOP.
+    ```
+    Be mindful of performance in loops. Avoid database access, screen operations, and complex calculations inside loops. Pre-fetch data, use efficient internal table operations, and consider alternatives to nested loops.
+  </Accordion>
+  
+  <Accordion title="Not Using Data Dictionary Objects" icon="warning">
+    ```abap
+    " Anti-pattern: Not using data dictionary objects
+    TYPES: BEGIN OF ty_employee,
+             id TYPE c LENGTH 10,
+             name TYPE c LENGTH 40,
+             department TYPE c LENGTH 20,
+           END OF ty_employee.
+    
+    DATA: lt_employees TYPE TABLE OF ty_employee.
+    
+    " Better approach: Use data dictionary objects
+    DATA: lt_employees TYPE TABLE OF zemployee.
+    
+    " Or with modern syntax
+    SELECT * FROM zemployee INTO TABLE @DATA(lt_employees).
+    ```
+    Use data dictionary objects (tables, structures, data elements) instead of defining types locally. This ensures consistency across applications, enables central changes, and leverages SAP's metadata capabilities.
+  </Accordion>
+</AccordionGroup>

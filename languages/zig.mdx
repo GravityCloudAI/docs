@@ -1,0 +1,556 @@
+---
+title: 'Zig'
+description: 'Zig is a general-purpose programming language and toolchain for maintaining robust, optimal, and reusable software. It emphasizes compile-time reflection, comptime, and provides low-level control with high-level safety features.'
+---
+
+<AccordionGroup>
+  <Accordion title="Zig Anti-Patterns Overview" icon="zig">
+    Zig, despite being a modern language designed to avoid many common programming pitfalls, still has several anti-patterns that can lead to code that's difficult to maintain, inefficient, or doesn't follow the language's idioms. Here are the most important anti-patterns to avoid when writing Zig code.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Allocators" icon="warning">
+    ```zig
+    // Anti-pattern: Excessive use of allocators for small, temporary data
+    fn processData(allocator: std.mem.Allocator, data: []const u8) !void {
+        var result = try allocator.alloc(u8, data.len);
+        defer allocator.free(result);
+        
+        for (data, 0..) |byte, i| {
+            result[i] = byte + 1;
+        }
+        
+        // Process result...
+    }
+    
+    // Better approach: Use stack memory for small, temporary data
+    fn processData(data: []const u8) void {
+        var result: [100]u8 = undefined;
+        if (data.len > result.len) return error.BufferTooSmall;
+        
+        for (data, 0..) |byte, i| {
+            result[i] = byte + 1;
+        }
+        
+        // Process result...
+    }
+    ```
+    Avoid excessive use of allocators for small, temporary data structures. Zig provides excellent support for stack allocation, which is often more efficient for small, short-lived objects. Reserve heap allocations for data whose size is not known at compile time or that needs to outlive the current scope.
+  </Accordion>
+  
+  <Accordion title="Not Using Comptime Features" icon="warning">
+    ```zig
+    // Anti-pattern: Not using comptime features
+    fn max(a: i32, b: i32) i32 {
+        if (a > b) return a;
+        return b;
+    }
+    
+    // Usage
+    const result = max(5, 10);
+    
+    // Better approach: Use comptime for generic functions
+    fn max(comptime T: type, a: T, b: T) T {
+        if (a > b) return a;
+        return b;
+    }
+    
+    // Usage
+    const result_i32 = max(i32, 5, 10);
+    const result_f64 = max(f64, 5.5, 10.1);
+    
+    // Even better: Use type inference
+    fn max2(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
+        if (a > b) return a;
+        return b;
+    }
+    
+    // Usage with type inference
+    const result_inferred = max2(5, 10); // Type is inferred as i32
+    ```
+    Take advantage of Zig's powerful comptime features. Use comptime for generic programming, metaprogramming, and compile-time evaluation. This leads to more flexible, type-safe, and efficient code.
+  </Accordion>
+  
+  <Accordion title="Ignoring Errors" icon="warning">
+    ```zig
+    // Anti-pattern: Ignoring errors
+    fn readFile(path: []const u8) void {
+        const file = std.fs.cwd().openFile(path, .{}) catch {
+            // Silently ignore error
+            return;
+        };
+        defer file.close();
+        
+        // Read and process file...
+    }
+    
+    // Better approach: Properly handle errors
+    fn readFile(path: []const u8) !void {
+        const file = try std.fs.cwd().openFile(path, .{});
+        defer file.close();
+        
+        // Read and process file...
+    }
+    
+    // Usage
+    fn main() !void {
+        try readFile("data.txt");
+        
+        // Or handle specific errors
+        readFile("data.txt") catch |err| switch (err) {
+            error.FileNotFound => std.debug.print("File not found\n", .{}),
+            error.AccessDenied => std.debug.print("Access denied\n", .{}),
+            else => return err,
+        };
+    }
+    ```
+    Don't ignore errors in Zig. The language's error handling system is designed to be explicit and comprehensive. Use `try`, `catch`, and error unions to properly handle and propagate errors. This makes your code more robust and easier to debug.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Pointers" icon="warning">
+    ```zig
+    // Anti-pattern: Excessive use of pointers
+    fn modifyValue(value: *i32) void {
+        value.* += 1;
+    }
+    
+    fn processArray(array: []*i32) void {
+        for (array) |item| {
+            modifyValue(item);
+        }
+    }
+    
+    // Usage
+    var numbers = [_]i32{ 1, 2, 3, 4, 5 };
+    var pointers: [5]*i32 = undefined;
+    for (numbers, 0..) |*number, i| {
+        pointers[i] = number;
+    }
+    processArray(&pointers);
+    
+    // Better approach: Use slices and references where appropriate
+    fn modifyValue(value: *i32) void {
+        value.* += 1;
+    }
+    
+    fn processArray(array: []i32) void {
+        for (array) |*item| {
+            modifyValue(item);
+        }
+    }
+    
+    // Usage
+    var numbers = [_]i32{ 1, 2, 3, 4, 5 };
+    processArray(&numbers);
+    ```
+    Avoid excessive use of pointers in Zig. While pointers are necessary in some cases, Zig provides safer alternatives like slices and references that are often more appropriate. Use pointers only when you need to represent optional values (`?*T`), share ownership, or interface with C code.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Memory Management" icon="warning">
+    ```zig
+    // Anti-pattern: Poor memory management
+    fn createString() ![]u8 {
+        var allocator = std.heap.page_allocator;
+        var result = try allocator.alloc(u8, 100);
+        // No way for caller to free this memory
+        return result;
+    }
+    
+    // Usage
+    fn main() !void {
+        const str = try createString();
+        // Memory leak: no way to free str
+    }
+    
+    // Better approach: Pass allocator to functions
+    fn createString(allocator: std.mem.Allocator) ![]u8 {
+        var result = try allocator.alloc(u8, 100);
+        return result;
+    }
+    
+    // Usage
+    fn main() !void {
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        defer _ = gpa.deinit();
+        const allocator = gpa.allocator();
+        
+        const str = try createString(allocator);
+        defer allocator.free(str);
+        
+        // Use str...
+    }
+    ```
+    Use proper memory management in Zig. Pass allocators to functions that need to allocate memory, and make it clear who is responsible for freeing that memory. Use `defer` to ensure resources are properly cleaned up, even in the presence of errors.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Sets" icon="warning">
+    ```zig
+    // Anti-pattern: Using anyerror instead of specific error sets
+    fn readConfig(path: []const u8) anyerror!void {
+        // Implementation...
+    }
+    
+    // Usage
+    fn main() !void {
+        readConfig("config.txt") catch |err| {
+            // No compile-time knowledge of possible errors
+            std.debug.print("Error: {any}\n", .{err});
+            return err;
+        };
+    }
+    
+    // Better approach: Use specific error sets
+    const ConfigError = error{
+        FileNotFound,
+        InvalidFormat,
+        PermissionDenied,
+    };
+    
+    fn readConfig(path: []const u8) ConfigError!void {
+        // Implementation...
+    }
+    
+    // Usage
+    fn main() !void {
+        readConfig("config.txt") catch |err| switch (err) {
+            // Compiler ensures all possible errors are handled
+            ConfigError.FileNotFound => std.debug.print("Config file not found\n", .{}),
+            ConfigError.InvalidFormat => std.debug.print("Invalid config format\n", .{}),
+            ConfigError.PermissionDenied => std.debug.print("Permission denied\n", .{}),
+        };
+    }
+    ```
+    Define specific error sets for your functions instead of using `anyerror`. This provides better documentation, enables more precise error handling, and allows the compiler to ensure all possible errors are handled.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```zig
+    // Anti-pattern: Not writing tests
+    fn add(a: i32, b: i32) i32 {
+        return a + b;
+    }
+    
+    // Better approach: Write tests using the built-in test framework
+    fn add(a: i32, b: i32) i32 {
+        return a + b;
+    }
+    
+    test "add function" {
+        try std.testing.expectEqual(@as(i32, 5), add(2, 3));
+        try std.testing.expectEqual(@as(i32, 0), add(0, 0));
+        try std.testing.expectEqual(@as(i32, -1), add(2, -3));
+    }
+    ```
+    Write tests for your Zig code using the built-in test framework. Zig makes testing easy with the `test` block syntax and the `std.testing` module. Tests help ensure your code works correctly and continues to work as you make changes.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling for Resources" icon="warning">
+    ```zig
+    // Anti-pattern: Improper resource cleanup on errors
+    fn processFile(path: []const u8) !void {
+        const file = try std.fs.cwd().openFile(path, .{});
+        // If an error occurs after this point, file will not be closed
+        
+        const data = try file.readToEndAlloc(std.heap.page_allocator, std.math.maxInt(usize));
+        // If an error occurs after this point, data will not be freed
+        
+        // Process data...
+        
+        std.heap.page_allocator.free(data);
+        file.close();
+    }
+    
+    // Better approach: Use defer for resource cleanup
+    fn processFile(path: []const u8) !void {
+        const file = try std.fs.cwd().openFile(path, .{});
+        defer file.close();
+        
+        const data = try file.readToEndAlloc(std.heap.page_allocator, std.math.maxInt(usize));
+        defer std.heap.page_allocator.free(data);
+        
+        // Process data...
+        // Resources will be cleaned up automatically, even if an error occurs
+    }
+    ```
+    Use `defer` to ensure resources are properly cleaned up, even in the presence of errors. This prevents resource leaks and makes your code more robust.
+  </Accordion>
+  
+  <Accordion title="Misusing Undefined Behavior" icon="warning">
+    ```zig
+    // Anti-pattern: Misusing undefined behavior
+    fn dangerousFunction() void {
+        var array: [10]u8 = undefined;
+        // Using uninitialized memory
+        std.debug.print("{any}\n", .{array});
+        
+        // Out-of-bounds access
+        const value = array[10];
+        
+        // Integer overflow in safe mode
+        var x: u8 = 255;
+        x += 1;
+    }
+    
+    // Better approach: Initialize memory and check bounds
+    fn safeFunction() void {
+        var array: [10]u8 = [_]u8{0} ** 10;
+        std.debug.print("{any}\n", .{array});
+        
+        // Bounds checking
+        const index = 10;
+        if (index < array.len) {
+            const value = array[index];
+        } else {
+            std.debug.print("Index out of bounds\n", .{});
+        }
+        
+        // Overflow checking
+        var x: u8 = 255;
+        x = std.math.add(u8, x, 1) catch |err| {
+            std.debug.print("Overflow: {any}\n", .{err});
+            return;
+        };
+    }
+    ```
+    Avoid undefined behavior in Zig. Initialize variables before using them, check array bounds, and use safe arithmetic operations. While Zig provides tools for working with undefined memory, use them carefully and only when necessary.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Build System" icon="warning">
+    ```zig
+    // Anti-pattern: Not using Zig's build system
+    // Manually compiling with command-line flags
+    // $ zig build-exe main.zig -O ReleaseFast -lc
+    
+    // Better approach: Use build.zig
+    // build.zig
+    const std = @import("std");
+    
+    pub fn build(b: *std.Build) void {
+        const target = b.standardTargetOptions(.{});
+        const optimize = b.standardOptimizeOption(.{});
+        
+        const exe = b.addExecutable(.{
+            .name = "my_app",
+            .root_source_file = .{ .path = "src/main.zig" },
+            .target = target,
+            .optimize = optimize,
+        });
+        
+        // Add dependencies
+        exe.linkLibC();
+        
+        // Add tests
+        const tests = b.addTest(.{
+            .root_source_file = .{ .path = "src/main.zig" },
+            .target = target,
+            .optimize = optimize,
+        });
+        
+        const test_step = b.step("test", "Run tests");
+        test_step.dependOn(&tests.step);
+        
+        b.installArtifact(exe);
+    }
+    ```
+    Use Zig's build system for your projects. The build system provides a clean, declarative way to specify build configurations, dependencies, and tests. It also makes cross-compilation easier and more consistent.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```zig
+    // Anti-pattern: Poor or no documentation
+    fn calculateScore(player: *Player, level: u32) u32 {
+        return player.baseScore * level + player.bonus;
+    }
+    
+    // Better approach: Include proper documentation
+    /// Calculates the player's score for a given level.
+    /// The score is calculated as (baseScore * level + bonus).
+    /// 
+    /// Parameters:
+    ///   player: A pointer to the Player struct containing the player's stats.
+    ///   level: The level number for which to calculate the score.
+    /// 
+    /// Returns: The calculated score as an unsigned 32-bit integer.
+    fn calculateScore(player: *Player, level: u32) u32 {
+        return player.baseScore * level + player.bonus;
+    }
+    ```
+    Document your code with clear, concise comments. Good documentation helps others (and your future self) understand how to use your code correctly. Use doc comments (`///`) for public APIs and regular comments (`//`) for implementation details.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Messages" icon="warning">
+    ```zig
+    // Anti-pattern: Poor error messages
+    fn parseConfig(data: []const u8) !Config {
+        if (data.len == 0) return error.InvalidConfig;
+        // Parse config...
+    }
+    
+    // Better approach: Use descriptive error messages
+    const ConfigError = error{
+        EmptyConfig,
+        MissingRequiredField,
+        InvalidFieldValue,
+        // ...
+    };
+    
+    fn parseConfig(data: []const u8) ConfigError!Config {
+        if (data.len == 0) return ConfigError.EmptyConfig;
+        
+        // Check for required fields
+        if (!hasField(data, "name")) return ConfigError.MissingRequiredField;
+        
+        // Validate field values
+        const value = getValue(data, "count");
+        if (value < 0) return ConfigError.InvalidFieldValue;
+        
+        // Parse config...
+    }
+    ```
+    Provide clear, descriptive error messages in your code. Use specific error types and meaningful error names. This makes debugging easier and helps users of your code understand what went wrong.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Naming Conventions" icon="warning">
+    ```zig
+    // Anti-pattern: Inconsistent naming
+    fn calculate_score(PlayerData: *player_data, Level: u32) u32 {
+        return PlayerData.base_score * Level + PlayerData.BONUS;
+    }
+    
+    // Better approach: Follow Zig naming conventions
+    fn calculateScore(player: *Player, level: u32) u32 {
+        return player.baseScore * level + player.bonus;
+    }
+    ```
+    Follow Zig's naming conventions. Use camelCase for functions and variables, PascalCase for types, and SCREAMING_SNAKE_CASE for constants. Consistent naming makes your code more readable and idiomatic.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Imports" icon="warning">
+    ```zig
+    // Anti-pattern: Global imports and aliases
+    const std = @import("std");
+    const print = std.debug.print;
+    const mem = std.mem;
+    const fs = std.fs;
+    
+    fn main() !void {
+        print("Hello, world!\n", .{});
+        var buffer: [100]u8 = undefined;
+        mem.set(u8, &buffer, 0);
+        const file = try fs.cwd().createFile("test.txt", .{});
+        defer file.close();
+    }
+    
+    // Better approach: Local imports and qualified names
+    const std = @import("std");
+    
+    fn main() !void {
+        std.debug.print("Hello, world!\n", .{});
+        var buffer: [100]u8 = undefined;
+        std.mem.set(u8, &buffer, 0);
+        const file = try std.fs.cwd().createFile("test.txt", .{});
+        defer file.close();
+    }
+    ```
+    Use imports judiciously in Zig. Prefer qualified names (e.g., `std.debug.print`) over aliases to make it clear where functions and types come from. This improves code readability and helps avoid name conflicts.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling for Optional Values" icon="warning">
+    ```zig
+    // Anti-pattern: Force-unwrapping optional values
+    fn findUser(id: u64) ?*User {
+        // Implementation...
+    }
+    
+    fn processUser(id: u64) void {
+        const user = findUser(id).?; // Will crash if user is null
+        // Process user...
+    }
+    
+    // Better approach: Properly handle optional values
+    fn processUser(id: u64) void {
+        const user_opt = findUser(id);
+        if (user_opt) |user| {
+            // Process user...
+        } else {
+            std.debug.print("User not found\n", .{});
+        }
+    }
+    
+    // Or using if-else
+    fn processUser(id: u64) void {
+        if (findUser(id)) |user| {
+            // Process user...
+        } else {
+            std.debug.print("User not found\n", .{});
+        }
+    }
+    ```
+    Handle optional values properly in Zig. Use `if (optional) |value|` or `if (optional) |value| else {}` to safely unwrap optional values. Avoid force-unwrapping with `.?` unless you're absolutely certain the value is non-null.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Concurrency Patterns" icon="warning">
+    ```zig
+    // Anti-pattern: Unsafe concurrency
+    var counter: usize = 0;
+    
+    fn incrementCounter() void {
+        counter += 1; // Race condition in concurrent context
+    }
+    
+    // Better approach: Use atomic operations
+    const std = @import("std");
+    const Atomic = std.atomic.Atomic;
+    
+    var counter = Atomic(usize).init(0);
+    
+    fn incrementCounter() void {
+        _ = counter.fetchAdd(1, .Monotonic);
+    }
+    
+    // Or use proper synchronization
+    const std = @import("std");
+    const Mutex = std.Thread.Mutex;
+    
+    var mutex = Mutex{};
+    var counter: usize = 0;
+    
+    fn incrementCounter() void {
+        mutex.lock();
+        defer mutex.unlock();
+        counter += 1;
+    }
+    ```
+    Use proper concurrency patterns in Zig. For shared mutable state, use atomic operations or proper synchronization primitives like mutexes. This prevents race conditions and ensures thread safety.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Propagation" icon="warning">
+    ```zig
+    // Anti-pattern: Manual error propagation
+    fn readConfig(path: []const u8) ConfigError!Config {
+        const file = std.fs.cwd().openFile(path, .{}) catch |err| {
+            return err;
+        };
+        defer file.close();
+        
+        const data = file.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
+            return err;
+        };
+        defer allocator.free(data);
+        
+        return parseConfig(data);
+    }
+    
+    // Better approach: Use try for error propagation
+    fn readConfig(path: []const u8) ConfigError!Config {
+        const file = try std.fs.cwd().openFile(path, .{});
+        defer file.close();
+        
+        const data = try file.readToEndAlloc(allocator, std.math.maxInt(usize));
+        defer allocator.free(data);
+        
+        return parseConfig(data);
+    }
+    ```
+    Use `try` for error propagation in Zig. The `try` keyword is a concise way to propagate errors up the call stack. It's equivalent to `x catch |err| return err`, but more readable and idiomatic.
+  </Accordion>
+</AccordionGroup>

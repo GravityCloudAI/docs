@@ -1,0 +1,360 @@
+---
+title: 'Python'
+description: 'Python is a high-level, interpreted programming language known for its readability and versatility. It emphasizes code readability with its notable use of significant indentation and supports multiple programming paradigms.'
+---
+
+<AccordionGroup>
+  <Accordion title="Python Anti-Patterns Overview" icon="python">
+    Python, despite its elegance and readability, has several common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing Python code.
+  </Accordion>
+  
+  <Accordion title="Using Mutable Default Arguments" icon="warning">
+    ```python
+    # Anti-pattern: Mutable default argument
+    def append_to(element, to=[]):
+        to.append(element)
+        return to
+    
+    # This will not work as expected
+    append_to(1)  # Returns [1]
+    append_to(2)  # Returns [1, 2], not [2]
+    
+    # Better approach
+    def append_to(element, to=None):
+        if to is None:
+            to = []
+        to.append(element)
+        return to
+    ```
+    Default arguments in Python are evaluated only once at function definition time, not each time the function is called. This can lead to unexpected behavior with mutable objects like lists, dictionaries, or sets.
+  </Accordion>
+  
+  <Accordion title="Not Using Context Managers" icon="warning">
+    ```python
+    # Anti-pattern: Not using context managers
+    f = open('file.txt', 'r')
+    data = f.read()
+    # What if an exception occurs here?
+    f.close()
+    
+    # Better approach: Use context managers
+    with open('file.txt', 'r') as f:
+        data = f.read()
+    # File is automatically closed, even if an exception occurs
+    ```
+    Always use context managers (`with` statement) for resource management to ensure resources are properly cleaned up, even if exceptions occur.
+  </Accordion>
+  
+  <Accordion title="Using Wildcard Imports" icon="warning">
+    ```python
+    # Anti-pattern: Wildcard imports
+    from module import *
+    
+    # Better approach: Import only what you need
+    from module import specific_function, AnotherFunction
+    # Or
+    import module
+    ```
+    Wildcard imports pollute the namespace, can lead to name conflicts, and make it difficult to track where functions and classes are coming from.
+  </Accordion>
+  
+  <Accordion title="Ignoring Exceptions Too Broadly" icon="warning">
+    ```python
+    # Anti-pattern: Catching all exceptions
+    try:
+        do_something()
+    except Exception:
+        pass  # Silently ignore all errors
+    
+    # Better approach: Catch specific exceptions
+    try:
+        do_something()
+    except ValueError as e:
+        logger.error(f"Value error occurred: {e}")
+    except IOError as e:
+        logger.error(f"IO error occurred: {e}")
+    ```
+    Catching exceptions too broadly can hide bugs and make debugging difficult. Always catch specific exceptions and handle them appropriately.
+  </Accordion>
+  
+  <Accordion title="Modifying Lists During Iteration" icon="warning">
+    ```python
+    # Anti-pattern: Modifying a list during iteration
+    numbers = [1, 2, 3, 4, 5]
+    for i in range(len(numbers)):
+        if numbers[i] % 2 == 0:
+            numbers.remove(numbers[i])  # This will skip elements
+    
+    # Better approach: Create a new list or use list comprehension
+    numbers = [1, 2, 3, 4, 5]
+    numbers = [n for n in numbers if n % 2 != 0]
+    # Or
+    odd_numbers = []
+    for n in numbers:
+        if n % 2 != 0:
+            odd_numbers.append(n)
+    ```
+    Modifying a list while iterating over it can lead to skipped elements or index errors. Create a new list or use list comprehension instead.
+  </Accordion>
+  
+  <Accordion title="Using type() Instead of isinstance()" icon="warning">
+    ```python
+    # Anti-pattern: Using type() for type checking
+    if type(obj) == list:
+        # Do something with list
+    
+    # Better approach: Use isinstance() for type checking
+    if isinstance(obj, list):
+        # Do something with list
+    ```
+    Using `type()` doesn't account for inheritance. `isinstance()` checks if an object is an instance of a class or any of its subclasses, which is usually what you want.
+  </Accordion>
+  
+  <Accordion title="Not Using Generator Expressions" icon="warning">
+    ```python
+    # Anti-pattern: Loading entire dataset into memory
+    data = [process(x) for x in large_dataset]
+    
+    # Better approach: Use generator expressions
+    data = (process(x) for x in large_dataset)
+    ```
+    List comprehensions load the entire result into memory. For large datasets, use generator expressions to process items one at a time, saving memory.
+  </Accordion>
+  
+  <Accordion title="Using Global Variables" icon="warning">
+    ```python
+    # Anti-pattern: Using global variables
+    counter = 0
+    
+    def increment_counter():
+        global counter
+        counter += 1
+    
+    # Better approach: Use class or function scope
+    class Counter:
+        def __init__(self):
+            self.value = 0
+        
+        def increment(self):
+            self.value += 1
+    ```
+    Global variables make code harder to test, debug, and maintain. Use class attributes or function parameters instead.
+  </Accordion>
+  
+  <Accordion title="Not Using enumerate()" icon="warning">
+    ```python
+    # Anti-pattern: Manual indexing
+    items = ['a', 'b', 'c']
+    for i in range(len(items)):
+        print(f"Item {i}: {items[i]}")
+    
+    # Better approach: Use enumerate()
+    for i, item in enumerate(items):
+        print(f"Item {i}: {item}")
+    ```
+    When you need both the index and value during iteration, use `enumerate()` instead of manual indexing for cleaner, more readable code.
+  </Accordion>
+  
+  <Accordion title="String Concatenation in Loops" icon="warning">
+    ```python
+    # Anti-pattern: String concatenation in loops
+    result = ""
+    for i in range(1000):
+        result += str(i)
+    
+    # Better approach: Use join() or list comprehension
+    result = ''.join(str(i) for i in range(1000))
+    ```
+    String concatenation in loops is inefficient because strings are immutable. Use `join()` on a generator expression or list comprehension instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Data Structures" icon="warning">
+    ```python
+    # Anti-pattern: Using plain tuples for structured data
+    person = ('John', 'Doe', 30)
+    print(person[0], person[1])  # Unclear what these indices mean
+    
+    # Better approach: Use namedtuple or dataclass
+    from collections import namedtuple
+    Person = namedtuple('Person', ['first_name', 'last_name', 'age'])
+    person = Person('John', 'Doe', 30)
+    print(person.first_name, person.last_name)
+    
+    # Or with dataclasses (Python 3.7+)
+    from dataclasses import dataclass
+    
+    @dataclass
+    class Person:
+        first_name: str
+        last_name: str
+        age: int
+    ```
+    Use appropriate data structures like namedtuples or dataclasses for better code readability and maintainability.
+  </Accordion>
+  
+  <Accordion title="Reinventing the Wheel" icon="warning">
+    ```python
+    # Anti-pattern: Implementing functionality that exists in standard library
+    def get_unique_items(items):
+        unique = []
+        for item in items:
+            if item not in unique:
+                unique.append(item)
+        return unique
+    
+    # Better approach: Use built-in set
+    def get_unique_items(items):
+        return list(set(items))
+    ```
+    Python's standard library is extensive. Before implementing functionality, check if it already exists in the standard library or a well-maintained package.
+  </Accordion>
+  
+  <Accordion title="Not Using Virtual Environments" icon="warning">
+    ```python
+    # Anti-pattern: Installing packages globally
+    # pip install some-package  # Affects all projects
+    
+    # Better approach: Use virtual environments
+    # python -m venv myenv
+    # source myenv/bin/activate  # On Windows: myenv\Scripts\activate
+    # pip install some-package  # Only affects this environment
+    ```
+    Always use virtual environments to isolate project dependencies and avoid conflicts between different projects.
+  </Accordion>
+  
+  <Accordion title="Using Bare Except Clauses" icon="warning">
+    ```python
+    # Anti-pattern: Bare except clause
+    try:
+        do_something()
+    except:
+        # Catches all exceptions, including KeyboardInterrupt, SystemExit
+        handle_error()
+    
+    # Better approach: Specify exceptions or use Exception
+    try:
+        do_something()
+    except Exception as e:
+        # Still broad, but doesn't catch KeyboardInterrupt, SystemExit
+        handle_error(e)
+    ```
+    Bare `except:` clauses catch all exceptions, including those you might not want to catch like `KeyboardInterrupt` and `SystemExit`. Always specify which exceptions to catch.
+  </Accordion>
+  
+  <Accordion title="Not Using pathlib" icon="warning">
+    ```python
+    # Anti-pattern: Using os.path for file operations
+    import os
+    file_path = os.path.join('dir', 'subdir', 'file.txt')
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            content = f.read()
+    
+    # Better approach: Use pathlib
+    from pathlib import Path
+    file_path = Path('dir') / 'subdir' / 'file.txt'
+    if file_path.exists():
+        content = file_path.read_text()
+    ```
+    For Python 3.4+, use `pathlib` for file operations. It provides an object-oriented interface and simplifies many common file operations.
+  </Accordion>
+  
+  <Accordion title="Not Using f-strings" icon="warning">
+    ```python
+    # Anti-pattern: Old-style string formatting
+    name = "John"
+    age = 30
+    message = "Hello, %s! You are %d years old." % (name, age)
+    # Or
+    message = "Hello, {}! You are {} years old.".format(name, age)
+    
+    # Better approach: Use f-strings
+    message = f"Hello, {name}! You are {age} years old."
+    ```
+    For Python 3.6+, use f-strings for string formatting. They are more readable, concise, and often faster than older formatting methods.
+  </Accordion>
+  
+  <Accordion title="Using eval() or exec()" icon="warning">
+    ```python
+    # Anti-pattern: Using eval for dynamic code execution
+    user_input = "2 + 2"
+    result = eval(user_input)  # Security risk!
+    
+    # Better approach: Use safer alternatives
+    import ast
+    def safe_eval(expr):
+        try:
+            return ast.literal_eval(expr)  # Only evaluates literals
+        except (ValueError, SyntaxError):
+            raise ValueError("Invalid expression")
+    ```
+    Avoid `eval()` and `exec()` as they can execute arbitrary code and pose security risks. Use safer alternatives like `ast.literal_eval()` when needed.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Logging" icon="warning">
+    ```python
+    # Anti-pattern: Using print for debugging
+    def process_data(data):
+        print("Processing data:", data)
+        # Process data...
+        print("Done processing")
+    
+    # Better approach: Use the logging module
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    
+    def process_data(data):
+        logging.info(f"Processing data: {data}")
+        # Process data...
+        logging.info("Done processing")
+    ```
+    Use the `logging` module instead of `print()` statements for debugging and monitoring. It offers more flexibility, including log levels, formatting, and output destinations.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Argument Parsing" icon="warning">
+    ```python
+    # Anti-pattern: Manual argument parsing
+    import sys
+    
+    if len(sys.argv) > 1:
+        filename = sys.argv[1]
+    else:
+        filename = "default.txt"
+    
+    # Better approach: Use argparse
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Process a file.")
+    parser.add_argument('filename', nargs='?', default='default.txt',
+                        help='file to process')
+    args = parser.parse_args()
+    filename = args.filename
+    ```
+    For command-line applications, use the `argparse` module instead of manually parsing `sys.argv`. It provides help messages, type conversion, and validation.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```python
+    # Anti-pattern: Manual testing
+    def add(a, b):
+        return a + b
+    
+    # Manual test
+    result = add(2, 3)
+    if result != 5:
+        print("Test failed!")
+    
+    # Better approach: Use unittest or pytest
+    import unittest
+    
+    class TestAddFunction(unittest.TestCase):
+        def test_add(self):
+            self.assertEqual(add(2, 3), 5)
+            self.assertEqual(add(-1, 1), 0)
+    
+    if __name__ == '__main__':
+        unittest.main()
+    ```
+    Use proper testing frameworks like `unittest` or `pytest` instead of manual testing. They provide test discovery, assertions, setup/teardown, and reporting.
+  </Accordion>
+</AccordionGroup>

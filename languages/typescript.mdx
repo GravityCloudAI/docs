@@ -1,0 +1,448 @@
+---
+title: 'TypeScript'
+description: 'TypeScript is a strongly typed programming language that builds on JavaScript, giving you better tooling at any scale. It adds static types to JavaScript, helping catch errors early and making code more maintainable.'
+---
+
+<AccordionGroup>
+  <Accordion title="TypeScript Anti-Patterns Overview" icon="typescript">
+    TypeScript, while improving upon JavaScript with static typing, still has common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing TypeScript code.
+  </Accordion>
+  
+  <Accordion title="Overusing any Type" icon="warning">
+    ```typescript
+    // Anti-pattern: Overusing 'any'
+    function processData(data: any): any {
+      return data.map((item: any) => item.value);
+    }
+    
+    // Better approach: Define proper types
+    interface DataItem {
+      value: string;
+      id: number;
+    }
+    
+    function processData(data: DataItem[]): string[] {
+      return data.map(item => item.value);
+    }
+    ```
+    Using `any` defeats the purpose of TypeScript's type system. It bypasses type checking and can lead to runtime errors that TypeScript is designed to prevent.
+  </Accordion>
+  
+  <Accordion title="Type Assertions Without Verification" icon="warning">
+    ```typescript
+    // Anti-pattern: Unsafe type assertion
+    const userData = JSON.parse(response) as UserData;
+    
+    // Better approach: Validate before assertion
+    function isUserData(obj: any): obj is UserData {
+      return obj && typeof obj.name === 'string' && typeof obj.id === 'number';
+    }
+    
+    const parsedData = JSON.parse(response);
+    if (isUserData(parsedData)) {
+      const userData: UserData = parsedData;
+      // Use userData safely
+    }
+    ```
+    Type assertions (`as` keyword) tell the compiler to trust you without verification. Use type guards to validate data at runtime.
+  </Accordion>
+  
+  <Accordion title="Not Using readonly for Immutable Properties" icon="warning">
+    ```typescript
+    // Anti-pattern: Mutable interface properties
+    interface Config {
+      apiUrl: string;
+      maxRetries: number;
+    }
+    
+    // Better approach: Use readonly for immutable properties
+    interface Config {
+      readonly apiUrl: string;
+      readonly maxRetries: number;
+    }
+    ```
+    Use the `readonly` modifier for properties that shouldn't change after initialization to prevent accidental mutations.
+  </Accordion>
+  
+  <Accordion title="Using Object as a Type" icon="warning">
+    ```typescript
+    // Anti-pattern: Using Object as a type
+    function processObject(obj: Object) {
+      // ...
+    }
+    
+    // Better approach: Use more specific types or generics
+    function processObject<T extends Record<string, unknown>>(obj: T) {
+      // ...
+    }
+    ```
+    The `Object` type is too general and doesn't provide useful type information. Use more specific types or generics.
+  </Accordion>
+  
+  <Accordion title="Not Leveraging Discriminated Unions" icon="warning">
+    ```typescript
+    // Anti-pattern: Complex type checking
+    interface Square {
+      kind?: string;
+      size: number;
+    }
+    
+    interface Rectangle {
+      kind?: string;
+      width: number;
+      height: number;
+    }
+    
+    type Shape = Square | Rectangle;
+    
+    function area(shape: Shape) {
+      if ('size' in shape) {
+        return shape.size * shape.size;
+      }
+      if ('width' in shape) {
+        return shape.width * shape.height;
+      }
+    }
+    
+    // Better approach: Use discriminated unions
+    interface Square {
+      kind: 'square';
+      size: number;
+    }
+    
+    interface Rectangle {
+      kind: 'rectangle';
+      width: number;
+      height: number;
+    }
+    
+    type Shape = Square | Rectangle;
+    
+    function area(shape: Shape) {
+      switch (shape.kind) {
+        case 'square':
+          return shape.size * shape.size;
+        case 'rectangle':
+          return shape.width * shape.height;
+      }
+    }
+    ```
+    Discriminated unions (also called tagged unions) make working with union types safer and more maintainable by adding a common property that can be used to distinguish between types.
+  </Accordion>
+  
+  <Accordion title="Using Function Types Instead of Interfaces" icon="warning">
+    ```typescript
+    // Anti-pattern: Using function types for complex callbacks
+    type FetchCallback = (data: any, error: Error | null) => void;
+    
+    // Better approach: Use interfaces for complex callbacks
+    interface FetchCallback {
+      (data: any, error: Error | null): void;
+      cancel?: () => void;
+      retry?: () => void;
+    }
+    ```
+    For complex function types, especially those with additional properties, use interfaces instead of simple function types.
+  </Accordion>
+  
+  <Accordion title="Not Using Strict Null Checks" icon="warning">
+    ```typescript
+    // Anti-pattern: Not using strict null checks
+    // tsconfig.json: { "strictNullChecks": false }
+    function getLength(text: string) {
+      return text.length; // text could be null or undefined
+    }
+    
+    // Better approach: Enable strict null checks
+    // tsconfig.json: { "strictNullChecks": true }
+    function getLength(text: string | null | undefined) {
+      return text?.length ?? 0; // Safely handle null/undefined
+    }
+    ```
+    Always enable `strictNullChecks` in your TypeScript configuration to catch null and undefined errors at compile time.
+  </Accordion>
+  
+  <Accordion title="Using String Enums Instead of Literal Types" icon="warning">
+    ```typescript
+    // Anti-pattern: Using string enums for simple cases
+    enum Direction {
+      Up = 'UP',
+      Down = 'DOWN',
+      Left = 'LEFT',
+      Right = 'RIGHT'
+    }
+    
+    // Better approach: Use literal types for simple cases
+    type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+    ```
+    For simple string constants, string literal unions are often more appropriate than enums, as they result in less code and are more straightforward.
+  </Accordion>
+  
+  <Accordion title="Not Using Index Signatures Properly" icon="warning">
+    ```typescript
+    // Anti-pattern: Incorrect index signature
+    interface StringDictionary {
+      [key: string]: string;
+      length: number; // Error: Property 'length' of type 'number' is not assignable to string index type 'string'
+    }
+    
+    // Better approach: Use correct index signature
+    interface StringDictionary {
+      [key: string]: string | number; // Allow both string and number values
+      length: number; // Now this is valid
+    }
+    ```
+    When using index signatures, make sure they're compatible with all properties in the interface.
+  </Accordion>
+  
+  <Accordion title="Not Using Utility Types" icon="warning">
+    ```typescript
+    // Anti-pattern: Manually creating derived types
+    interface User {
+      id: number;
+      name: string;
+      email: string;
+    }
+    
+    interface PartialUser {
+      id?: number;
+      name?: string;
+      email?: string;
+    }
+    
+    // Better approach: Use utility types
+    interface User {
+      id: number;
+      name: string;
+      email: string;
+    }
+    
+    // Use built-in utility types
+    type PartialUser = Partial<User>;
+    type ReadonlyUser = Readonly<User>;
+    type UserKeys = keyof User;
+    ```
+    TypeScript provides many built-in utility types like `Partial`, `Readonly`, `Pick`, `Omit`, etc. Use them instead of manually creating derived types.
+  </Accordion>
+  
+  <Accordion title="Using namespace Instead of ES Modules" icon="warning">
+    ```typescript
+    // Anti-pattern: Using namespaces
+    namespace Utils {
+      export function format(date: Date): string {
+        return date.toISOString();
+      }
+    }
+    
+    // Better approach: Use ES modules
+    // utils.ts
+    export function format(date: Date): string {
+      return date.toISOString();
+    }
+    
+    // app.ts
+    import { format } from './utils';
+    ```
+    Namespaces are an older way of organizing code in TypeScript. Modern TypeScript code should use ES modules (import/export) instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Type Guards" icon="warning">
+    ```typescript
+    // Anti-pattern: Type casting without checks
+    function processValue(value: string | number) {
+      const numValue = value as number;
+      return numValue.toFixed(2); // Runtime error if value is a string
+    }
+    
+    // Better approach: Use type guards
+    function processValue(value: string | number) {
+      if (typeof value === 'number') {
+        return value.toFixed(2);
+      }
+      return value;
+    }
+    ```
+    Use type guards (`typeof`, `instanceof`, or custom predicates) to narrow types safely instead of type assertions.
+  </Accordion>
+  
+  <Accordion title="Not Using Interfaces for Public APIs" icon="warning">
+    ```typescript
+    // Anti-pattern: Using types for public APIs
+    export type User = {
+      id: number;
+      name: string;
+    };
+    
+    // Better approach: Use interfaces for public APIs
+    export interface User {
+      id: number;
+      name: string;
+    }
+    ```
+    Interfaces are generally preferred for public APIs because they can be extended later without breaking changes, while types cannot.
+  </Accordion>
+  
+  <Accordion title="Using the Non-null Assertion Operator (!.)" icon="warning">
+    ```typescript
+    // Anti-pattern: Using non-null assertion
+    function getUser(id: string): User | null {
+      // Implementation might return null
+      return findUser(id);
+    }
+    
+    const user = getUser('123')!; // Dangerous: assumes getUser never returns null
+    console.log(user.name); // Might cause runtime error
+    
+    // Better approach: Use proper null checking
+    const user = getUser('123');
+    if (user) {
+      console.log(user.name);
+    }
+    ```
+    The non-null assertion operator (`!`) tells TypeScript to ignore the possibility of `null` or `undefined`. This can lead to runtime errors if the value is actually null.
+  </Accordion>
+  
+  <Accordion title="Not Using Unknown for API Responses" icon="warning">
+    ```typescript
+    // Anti-pattern: Using any for API responses
+    async function fetchData(): Promise<any> {
+      const response = await fetch('/api/data');
+      return response.json();
+    }
+    
+    // Better approach: Use unknown with type guards
+    async function fetchData(): Promise<unknown> {
+      const response = await fetch('/api/data');
+      return response.json();
+    }
+    
+    // Usage with type guard
+    const data = await fetchData();
+    if (isUserData(data)) {
+      // Now TypeScript knows data is UserData
+      console.log(data.name);
+    }
+    ```
+    Use `unknown` instead of `any` for values from external sources like API responses, then use type guards to narrow the type safely.
+  </Accordion>
+  
+  <Accordion title="Not Using Branded Types for IDs" icon="warning">
+    ```typescript
+    // Anti-pattern: Using primitive types for IDs
+    interface User {
+      id: string;
+      name: string;
+    }
+    
+    interface Order {
+      id: string;
+      userId: string; // Could accidentally use orderId here
+    }
+    
+    // Better approach: Use branded types
+    type UserId = string & { readonly _brand: unique symbol };
+    type OrderId = string & { readonly _brand: unique symbol };
+    
+    function createUserId(id: string): UserId {
+      return id as UserId;
+    }
+    
+    function createOrderId(id: string): OrderId {
+      return id as OrderId;
+    }
+    
+    interface User {
+      id: UserId;
+      name: string;
+    }
+    
+    interface Order {
+      id: OrderId;
+      userId: UserId; // Type safety prevents using OrderId here
+    }
+    ```
+    Branded types (also called nominal types) add type safety to primitive types like strings and numbers, preventing accidental use of the wrong ID type.
+  </Accordion>
+  
+  <Accordion title="Not Using Exhaustiveness Checking" icon="warning">
+    ```typescript
+    // Anti-pattern: Missing exhaustiveness check
+    type Status = 'pending' | 'fulfilled' | 'rejected';
+    
+    function handleStatus(status: Status) {
+      switch (status) {
+        case 'pending':
+          return 'Loading...';
+        case 'fulfilled':
+          return 'Success!';
+        // Missing case for 'rejected'
+      }
+    }
+    
+    // Better approach: Use exhaustiveness checking
+    function handleStatus(status: Status): string {
+      switch (status) {
+        case 'pending':
+          return 'Loading...';
+        case 'fulfilled':
+          return 'Success!';
+        case 'rejected':
+          return 'Error!';
+        default:
+          // This ensures all cases are handled
+          const _exhaustiveCheck: never = status;
+          return _exhaustiveCheck;
+      }
+    }
+    ```
+    Exhaustiveness checking ensures that all possible values of a union type are handled, catching errors when new values are added to the union.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Module Augmentation" icon="warning">
+    ```typescript
+    // Anti-pattern: Modifying third-party types directly
+    // Directly modifying Express Request type (error-prone)
+    interface Request {
+      user: User; // Error: Duplicate identifier 'Request'
+    }
+    
+    // Better approach: Use proper module augmentation
+    // In a declaration file (e.g., types.d.ts)
+    declare namespace Express {
+      interface Request {
+        user?: User;
+      }
+    }
+    ```
+    When extending third-party types, use proper module augmentation instead of trying to modify the original types directly.
+  </Accordion>
+  
+  <Accordion title="Not Using Conditional Types" icon="warning">
+    ```typescript
+    // Anti-pattern: Duplicating type logic
+    type StringOrNumberArray<T> = T extends string ? string[] : number[];
+    
+    // Separate functions for different types
+    function processStrings(input: string): string[] {
+      return input.split('');
+    }
+    
+    function processNumbers(input: number): number[] {
+      return [input, input * 2];
+    }
+    
+    // Better approach: Use conditional types
+    type ProcessResult<T> = T extends string ? string[] : T extends number ? number[] : never;
+    
+    function process<T extends string | number>(input: T): ProcessResult<T> {
+      if (typeof input === 'string') {
+        return input.split('') as ProcessResult<T>;
+      } else if (typeof input === 'number') {
+        return [input, input * 2] as ProcessResult<T>;
+      }
+      throw new Error('Unsupported input type');
+    }
+    ```
+    Conditional types allow you to create flexible, reusable type definitions that depend on the properties of input types.
+  </Accordion>
+</AccordionGroup>

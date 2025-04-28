@@ -1,0 +1,498 @@
+---
+title: 'Haskell'
+description: 'Haskell is a statically typed, purely functional programming language with type inference and lazy evaluation. It is designed for teaching, research, and industrial applications.'
+---
+
+<AccordionGroup>
+  <Accordion title="Haskell Anti-Patterns Overview" icon="haskell">
+    Haskell, despite being a powerful and elegant functional language, has several common anti-patterns that can lead to performance issues, maintainability problems, and bugs. Here are the most important anti-patterns to avoid when writing Haskell code.
+  </Accordion>
+  
+  <Accordion title="String Concatenation with ++" icon="warning">
+    ```haskell
+    -- Anti-pattern: String concatenation with ++
+    buildMessage :: [String] -> String
+    buildMessage [] = ""
+    buildMessage (x:xs) = x ++ " " ++ buildMessage xs  -- O(n²) complexity
+    
+    -- Better approach: Use a more efficient data structure
+    import Data.Text (Text)
+    import qualified Data.Text as T
+    
+    buildMessage :: [Text] -> Text
+    buildMessage = T.intercalate (T.pack " ")
+    
+    -- Or with String but using ShowS for efficiency
+    buildMessageS :: [String] -> String
+    buildMessageS xs = foldr (\x acc -> x ++ " " ++ acc) "" xs
+    ```
+    Avoid using `++` for repeated string concatenation, as it has O(n²) complexity. Use more efficient data structures like `Text` or `ByteString`, or techniques like `ShowS` or `Builder`.
+  </Accordion>
+  
+  <Accordion title="Partial Functions" icon="warning">
+    ```haskell
+    -- Anti-pattern: Partial functions
+    headOfList :: [a] -> a
+    headOfList xs = head xs  -- Crashes on empty list
+    
+    lookupValue :: Eq k => k -> [(k, v)] -> v
+    lookupValue k xs = fromJust (lookup k xs)  -- Crashes if key not found
+    
+    -- Better approach: Return Maybe or Either
+    headOfList :: [a] -> Maybe a
+    headOfList [] = Nothing
+    headOfList (x:_) = Just x
+    
+    lookupValue :: Eq k => k -> [(k, v)] -> Maybe v
+    lookupValue k xs = lookup k xs
+    ```
+    Avoid partial functions like `head`, `tail`, `fromJust`, etc. that can crash on certain inputs. Instead, use pattern matching or return `Maybe` or `Either` to handle all possible cases.
+  </Accordion>
+  
+  <Accordion title="Inefficient List Processing" icon="warning">
+    ```haskell
+    -- Anti-pattern: Inefficient list processing
+    sumOfSquares :: [Int] -> Int
+    sumOfSquares xs = sum [x * x | x <- xs, x > 0]  -- Creates intermediate list
+    
+    -- Better approach: Use foldr/foldl'
+    sumOfSquares :: [Int] -> Int
+    sumOfSquares = foldl' (\acc x -> if x > 0 then acc + x * x else acc) 0
+    ```
+    Avoid creating intermediate lists when processing data. Use higher-order functions like `foldr`, `foldl'`, or `foldMap` for more efficient processing.
+  </Accordion>
+  
+  <Accordion title="Not Using Strictness Annotations" icon="warning">
+    ```haskell
+    -- Anti-pattern: Not using strictness annotations
+    data Point = Point Double Double  -- Lazy fields
+    
+    sumPoints :: [Point] -> Point
+    sumPoints points = foldl addPoints (Point 0 0) points
+      where addPoints (Point x1 y1) (Point x2 y2) = Point (x1 + x2) (y1 + y2)
+    
+    -- Better approach: Use strictness annotations
+    data Point = Point !Double !Double  -- Strict fields
+    
+    sumPoints :: [Point] -> Point
+    sumPoints = foldl' addPoints (Point 0 0)
+      where addPoints (Point x1 y1) (Point x2 y2) = Point (x1 + x2) (y1 + y2)
+    ```
+    Use strictness annotations (`!`) for data fields that should be evaluated eagerly, especially in numeric computations, to avoid space leaks and improve performance.
+  </Accordion>
+  
+  <Accordion title="Using String Instead of Text or ByteString" icon="warning">
+    ```haskell
+    -- Anti-pattern: Using String for text processing
+    countLines :: String -> Int
+    countLines = length . lines
+    
+    -- Better approach: Use Text or ByteString
+    import qualified Data.Text as T
+    import qualified Data.Text.IO as TIO
+    
+    countLines :: T.Text -> Int
+    countLines = length . T.lines
+    
+    main :: IO ()
+    main = do
+      content <- TIO.readFile "file.txt"
+      print $ countLines content
+    ```
+    Avoid using `String` (which is a linked list of characters) for text processing. Use `Text` or `ByteString` for better performance with large text data.
+  </Accordion>
+  
+  <Accordion title="Not Using Newtypes" icon="warning">
+    ```haskell
+    -- Anti-pattern: Using type synonyms
+    type UserId = Int
+    type Username = String
+    
+    lookupUser :: UserId -> IO (Maybe Username)
+    lookupUser uid = -- implementation
+    
+    -- Prone to errors like this:
+    someFunction :: Username -> UserId -> IO ()
+    someFunction uid name = lookupUser name >>= -- Wrong order, but compiles!
+    
+    -- Better approach: Use newtypes
+    newtype UserId = UserId Int deriving (Eq, Show)
+    newtype Username = Username String deriving (Eq, Show)
+    
+    lookupUser :: UserId -> IO (Maybe Username)
+    lookupUser (UserId uid) = -- implementation
+    
+    -- Now this won't compile:
+    someFunction :: Username -> UserId -> IO ()
+    someFunction name uid = lookupUser name -- Type error!
+    ```
+    Use `newtype` instead of `type` for type aliases to get compile-time type checking and avoid mixing up values of the same underlying type but different semantic meanings.
+  </Accordion>
+  
+  <Accordion title="Excessive Use of Point-Free Style" icon="warning">
+    ```haskell
+    -- Anti-pattern: Excessive point-free style
+    processData :: [Int] -> [Int]
+    processData = map (*2) . filter (>0) . takeWhile (<100) . dropWhile (==0)
+    
+    -- Better approach: More readable style
+    processData :: [Int] -> [Int]
+    processData xs = map (*2) $ filter (>0) $ takeWhile (<100) $ dropWhile (==0) xs
+    
+    -- Or even clearer with named steps
+    processData :: [Int] -> [Int]
+    processData xs = map (*2) validNumbers
+      where 
+        withoutLeadingZeros = dropWhile (==0) xs
+        numbersUnder100 = takeWhile (<100) withoutLeadingZeros
+        validNumbers = filter (>0) numbersUnder100
+    ```
+    Avoid excessive point-free style that makes code hard to read. Use named parameters and intermediate values when it improves clarity.
+  </Accordion>
+  
+  <Accordion title="Not Using Record Syntax" icon="warning">
+    ```haskell
+    -- Anti-pattern: Not using record syntax
+    data Person = Person String Int String
+    
+    getName :: Person -> String
+    getName (Person name _ _) = name
+    
+    getAge :: Person -> Int
+    getAge (Person _ age _) = age
+    
+    getEmail :: Person -> String
+    getEmail (Person _ _ email) = email
+    
+    -- Better approach: Use record syntax
+    data Person = Person 
+      { name :: String
+      , age :: Int
+      , email :: String
+      }
+    
+    -- Now we get accessor functions for free
+    -- And can create/update records more clearly
+    updateEmail :: String -> Person -> Person
+    updateEmail newEmail person = person { email = newEmail }
+    ```
+    Use record syntax for data types with multiple fields to get accessor functions for free and make field access more explicit and maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Language Extensions Appropriately" icon="warning">
+    ```haskell
+    -- Anti-pattern: Not using helpful language extensions
+    data Maybe a = Nothing | Just a
+    
+    instance Functor Maybe where
+      fmap _ Nothing = Nothing
+      fmap f (Just a) = Just (f a)
+    
+    instance Applicative Maybe where
+      pure = Just
+      Nothing <*> _ = Nothing
+      (Just f) <*> x = fmap f x
+    
+    instance Monad Maybe where
+      return = pure
+      Nothing >>= _ = Nothing
+      (Just a) >>= f = f a
+    
+    -- Better approach: Use language extensions
+    {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+    
+    data Maybe a = Nothing | Just a
+      deriving (Functor, Foldable, Traversable)
+    
+    -- Or even better with more extensions
+    {-# LANGUAGE DerivingStrategies, GeneralizedNewtypeDeriving #-}
+    
+    newtype UserId = UserId Int
+      deriving stock (Eq, Ord, Show)
+      deriving newtype (Num, Enum)
+    ```
+    Use appropriate language extensions like `DeriveFunctor`, `RecordWildCards`, or `OverloadedStrings` to make your code more concise and expressive.
+  </Accordion>
+  
+  <Accordion title="Not Using Smart Constructors" icon="warning">
+    ```haskell
+    -- Anti-pattern: Exposing constructors for invalid states
+    module Email (Email(..)) where
+    
+    data Email = Email String
+    
+    -- Client code can create invalid emails
+    invalidEmail = Email "not-an-email"
+    
+    -- Better approach: Use smart constructors
+    module Email (Email, mkEmail, emailAddress) where
+    
+    data Email = Email String
+    
+    emailAddress :: Email -> String
+    emailAddress (Email addr) = addr
+    
+    mkEmail :: String -> Maybe Email
+    mkEmail addr
+      | isValidEmail addr = Just (Email addr)
+      | otherwise = Nothing
+    
+    isValidEmail :: String -> Bool
+    isValidEmail = -- validation logic
+    ```
+    Use smart constructors to ensure that invalid states cannot be represented. Hide data constructors and expose only functions that create valid values.
+  </Accordion>
+  
+  <Accordion title="Using IO Unnecessarily" icon="warning">
+    ```haskell
+    -- Anti-pattern: Using IO unnecessarily
+    calculateTotal :: [Double] -> IO Double
+    calculateTotal prices = do
+      let subtotal = sum prices
+      let tax = subtotal * 0.1
+      let total = subtotal + tax
+      return total  -- No IO needed here
+    
+    -- Better approach: Pure function
+    calculateTotal :: [Double] -> Double
+    calculateTotal prices = subtotal + tax
+      where
+        subtotal = sum prices
+        tax = subtotal * 0.1
+    ```
+    Keep functions pure (without IO) whenever possible. Only use the IO monad when you actually need to perform input/output operations.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Monads" icon="warning">
+    ```haskell
+    -- Anti-pattern: Explicit error handling everywhere
+    processItem :: Item -> Either Error Result
+    
+    processItems :: [Item] -> Either Error [Result]
+    processItems [] = Right []
+    processItems (x:xs) = case processItem x of
+      Left err -> Left err
+      Right result -> case processItems xs of
+        Left err -> Left err
+        Right results -> Right (result : results)
+    
+    -- Better approach: Use appropriate monads
+    import Control.Monad.Except
+    
+    processItem :: Item -> Either Error Result
+    
+    processItems :: [Item] -> Either Error [Result]
+    processItems items = forM items processItem
+    
+    -- Or with different monads for different concerns
+    import Control.Monad.Reader
+    import Control.Monad.Except
+    
+    processItem :: ReaderT Config (ExceptT Error IO) Result
+    ```
+    Use appropriate monads and monad transformers for different concerns like error handling (`Either`, `ExceptT`), configuration (`Reader`), or state (`State`).
+  </Accordion>
+  
+  <Accordion title="Not Using Lenses for Deep Updates" icon="warning">
+    ```haskell
+    -- Anti-pattern: Manual nested record updates
+    data Address = Address { street :: String, city :: String, zipCode :: String }
+    data Person = Person { name :: String, age :: Int, address :: Address }
+    
+    updateZipCode :: String -> Person -> Person
+    updateZipCode newZip person =
+      person { address = (address person) { zipCode = newZip } }
+    
+    -- Better approach: Use lenses
+    {-# LANGUAGE TemplateHaskell #-}
+    import Control.Lens
+    
+    data Address = Address { _street :: String, _city :: String, _zipCode :: String }
+    data Person = Person { _name :: String, _age :: Int, _address :: Address }
+    
+    makeLenses ''Address
+    makeLenses ''Person
+    
+    updateZipCode :: String -> Person -> Person
+    updateZipCode newZip = address.zipCode .~ newZip
+    ```
+    Use lenses (e.g., from the `lens` package) for working with nested data structures, especially when you need to update deeply nested fields.
+  </Accordion>
+  
+  <Accordion title="Not Using Type Classes Appropriately" icon="warning">
+    ```haskell
+    -- Anti-pattern: Duplicated functionality
+    serializeToJSON :: User -> String
+    serializeToJSON user = -- implementation
+    
+    serializeToJSON :: Product -> String
+    serializeToJSON product = -- implementation
+    
+    -- Better approach: Use type classes
+    class ToJSON a where
+      toJSON :: a -> String
+    
+    instance ToJSON User where
+      toJSON user = -- implementation
+    
+    instance ToJSON Product where
+      toJSON product = -- implementation
+    
+    -- Now we can write generic functions
+    saveToFile :: ToJSON a => FilePath -> a -> IO ()
+    saveToFile path obj = writeFile path (toJSON obj)
+    ```
+    Use type classes to define common interfaces for different types, enabling polymorphic functions and reducing code duplication.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Messages" icon="warning">
+    ```haskell
+    -- Anti-pattern: Poor error messages
+    parseConfig :: String -> Config
+    parseConfig str = case decode str of
+      Nothing -> error "Parse failed"  -- Unhelpful message
+      Just config -> config
+    
+    -- Better approach: Descriptive errors
+    parseConfig :: String -> Either String Config
+    parseConfig str = case decode str of
+      Nothing -> Left $ "Failed to parse config: " ++ str
+      Just config -> Right config
+    
+    -- Even better with custom error types
+    data ConfigError = InvalidFormat String | MissingField String | InvalidValue String String
+      deriving Show
+    
+    parseConfig :: String -> Either ConfigError Config
+    ```
+    Provide descriptive error messages and use structured error types. Avoid using `error` or `undefined` in production code.
+  </Accordion>
+  
+  <Accordion title="Using Lazy I/O" icon="warning">
+    ```haskell
+    -- Anti-pattern: Lazy I/O
+    processFile :: FilePath -> IO ()
+    processFile path = do
+      contents <- readFile path  -- Lazy I/O
+      let lines = lines contents
+      -- Process lines
+      -- File might still be open here!
+    
+    -- Better approach: Strict I/O or streaming
+    import qualified Data.ByteString as BS
+    
+    processFile :: FilePath -> IO ()
+    processFile path = do
+      contents <- BS.readFile path  -- Strict I/O
+      let lines = BS.split 10 contents  -- Split on newline
+      -- Process lines
+      -- File is definitely closed here
+    
+    -- Or using streaming libraries
+    import Streaming.Prelude as S
+    import qualified Streaming.ByteString as SB
+    
+    processFile :: FilePath -> IO ()
+    processFile path = SB.readFile path
+      & SB.lines
+      & S.map processLine
+      & S.stdoutLn
+    ```
+    Avoid lazy I/O which can lead to resource leaks and unpredictable performance. Use strict I/O or streaming libraries instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Project Structure" icon="warning">
+    ```haskell
+    -- Anti-pattern: Everything in one file
+    -- Main.hs with thousands of lines
+    
+    -- Better approach: Modular project structure
+    -- src/
+    --   MyApp/
+    --     Types.hs
+    --     Database.hs
+    --     API.hs
+    --     Utils.hs
+    --   Main.hs
+    ```
+    Organize your code into modules with clear responsibilities. Follow a consistent project structure to make your codebase more maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Dependency Management" icon="warning">
+    ```haskell
+    -- Anti-pattern: Manual dependency management
+    -- Copying code from other projects
+    -- Using globally installed packages
+    
+    -- Better approach: Use Cabal or Stack
+    -- package.yaml (for Stack)
+    name: my-project
+    version: 0.1.0.0
+    dependencies:
+      - base >= 4.7 && < 5
+      - text
+      - aeson
+      - containers
+    library:
+      source-dirs: src
+    executables:
+      my-project-exe:
+        main: Main.hs
+        source-dirs: app
+        dependencies:
+          - my-project
+    tests:
+      my-project-test:
+        main: Spec.hs
+        source-dirs: test
+        dependencies:
+          - my-project
+          - hspec
+    ```
+    Use proper dependency management tools like Cabal or Stack to manage your project's dependencies and build process.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```haskell
+    -- Anti-pattern: Manual testing or no testing
+    main = do
+      let result = myFunction 42
+      print result  -- Manual check
+    
+    -- Better approach: Use testing frameworks
+    import Test.Hspec
+    import Test.QuickCheck
+    
+    main :: IO ()
+    main = hspec $ do
+      describe "myFunction" $ do
+        it "returns correct result for specific input" $ do
+          myFunction 42 `shouldBe` expectedResult
+        
+        it "satisfies key property" $ property $
+          \x -> myFunction x >= 0  -- Property-based test
+    ```
+    Write proper tests using frameworks like HUnit, Hspec, or QuickCheck. Use property-based testing when appropriate.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Documentation" icon="warning">
+    ```haskell
+    -- Anti-pattern: Poor or no documentation
+    processData :: [a] -> [a]
+    processData xs = -- implementation
+    
+    -- Better approach: Proper documentation
+    -- | Process a list of items according to business rules.
+    -- The function filters out invalid items and transforms the rest.
+    --
+    -- >>> processData [1, 2, 3, 4]
+    -- [2, 4, 6, 8]
+    --
+    -- >>> processData []
+    -- []
+    processData :: [a] -> [a]
+    processData xs = -- implementation
+    ```
+    Document your code with Haddock comments. Include descriptions, examples, and edge cases to help users understand how to use your functions.
+  </Accordion>
+</AccordionGroup>

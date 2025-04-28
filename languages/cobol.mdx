@@ -1,0 +1,444 @@
+---
+title: 'COBOL'
+description: 'COBOL (Common Business-Oriented Language) is a compiled English-like computer programming language designed for business use. It is an imperative, procedural language that was designed in 1959.'
+---
+
+<AccordionGroup>
+  <Accordion title="COBOL Anti-Patterns Overview" icon="cobol">
+    COBOL, despite its longevity and importance in business applications, has several common anti-patterns that can lead to maintainability problems and bugs. Here are the most important anti-patterns to avoid when writing COBOL code.
+  </Accordion>
+  
+  <Accordion title="Using GO TO Excessively" icon="warning">
+    ```cobol
+    * Anti-pattern: Excessive use of GO TO
+    PROCEDURE DIVISION.
+       PERFORM INITIALIZE-ROUTINE.
+       GO TO PROCESS-DATA.
+    
+    INITIALIZE-ROUTINE.
+       MOVE ZEROS TO TOTAL-AMOUNT.
+       MOVE SPACES TO ERROR-MESSAGE.
+    
+    PROCESS-DATA.
+       READ INPUT-FILE
+          AT END GO TO END-OF-FILE
+       END-READ.
+       
+       IF AMOUNT-FIELD > 1000
+          GO TO LARGE-AMOUNT-ROUTINE
+       ELSE
+          GO TO SMALL-AMOUNT-ROUTINE
+       END-IF.
+    
+    LARGE-AMOUNT-ROUTINE.
+       ADD AMOUNT-FIELD TO LARGE-TOTAL.
+       GO TO PROCESS-DATA.
+    
+    SMALL-AMOUNT-ROUTINE.
+       ADD AMOUNT-FIELD TO SMALL-TOTAL.
+       GO TO PROCESS-DATA.
+    
+    END-OF-FILE.
+       DISPLAY "Processing complete".
+       STOP RUN.
+    
+    * Better approach: Structured programming
+    PROCEDURE DIVISION.
+       PERFORM INITIALIZE-ROUTINE.
+       PERFORM PROCESS-DATA UNTIL END-OF-FILE.
+       DISPLAY "Processing complete".
+       STOP RUN.
+    
+    INITIALIZE-ROUTINE.
+       MOVE ZEROS TO TOTAL-AMOUNT.
+       MOVE SPACES TO ERROR-MESSAGE.
+    
+    PROCESS-DATA.
+       READ INPUT-FILE
+          AT END SET END-OF-FILE TO TRUE
+          NOT AT END PERFORM PROCESS-RECORD
+       END-READ.
+    
+    PROCESS-RECORD.
+       IF AMOUNT-FIELD > 1000
+          PERFORM LARGE-AMOUNT-ROUTINE
+       ELSE
+          PERFORM SMALL-AMOUNT-ROUTINE
+       END-IF.
+    
+    LARGE-AMOUNT-ROUTINE.
+       ADD AMOUNT-FIELD TO LARGE-TOTAL.
+    
+    SMALL-AMOUNT-ROUTINE.
+       ADD AMOUNT-FIELD TO SMALL-TOTAL.
+    ```
+    Avoid excessive use of `GO TO` statements, which create spaghetti code that is difficult to understand and maintain. Use structured programming constructs like `PERFORM`, `IF-ELSE`, and `EVALUATE` instead.
+  </Accordion>
+  
+  <Accordion title="Using Magic Numbers" icon="warning">
+    ```cobol
+    * Anti-pattern: Using magic numbers
+    IF CUSTOMER-TYPE = 1
+       COMPUTE DISCOUNT = TOTAL-AMOUNT * 0.10
+    ELSE IF CUSTOMER-TYPE = 2
+       COMPUTE DISCOUNT = TOTAL-AMOUNT * 0.15
+    ELSE IF CUSTOMER-TYPE = 3
+       COMPUTE DISCOUNT = TOTAL-AMOUNT * 0.20
+    END-IF.
+    
+    * Better approach: Use named constants
+    01 DISCOUNT-RATES.
+       05 REGULAR-CUSTOMER-RATE     PIC 9V99 VALUE 0.10.
+       05 PREFERRED-CUSTOMER-RATE   PIC 9V99 VALUE 0.15.
+       05 PREMIUM-CUSTOMER-RATE     PIC 9V99 VALUE 0.20.
+    
+    01 CUSTOMER-TYPES.
+       05 REGULAR-CUSTOMER          PIC 9 VALUE 1.
+       05 PREFERRED-CUSTOMER        PIC 9 VALUE 2.
+       05 PREMIUM-CUSTOMER          PIC 9 VALUE 3.
+    
+    * In PROCEDURE DIVISION
+    IF CUSTOMER-TYPE = REGULAR-CUSTOMER
+       COMPUTE DISCOUNT = TOTAL-AMOUNT * REGULAR-CUSTOMER-RATE
+    ELSE IF CUSTOMER-TYPE = PREFERRED-CUSTOMER
+       COMPUTE DISCOUNT = TOTAL-AMOUNT * PREFERRED-CUSTOMER-RATE
+    ELSE IF CUSTOMER-TYPE = PREMIUM-CUSTOMER
+       COMPUTE DISCOUNT = TOTAL-AMOUNT * PREMIUM-CUSTOMER-RATE
+    END-IF.
+    ```
+    Avoid using magic numbers (hardcoded numeric literals) in your code. Use named constants to make your code more readable and maintainable.
+  </Accordion>
+  
+  <Accordion title="Not Using Structured Data" icon="warning">
+    ```cobol
+    * Anti-pattern: Flat data structures
+    01 CUSTOMER-RECORD.
+       05 CUSTOMER-ID           PIC X(10).
+       05 CUSTOMER-NAME         PIC X(30).
+       05 CUSTOMER-ADDRESS-1    PIC X(30).
+       05 CUSTOMER-ADDRESS-2    PIC X(30).
+       05 CUSTOMER-CITY         PIC X(20).
+       05 CUSTOMER-STATE        PIC X(2).
+       05 CUSTOMER-ZIP          PIC X(10).
+       05 CUSTOMER-PHONE        PIC X(15).
+       05 CUSTOMER-EMAIL        PIC X(50).
+    
+    * Better approach: Use hierarchical data structures
+    01 CUSTOMER-RECORD.
+       05 CUSTOMER-ID           PIC X(10).
+       05 CUSTOMER-NAME         PIC X(30).
+       05 CUSTOMER-ADDRESS.
+          10 STREET-ADDRESS-1   PIC X(30).
+          10 STREET-ADDRESS-2   PIC X(30).
+          10 CITY               PIC X(20).
+          10 STATE              PIC X(2).
+          10 ZIP-CODE           PIC X(10).
+       05 CUSTOMER-CONTACT.
+          10 PHONE-NUMBER       PIC X(15).
+          10 EMAIL-ADDRESS      PIC X(50).
+    ```
+    Use hierarchical data structures to organize related data fields. This makes your code more readable and easier to maintain, especially when passing data between program modules.
+  </Accordion>
+  
+  <Accordion title="Hardcoding File Names" icon="warning">
+    ```cobol
+    * Anti-pattern: Hardcoded file names
+    SELECT CUSTOMER-FILE
+       ASSIGN TO "C:\DATA\CUSTOMER.DAT"
+       ORGANIZATION IS INDEXED
+       ACCESS MODE IS DYNAMIC
+       RECORD KEY IS CUSTOMER-ID.
+    
+    * Better approach: Use configuration files or environment variables
+    SELECT CUSTOMER-FILE
+       ASSIGN TO CUSTOMER-FILE-PATH
+       ORGANIZATION IS INDEXED
+       ACCESS MODE IS DYNAMIC
+       RECORD KEY IS CUSTOMER-ID.
+    
+    * In WORKING-STORAGE SECTION
+    01 CONFIGURATION-VARIABLES.
+       05 CUSTOMER-FILE-PATH     PIC X(100).
+    
+    * In PROCEDURE DIVISION
+    ACCEPT CUSTOMER-FILE-PATH FROM ENVIRONMENT "CUSTOMER_FILE_PATH".
+    IF CUSTOMER-FILE-PATH = SPACES
+       MOVE "C:\DATA\CUSTOMER.DAT" TO CUSTOMER-FILE-PATH
+    END-IF.
+    ```
+    Avoid hardcoding file paths and names in your programs. Use configuration files or environment variables instead, which makes your code more flexible and portable across different environments.
+  </Accordion>
+  
+  <Accordion title="Not Validating Input Data" icon="warning">
+    ```cobol
+    * Anti-pattern: Not validating input
+    ACCEPT CUSTOMER-ID.
+    READ CUSTOMER-FILE
+       INVALID KEY DISPLAY "Customer not found"
+    END-READ.
+    
+    * Better approach: Validate input data
+    ACCEPT CUSTOMER-ID.
+    
+    * Validate input format
+    IF CUSTOMER-ID IS NOT NUMERIC
+       DISPLAY "Error: Customer ID must be numeric"
+       EXIT PARAGRAPH
+    END-IF.
+    
+    IF CUSTOMER-ID = ZEROS
+       DISPLAY "Error: Customer ID cannot be zero"
+       EXIT PARAGRAPH
+    END-IF.
+    
+    * Proceed with valid input
+    READ CUSTOMER-FILE
+       INVALID KEY DISPLAY "Customer not found"
+    END-READ.
+    ```
+    Always validate input data before processing it. This helps prevent runtime errors, data corruption, and potential security issues.
+  </Accordion>
+  
+  <Accordion title="Using PERFORM THRU" icon="warning">
+    ```cobol
+    * Anti-pattern: Using PERFORM THRU
+    PROCEDURE DIVISION.
+       PERFORM INITIALIZE-ROUTINE THRU INITIALIZE-EXIT.
+       PERFORM PROCESS-DATA THRU PROCESS-EXIT.
+       STOP RUN.
+    
+    INITIALIZE-ROUTINE.
+       MOVE ZEROS TO TOTAL-AMOUNT.
+       MOVE SPACES TO ERROR-MESSAGE.
+    INITIALIZE-EXIT.
+       EXIT.
+    
+    PROCESS-DATA.
+       READ INPUT-FILE
+          AT END GO TO PROCESS-EXIT
+       END-READ.
+       ADD AMOUNT-FIELD TO TOTAL-AMOUNT.
+       GO TO PROCESS-DATA.
+    PROCESS-EXIT.
+       EXIT.
+    
+    * Better approach: Use structured PERFORM statements
+    PROCEDURE DIVISION.
+       PERFORM INITIALIZE-ROUTINE.
+       PERFORM PROCESS-DATA UNTIL END-OF-FILE.
+       STOP RUN.
+    
+    INITIALIZE-ROUTINE.
+       MOVE ZEROS TO TOTAL-AMOUNT.
+       MOVE SPACES TO ERROR-MESSAGE.
+    
+    PROCESS-DATA.
+       READ INPUT-FILE
+          AT END SET END-OF-FILE TO TRUE
+          NOT AT END ADD AMOUNT-FIELD TO TOTAL-AMOUNT
+       END-READ.
+    ```
+    Avoid using `PERFORM THRU` statements, which can lead to maintenance issues if paragraphs are reordered or renamed. Use structured `PERFORM` statements with well-defined paragraph boundaries instead.
+  </Accordion>
+  
+  <Accordion title="Not Using COPY Books" icon="warning">
+    ```cobol
+    * Anti-pattern: Duplicating data definitions
+    * In Program A
+    01 CUSTOMER-RECORD.
+       05 CUSTOMER-ID           PIC X(10).
+       05 CUSTOMER-NAME         PIC X(30).
+       05 CUSTOMER-ADDRESS.
+          10 STREET-ADDRESS-1   PIC X(30).
+          10 STREET-ADDRESS-2   PIC X(30).
+          10 CITY               PIC X(20).
+          10 STATE              PIC X(2).
+          10 ZIP-CODE           PIC X(10).
+    
+    * In Program B (duplicated definition)
+    01 CUSTOMER-RECORD.
+       05 CUSTOMER-ID           PIC X(10).
+       05 CUSTOMER-NAME         PIC X(30).
+       05 CUSTOMER-ADDRESS.
+          10 STREET-ADDRESS-1   PIC X(30).
+          10 STREET-ADDRESS-2   PIC X(30).
+          10 CITY               PIC X(20).
+          10 STATE              PIC X(2).
+          10 ZIP-CODE           PIC X(10).
+    
+    * Better approach: Use COPY books
+    * In CUSTOMER.CPY file
+    01 CUSTOMER-RECORD.
+       05 CUSTOMER-ID           PIC X(10).
+       05 CUSTOMER-NAME         PIC X(30).
+       05 CUSTOMER-ADDRESS.
+          10 STREET-ADDRESS-1   PIC X(30).
+          10 STREET-ADDRESS-2   PIC X(30).
+          10 CITY               PIC X(20).
+          10 STATE              PIC X(2).
+          10 ZIP-CODE           PIC X(10).
+    
+    * In Program A and Program B
+    COPY CUSTOMER.
+    ```
+    Use COPY books to share common data definitions and code across multiple programs. This reduces duplication and ensures consistency.
+  </Accordion>
+  
+  <Accordion title="Not Using Meaningful Variable Names" icon="warning">
+    ```cobol
+    * Anti-pattern: Cryptic variable names
+    01 X1              PIC 9(5)V99.
+    01 X2              PIC 9(5)V99.
+    01 X3              PIC 9(5)V99.
+    
+    COMPUTE X3 = X1 * X2.
+    
+    * Better approach: Descriptive variable names
+    01 ITEM-PRICE      PIC 9(5)V99.
+    01 QUANTITY        PIC 9(5)V99.
+    01 TOTAL-COST      PIC 9(5)V99.
+    
+    COMPUTE TOTAL-COST = ITEM-PRICE * QUANTITY.
+    ```
+    Use meaningful and descriptive names for variables, paragraphs, and sections. This makes your code more readable and easier to understand and maintain.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```cobol
+    * Anti-pattern: Minimal error handling
+    READ CUSTOMER-FILE
+       INVALID KEY DISPLAY "Error reading file"
+    END-READ.
+    
+    * Better approach: Comprehensive error handling
+    READ CUSTOMER-FILE
+       INVALID KEY
+          MOVE "Y" TO ERROR-FOUND
+          MOVE "Customer record not found" TO ERROR-MESSAGE
+          PERFORM LOG-ERROR
+          PERFORM DISPLAY-ERROR-TO-USER
+    END-READ.
+    
+    IF ERROR-FOUND = "Y"
+       PERFORM ERROR-RECOVERY-ROUTINE
+    END-IF.
+    ```
+    Implement proper error handling with detailed error messages, logging, and recovery procedures. This helps diagnose and resolve issues more quickly.
+  </Accordion>
+  
+  <Accordion title="Using REDEFINES Inappropriately" icon="warning">
+    ```cobol
+    * Anti-pattern: Inappropriate use of REDEFINES
+    01 MULTI-PURPOSE-FIELD.
+       05 NUMERIC-VALUE         PIC 9(10).
+       05 TEXT-VALUE REDEFINES NUMERIC-VALUE PIC X(10).
+       05 DATE-VALUE REDEFINES NUMERIC-VALUE.
+          10 YEAR               PIC 9(4).
+          10 MONTH              PIC 9(2).
+          10 DAY                PIC 9(2).
+          10 FILLER             PIC 9(2).
+    
+    * Better approach: Use separate fields for different purposes
+    01 CUSTOMER-DATA.
+       05 CUSTOMER-ID           PIC 9(10).
+       05 CUSTOMER-NAME         PIC X(30).
+       05 REGISTRATION-DATE.
+          10 REG-YEAR           PIC 9(4).
+          10 REG-MONTH          PIC 9(2).
+          10 REG-DAY            PIC 9(2).
+    ```
+    Avoid using `REDEFINES` to repurpose the same memory location for different data types. This can lead to data corruption and maintenance issues. Use separate fields for different purposes instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Structured Programming" icon="warning">
+    ```cobol
+    * Anti-pattern: Unstructured code
+    PROCEDURE DIVISION.
+    MAIN-LOGIC.
+       OPEN INPUT CUSTOMER-FILE.
+       OPEN OUTPUT REPORT-FILE.
+       READ CUSTOMER-FILE
+          AT END MOVE "Y" TO END-OF-FILE-FLAG
+       END-READ.
+       PERFORM UNTIL END-OF-FILE-FLAG = "Y"
+          MOVE CUSTOMER-NAME TO REPORT-NAME
+          MOVE CUSTOMER-BALANCE TO REPORT-BALANCE
+          WRITE REPORT-RECORD
+          READ CUSTOMER-FILE
+             AT END MOVE "Y" TO END-OF-FILE-FLAG
+          END-READ
+       END-PERFORM.
+       CLOSE CUSTOMER-FILE.
+       CLOSE REPORT-FILE.
+       STOP RUN.
+    
+    * Better approach: Structured code with modular design
+    PROCEDURE DIVISION.
+    MAIN-LOGIC.
+       PERFORM INITIALIZATION.
+       PERFORM PROCESS-RECORDS UNTIL END-OF-FILE.
+       PERFORM TERMINATION.
+       STOP RUN.
+    
+    INITIALIZATION.
+       OPEN INPUT CUSTOMER-FILE.
+       OPEN OUTPUT REPORT-FILE.
+       PERFORM READ-CUSTOMER-RECORD.
+    
+    PROCESS-RECORDS.
+       PERFORM WRITE-REPORT-RECORD.
+       PERFORM READ-CUSTOMER-RECORD.
+    
+    WRITE-REPORT-RECORD.
+       MOVE CUSTOMER-NAME TO REPORT-NAME.
+       MOVE CUSTOMER-BALANCE TO REPORT-BALANCE.
+       WRITE REPORT-RECORD.
+    
+    READ-CUSTOMER-RECORD.
+       READ CUSTOMER-FILE
+          AT END MOVE "Y" TO END-OF-FILE-FLAG
+       END-READ.
+    
+    TERMINATION.
+       CLOSE CUSTOMER-FILE.
+       CLOSE REPORT-FILE.
+    ```
+    Use structured programming principles with modular design. Break down your program into logical, self-contained modules with clear responsibilities.
+  </Accordion>
+  
+  <Accordion title="Not Using EVALUATE for Complex Conditions" icon="warning">
+    ```cobol
+    * Anti-pattern: Nested IF statements
+    IF TRANSACTION-TYPE = "S"
+       IF CUSTOMER-TYPE = "R"
+          IF AMOUNT > 1000
+             COMPUTE DISCOUNT = AMOUNT * 0.10
+          ELSE
+             COMPUTE DISCOUNT = AMOUNT * 0.05
+          END-IF
+       ELSE IF CUSTOMER-TYPE = "P"
+          IF AMOUNT > 1000
+             COMPUTE DISCOUNT = AMOUNT * 0.15
+          ELSE
+             COMPUTE DISCOUNT = AMOUNT * 0.10
+          END-IF
+       END-IF
+    END-IF.
+    
+    * Better approach: Use EVALUATE
+    EVALUATE TRUE
+       WHEN TRANSACTION-TYPE = "S" AND CUSTOMER-TYPE = "R" AND AMOUNT > 1000
+          COMPUTE DISCOUNT = AMOUNT * 0.10
+       WHEN TRANSACTION-TYPE = "S" AND CUSTOMER-TYPE = "R"
+          COMPUTE DISCOUNT = AMOUNT * 0.05
+       WHEN TRANSACTION-TYPE = "S" AND CUSTOMER-TYPE = "P" AND AMOUNT > 1000
+          COMPUTE DISCOUNT = AMOUNT * 0.15
+       WHEN TRANSACTION-TYPE = "S" AND CUSTOMER-TYPE = "P"
+          COMPUTE DISCOUNT = AMOUNT * 0.10
+       WHEN OTHER
+          MOVE ZEROS TO DISCOUNT
+    END-EVALUATE.
+    ```
+    Use the `EVALUATE` statement for complex conditional logic instead of deeply nested `IF` statements. This makes your code more readable and easier to maintain.
+  </Accordion>
+</AccordionGroup>

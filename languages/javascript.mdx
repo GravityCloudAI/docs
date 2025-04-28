@@ -1,0 +1,382 @@
+---
+title: 'JavaScript'
+description: 'JavaScript is a high-level, interpreted programming language that conforms to the ECMAScript specification. It is a language that is also characterized as dynamic, weakly typed, prototype-based, and multi-paradigm.'
+---
+
+<AccordionGroup>
+  <Accordion title="JavaScript Anti-Patterns Overview" icon="js">
+    JavaScript, while powerful and flexible, has several common anti-patterns that can lead to bugs, performance issues, and maintenance problems. Here are the most important anti-patterns to avoid when writing JavaScript code.
+  </Accordion>
+  
+  <Accordion title="Using eval()" icon="warning">
+    ```javascript
+    // Anti-pattern: Using eval to parse JSON
+    const userData = eval('(' + jsonString + ')');
+    
+    // Better approach
+    const userData = JSON.parse(jsonString);
+    ```
+    The `eval()` function executes any JavaScript code passed to it, creating significant security vulnerabilities. It's also slower than alternatives like `JSON.parse()`.
+  </Accordion>
+  
+  <Accordion title="Modifying Built-in Objects" icon="warning">
+    ```javascript
+    // Anti-pattern: Extending built-in objects
+    Array.prototype.contains = function(item) {
+      return this.indexOf(item) !== -1;
+    };
+    
+    // Better approach: Create utility functions
+    function arrayContains(array, item) {
+      return array.indexOf(item) !== -1;
+    }
+    ```
+    Modifying built-in object prototypes can lead to naming conflicts, unexpected behavior, and compatibility issues with future JavaScript versions.
+  </Accordion>
+  
+  <Accordion title="Using == Instead of ===" icon="warning">
+    ```javascript
+    // Anti-pattern: Using loose equality
+    if (value == 0) { /* ... */ }
+    
+    // Better approach: Use strict equality
+    if (value === 0) { /* ... */ }
+    ```
+    The loose equality operator (`==`) performs type coercion, which can lead to unexpected results. Always use strict equality (`===`) to compare both value and type.
+  </Accordion>
+  
+  <Accordion title="Global Variables" icon="warning">
+    ```javascript
+    // Anti-pattern: Using global variables
+    var count = 0;
+    function incrementCounter() {
+      count++;
+    }
+    
+    // Better approach: Use closures or modules
+    const counter = (function() {
+      let count = 0;
+      return {
+        increment: function() { count++; },
+        getCount: function() { return count; }
+      };
+    })();
+    ```
+    Global variables can be modified from anywhere, leading to unpredictable behavior and making code harder to test and maintain.
+  </Accordion>
+  
+  <Accordion title="Callback Hell" icon="warning">
+    ```javascript
+    // Anti-pattern: Nested callbacks
+    getData(function(a) {
+      getMoreData(a, function(b) {
+        getEvenMoreData(b, function(c) {
+          getTheMostData(c, function(d) {
+            // Do something with d
+          });
+        });
+      });
+    });
+    
+    // Better approach: Use Promises or async/await
+    async function getAllData() {
+      const a = await getData();
+      const b = await getMoreData(a);
+      const c = await getEvenMoreData(b);
+      const d = await getTheMostData(c);
+      // Do something with d
+    }
+    ```
+    Deeply nested callbacks make code hard to read and maintain. Use Promises or async/await for cleaner asynchronous code.
+  </Accordion>
+  
+  <Accordion title="Using var Instead of let/const" icon="warning">
+    ```javascript
+    // Anti-pattern: Using var
+    function example() {
+      for (var i = 0; i < 10; i++) {
+        // i is function-scoped, not block-scoped
+      }
+      console.log(i); // 10 (i is still accessible)
+    }
+    
+    // Better approach: Use let/const
+    function example() {
+      for (let i = 0; i < 10; i++) {
+        // i is block-scoped
+      }
+      // console.log(i); // ReferenceError: i is not defined
+    }
+    ```
+    The `var` keyword has function scope, which can lead to unexpected behavior. Use `let` for variables that change and `const` for variables that don't.
+  </Accordion>
+  
+  <Accordion title="Not Using Semicolons" icon="warning">
+    ```javascript
+    // Anti-pattern: Omitting semicolons
+    const a = 1
+    const b = 2
+    [a, b].forEach(console.log) // Interpreted as: const b = 2[a, b].forEach(console.log)
+    
+    // Better approach: Use semicolons
+    const a = 1;
+    const b = 2;
+    [a, b].forEach(console.log);
+    ```
+    JavaScript's automatic semicolon insertion can lead to unexpected behavior. Always use semicolons to explicitly terminate statements.
+  </Accordion>
+  
+  <Accordion title="Using new Object() Instead of Object Literals" icon="warning">
+    ```javascript
+    // Anti-pattern: Using constructors for simple objects
+    const person = new Object();
+    person.name = 'John';
+    person.age = 30;
+    
+    // Better approach: Use object literals
+    const person = {
+      name: 'John',
+      age: 30
+    };
+    ```
+    Object literals are more concise, easier to read, and perform better than using the `new Object()` constructor.
+  </Accordion>
+  
+  <Accordion title="Using new Array() Instead of Array Literals" icon="warning">
+    ```javascript
+    // Anti-pattern: Using Array constructor
+    const numbers = new Array(1, 2, 3, 4, 5);
+    
+    // Better approach: Use array literals
+    const numbers = [1, 2, 3, 4, 5];
+    ```
+    Array literals are more concise and less prone to errors than using the `new Array()` constructor, which behaves differently with one argument.
+  </Accordion>
+  
+  <Accordion title="Not Using Strict Mode" icon="warning">
+    ```javascript
+    // Anti-pattern: Not using strict mode
+    function example() {
+      x = 10; // Implicitly creates a global variable
+    }
+    
+    // Better approach: Use strict mode
+    'use strict';
+    function example() {
+      x = 10; // ReferenceError: x is not defined
+    }
+    ```
+    Strict mode helps catch common mistakes and prevents certain error-prone features from being used.
+  </Accordion>
+  
+  <Accordion title="Using document.write()" icon="warning">
+    ```javascript
+    // Anti-pattern: Using document.write()
+    document.write('<h1>Hello World</h1>');
+    
+    // Better approach: Manipulate the DOM
+    document.getElementById('content').innerHTML = '<h1>Hello World</h1>';
+    // Or better yet
+    const heading = document.createElement('h1');
+    heading.textContent = 'Hello World';
+    document.getElementById('content').appendChild(heading);
+    ```
+    `document.write()` can overwrite the entire document if called after the page has loaded and doesn't work with XHTML.
+  </Accordion>
+  
+  <Accordion title="Using setTimeout/setInterval with Strings" icon="warning">
+    ```javascript
+    // Anti-pattern: Using strings with setTimeout
+    setTimeout("doSomething()", 1000);
+    
+    // Better approach: Pass functions directly
+    setTimeout(doSomething, 1000);
+    // Or use arrow functions for parameters
+    setTimeout(() => doSomething(param), 1000);
+    ```
+    Using strings with `setTimeout` or `setInterval` is similar to using `eval()` and has the same security and performance issues.
+  </Accordion>
+  
+  <Accordion title="Not Handling Asynchronous Errors" icon="warning">
+    ```javascript
+    // Anti-pattern: Not handling async errors
+    fetch('https://api.example.com/data')
+      .then(response => response.json())
+      .then(data => {
+        // Use data
+      }); // No error handling
+    
+    // Better approach: Always handle errors
+    fetch('https://api.example.com/data')
+      .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+      })
+      .then(data => {
+        // Use data
+      })
+      .catch(error => {
+        console.error('Fetch error:', error);
+      });
+    ```
+    Always handle errors in asynchronous operations to prevent silent failures and provide better debugging information.
+  </Accordion>
+  
+  <Accordion title="Memory Leaks in Closures" icon="warning">
+    ```javascript
+    // Anti-pattern: Creating memory leaks with closures
+    function createButtons() {
+      for (var i = 0; i < 10; i++) {
+        const button = document.createElement('button');
+        button.textContent = 'Button ' + i;
+        button.onclick = function() {
+          // This creates a closure that holds a reference to the entire parent scope
+          console.log('Button ' + i + ' clicked');
+        };
+        document.body.appendChild(button);
+      }
+    }
+    
+    // Better approach: Use let or create a new scope
+    function createButtons() {
+      for (let i = 0; i < 10; i++) { // Using let creates a new binding for each iteration
+        const button = document.createElement('button');
+        button.textContent = 'Button ' + i;
+        button.onclick = function() {
+          console.log('Button ' + i + ' clicked');
+        };
+        document.body.appendChild(button);
+      }
+    }
+    ```
+    Closures can inadvertently keep references to large objects in memory, causing memory leaks. Be mindful of what variables are being captured.
+  </Accordion>
+  
+  <Accordion title="Using with Statement" icon="warning">
+    ```javascript
+    // Anti-pattern: Using with statement
+    with (document) {
+      const links = getElementsByTagName('a');
+      // Is getElementsByTagName from document or from a variable in the current scope?
+    }
+    
+    // Better approach: Be explicit
+    const links = document.getElementsByTagName('a');
+    ```
+    The `with` statement makes code harder to understand, slower, and is not allowed in strict mode. Always be explicit about object references.
+  </Accordion>
+  
+  <Accordion title="Using innerHTML for Content" icon="warning">
+    ```javascript
+    // Anti-pattern: Using innerHTML with user input
+    const userInput = '<script>alert("XSS attack");</script>';
+    element.innerHTML = userInput; // Potential XSS vulnerability
+    
+    // Better approach: Use textContent or DOM methods
+    element.textContent = userInput; // Safely escapes content
+    // Or
+    const div = document.createElement('div');
+    div.textContent = userInput;
+    element.appendChild(div);
+    ```
+    Using `innerHTML` with unvalidated input can lead to cross-site scripting (XSS) vulnerabilities. Use `textContent` or DOM methods instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Event Delegation" icon="warning">
+    ```javascript
+    // Anti-pattern: Adding event listeners to multiple elements
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
+      button.addEventListener('click', handleClick);
+    });
+    
+    // Better approach: Use event delegation
+    document.addEventListener('click', function(event) {
+      if (event.target.matches('button')) {
+        handleClick(event);
+      }
+    });
+    ```
+    Adding event listeners to many elements can impact performance and memory usage. Use event delegation to handle events at a higher level.
+  </Accordion>
+  
+  <Accordion title="Not Using Feature Detection" icon="warning">
+    ```javascript
+    // Anti-pattern: Browser detection
+    if (navigator.userAgent.indexOf('Chrome') !== -1) {
+      // Use Chrome-specific code
+    } else if (navigator.userAgent.indexOf('Firefox') !== -1) {
+      // Use Firefox-specific code
+    }
+    
+    // Better approach: Feature detection
+    if ('IntersectionObserver' in window) {
+      // Use IntersectionObserver
+    } else {
+      // Use fallback
+    }
+    ```
+    Browser detection is unreliable. Instead, detect if specific features are available in the browser.
+  </Accordion>
+  
+  <Accordion title="Using document.getElementById() Repeatedly" icon="warning">
+    ```javascript
+    // Anti-pattern: Repeatedly querying the DOM
+    document.getElementById('button').addEventListener('click', () => {
+      document.getElementById('result').textContent = 'Clicked';
+      document.getElementById('counter').textContent = count;
+    });
+    
+    // Better approach: Cache DOM references
+    const button = document.getElementById('button');
+    const result = document.getElementById('result');
+    const counter = document.getElementById('counter');
+    
+    button.addEventListener('click', () => {
+      result.textContent = 'Clicked';
+      counter.textContent = count;
+    });
+    ```
+    Repeatedly querying the DOM is inefficient. Cache DOM references when you'll use them multiple times.
+  </Accordion>
+  
+  <Accordion title="Using console.log in Production" icon="warning">
+    ```javascript
+    // Anti-pattern: Using console.log in production
+    function calculateTotal(items) {
+      console.log('Calculating total for', items);
+      // Calculate total
+      return total;
+    }
+    
+    // Better approach: Use a logging library with levels
+    function calculateTotal(items) {
+      logger.debug('Calculating total for', items);
+      // Calculate total
+      return total;
+    }
+    ```
+    Leaving `console.log` statements in production code can impact performance and potentially expose sensitive information. Use a proper logging library with configurable levels.
+  </Accordion>
+  
+  <Accordion title="Not Using Linters or Formatters" icon="warning">
+    ```javascript
+    // Anti-pattern: Inconsistent code style
+    function  badlyFormattedFunction ( x ){
+      var y=x+1
+      return y;
+    }
+    
+    // Better approach: Use linters and formatters
+    // Install ESLint and Prettier
+    // $ npm install eslint prettier --save-dev
+    // Configure with .eslintrc and .prettierrc
+    
+    function properlyFormattedFunction(x) {
+      const y = x + 1;
+      return y;
+    }
+    ```
+    Not using linters or formatters leads to inconsistent code style and can allow common errors to slip through. Use tools like ESLint and Prettier.
+  </Accordion>
+</AccordionGroup>
