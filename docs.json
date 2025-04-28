@@ -89,7 +89,6 @@
                 "icon": "message-code",
                 "pages": [
                   "languages/python",
-                  "languages/nodejs",
                   "languages/java",
                   "languages/javascript",
                   "languages/typescript",
