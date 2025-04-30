@@ -1,0 +1,606 @@
+---
+title: 'UI Rendering Bottlenecks'
+description: 'Anti-patterns related to UI rendering that can cause performance bottlenecks and affect user experience.'
+---
+
+<AccordionGroup>
+  <Accordion title="UI Rendering Bottlenecks Overview" icon="display">
+    UI rendering bottlenecks occur when the process of displaying content on screen becomes inefficient, causing lag, stuttering, or unresponsiveness. These bottlenecks can significantly impact user experience, especially on devices with limited resources.
+    
+    Common causes of UI rendering bottlenecks include excessive DOM manipulations, inefficient layouts, unnecessary repaints and reflows, heavy animations, and unoptimized assets. Identifying and resolving these bottlenecks is crucial for maintaining a smooth and responsive user interface.
+    
+    This guide covers common anti-patterns related to UI rendering and provides best practices for optimizing rendering performance across different frameworks and environments.
+  </Accordion>
+  
+  <Accordion title="Excessive DOM Manipulations" icon="code">
+    ```javascript
+    // Anti-pattern: Excessive DOM manipulations in a loop
+    function appendItems(items) {
+      const container = document.getElementById('container');
+      
+      for (let i = 0; i < items.length; i++) {
+        // Each append causes a reflow
+        const div = document.createElement('div');
+        div.textContent = items[i].name;
+        container.appendChild(div);
+      }
+    }
+    
+    // Better approach: Using document fragment
+    function appendItemsEfficiently(items) {
+      const container = document.getElementById('container');
+      const fragment = document.createDocumentFragment();
+      
+      for (let i = 0; i < items.length; i++) {
+        const div = document.createElement('div');
+        div.textContent = items[i].name;
+        fragment.appendChild(div);
+      }
+      
+      // Single DOM update
+      container.appendChild(fragment);
+    }
+    ```
+    
+    ```react
+    // Anti-pattern: Inefficient list rendering in React
+    function ItemList({ items }) {
+      return (
+        <div>
+          {items.map(item => (
+            // Missing key prop causes inefficient DOM updates
+            <div>
+              {item.name}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    // Better approach: Using keys and proper component structure
+    function ItemList({ items }) {
+      return (
+        <div>
+          {items.map(item => (
+            <div key={item.id}>
+              {item.name}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    ```
+    
+    Excessive DOM manipulations can trigger multiple reflows and repaints, causing significant performance issues, especially in complex applications.
+    
+    To optimize DOM manipulations:
+    - Batch DOM updates using document fragments or virtual DOM
+    - Minimize direct DOM manipulations in loops
+    - Use appropriate keys in list rendering
+    - Consider using CSS for animations instead of JavaScript DOM manipulations
+    - Modify classes instead of inline styles when possible
+    - Use requestAnimationFrame for animations and visual updates
+    - Consider using CSS transforms instead of properties that trigger layout
+    - Implement virtualization for long lists
+  </Accordion>
+  
+  <Accordion title="Layout Thrashing" icon="layer-group">
+    ```javascript
+    // Anti-pattern: Layout thrashing (forced reflow)
+    function resizeElements() {
+      const elements = document.querySelectorAll('.resizable');
+      
+      for (let i = 0; i < elements.length; i++) {
+        // Read (forces layout calculation)
+        const height = elements[i].offsetHeight;
+        
+        // Write (invalidates layout)
+        elements[i].style.height = (height * 1.5) + 'px';
+        
+        // Read again (forces another layout calculation)
+        const width = elements[i].offsetWidth;
+        
+        // Write again (invalidates layout again)
+        elements[i].style.width = (width * 1.5) + 'px';
+      }
+    }
+    
+    // Better approach: Batching reads and writes
+    function resizeElementsEfficiently() {
+      const elements = document.querySelectorAll('.resizable');
+      const dimensions = [];
+      
+      // Batch all reads
+      for (let i = 0; i < elements.length; i++) {
+        dimensions.push({
+          height: elements[i].offsetHeight,
+          width: elements[i].offsetWidth
+        });
+      }
+      
+      // Batch all writes
+      for (let i = 0; i < elements.length; i++) {
+        elements[i].style.height = (dimensions[i].height * 1.5) + 'px';
+        elements[i].style.width = (dimensions[i].width * 1.5) + 'px';
+      }
+    }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Layout thrashing with libraries
+    function animateElements() {
+      const elements = document.querySelectorAll('.animated');
+      
+      elements.forEach(el => {
+        // Each of these causes a read/write cycle
+        $(el).animate({ height: '+=10px' });
+        $(el).animate({ width: '+=10px' });
+        $(el).animate({ padding: '+=5px' });
+      });
+    }
+    
+    // Better approach: Using CSS transitions
+    function animateElementsEfficiently() {
+      const elements = document.querySelectorAll('.animated');
+      
+      elements.forEach(el => {
+        // Add a class that triggers CSS transitions
+        el.classList.add('animate-size');
+      });
+    }
+    
+    // In CSS:
+    // .animate-size {
+    //   transition: height 0.3s, width 0.3s, padding 0.3s;
+    //   height: calc(100% + 10px);
+    //   width: calc(100% + 10px);
+    //   padding: calc(100% + 5px);
+    // }
+    ```
+    
+    Layout thrashing occurs when code repeatedly alternates between reading and writing to the DOM, forcing the browser to recalculate layout multiple times.
+    
+    To prevent layout thrashing:
+    - Batch DOM reads and writes separately
+    - Read layout properties first, then perform all writes
+    - Use CSS classes or requestAnimationFrame for animations
+    - Consider using libraries like FastDOM to automatically batch DOM operations
+    - Minimize the number of elements affected by layout changes
+    - Use CSS transforms and opacity for animations when possible
+    - Avoid querying layout properties in loops
+    - Consider using the Web Animations API for complex animations
+  </Accordion>
+  
+  <Accordion title="Unoptimized Images and Assets" icon="image">
+    ```html
+    <!-- Anti-pattern: Unoptimized images -->
+    <div class="gallery">
+      <img src="high-res-image.jpg" alt="Product Photo">
+      <img src="large-background.png" alt="Background">
+      <img src="uncompressed-icon.svg" alt="Icon">
+    </div>
+    
+    <!-- Better approach: Optimized and responsive images -->
+    <div class="gallery">
+      <picture>
+        <source srcset="product-small.webp 400w, product-medium.webp 800w, product-large.webp 1200w" 
+                type="image/webp">
+        <source srcset="product-small.jpg 400w, product-medium.jpg 800w, product-large.jpg 1200w" 
+                type="image/jpeg">
+        <img src="product-fallback.jpg" alt="Product Photo" loading="lazy" width="800" height="600">
+      </picture>
+      
+      <img src="background.svg" alt="Background" loading="lazy">
+      
+      <img src="icon.svg" alt="Icon" width="24" height="24">
+    </div>
+    ```
+    
+    ```css
+    /* Anti-pattern: Large background images without optimization */
+    .hero {
+      background-image: url('large-hero-image.jpg');
+      background-size: cover;
+    }
+    
+    /* Better approach: Responsive background images */
+    .hero {
+      background-image: url('hero-small.jpg');
+      background-size: cover;
+    }
+    
+    @media (min-width: 768px) {
+      .hero {
+        background-image: url('hero-medium.jpg');
+      }
+    }
+    
+    @media (min-width: 1200px) {
+      .hero {
+        background-image: url('hero-large.jpg');
+      }
+    }
+    ```
+    
+    Unoptimized images and assets can significantly increase page load time and consume excessive memory, leading to poor rendering performance.
+    
+    To optimize images and assets:
+    - Compress and optimize images using appropriate formats (JPEG, PNG, WebP, AVIF)
+    - Use responsive images with srcset and sizes attributes
+    - Implement lazy loading for off-screen images
+    - Consider using image CDNs with automatic optimization
+    - Specify image dimensions to avoid layout shifts
+    - Use SVG for icons and simple graphics
+    - Implement proper caching strategies
+    - Consider using image sprites for multiple small images
+    - Optimize web fonts and limit font variations
+  </Accordion>
+  
+  <Accordion title="Inefficient Animations" icon="film">
+    ```javascript
+    // Anti-pattern: Inefficient JavaScript animations
+    function animatePosition() {
+      const element = document.getElementById('moving-element');
+      let position = 0;
+      
+      // Using setInterval for animations (can cause jank)
+      const interval = setInterval(() => {
+        position += 5;
+        element.style.left = position + 'px';
+        
+        if (position >= 500) {
+          clearInterval(interval);
+        }
+      }, 16); // ~60fps
+    }
+    
+    // Better approach: Using requestAnimationFrame
+    function animatePositionEfficiently() {
+      const element = document.getElementById('moving-element');
+      let position = 0;
+      
+      function animate() {
+        position += 5;
+        element.style.left = position + 'px';
+        
+        if (position < 500) {
+          requestAnimationFrame(animate);
+        }
+      }
+      
+      requestAnimationFrame(animate);
+    }
+    
+    // Even better approach: Using CSS transitions or animations
+    function animateWithCSS() {
+      const element = document.getElementById('moving-element');
+      element.classList.add('move-right');
+    }
+    
+    // In CSS:
+    // .move-right {
+    //   transition: transform 0.5s ease;
+    //   transform: translateX(500px);
+    // }
+    ```
+    
+    ```javascript
+    // Anti-pattern: Animating non-composited properties
+    function animateLayout() {
+      const element = document.getElementById('animated-element');
+      
+      // Animating properties that trigger layout
+      element.animate([
+        { width: '100px', height: '100px' },
+        { width: '200px', height: '200px' }
+      ], {
+        duration: 1000,
+        iterations: Infinity,
+        direction: 'alternate'
+      });
+    }
+    
+    // Better approach: Animating composited properties
+    function animateCompositedProperties() {
+      const element = document.getElementById('animated-element');
+      
+      // Animating transform and opacity (GPU-accelerated)
+      element.animate([
+        { transform: 'scale(1)', opacity: 1 },
+        { transform: 'scale(2)', opacity: 0.8 }
+      ], {
+        duration: 1000,
+        iterations: Infinity,
+        direction: 'alternate'
+      });
+    }
+    ```
+    
+    Inefficient animations can cause frame drops, jank, and excessive CPU/GPU usage, resulting in a poor user experience.
+    
+    To optimize animations:
+    - Use CSS transitions and animations when possible
+    - Animate composited properties (transform, opacity) for GPU acceleration
+    - Use requestAnimationFrame for JavaScript animations
+    - Implement the FLIP technique for complex animations
+    - Avoid animating layout properties (width, height, top, left)
+    - Use will-change property judiciously for complex animations
+    - Reduce the number of animated elements
+    - Consider using animation libraries optimized for performance
+    - Implement throttling or debouncing for scroll-based animations
+  </Accordion>
+  
+  <Accordion title="Render-Blocking Resources" icon="stop-circle">
+    ```html
+    <!-- Anti-pattern: Render-blocking resources -->
+    <head>
+      <link rel="stylesheet" href="large-styles.css">
+      <script src="heavy-script.js"></script>
+      <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap" rel="stylesheet">
+    </head>
+    
+    <!-- Better approach: Optimized resource loading -->
+    <head>
+      <!-- Critical CSS inlined -->
+      <style>
+        /* Critical styles for above-the-fold content */
+        body { margin: 0; font-family: sans-serif; }
+        .header { /* ... */ }
+      </style>
+      
+      <!-- Non-critical CSS loaded asynchronously -->
+      <link rel="preload" href="large-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+      <noscript><link rel="stylesheet" href="large-styles.css"></noscript>
+      
+      <!-- Defer non-critical JavaScript -->
+      <script src="heavy-script.js" defer></script>
+      
+      <!-- Preconnect to external domains -->
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      
+      <!-- Font loading optimized -->
+      <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    </head>
+    ```
+    
+    ```html
+    <!-- Anti-pattern: Large inline scripts blocking rendering -->
+    <head>
+      <script>
+        // Large initialization script with complex calculations
+        function initialize() {
+          // ... lots of code ...
+        }
+        initialize();
+      </script>
+    </head>
+    
+    <!-- Better approach: Deferred execution -->
+    <head>
+      <script>
+        // Only critical initialization
+        document.addEventListener('DOMContentLoaded', function() {
+          // Defer non-critical initialization
+          setTimeout(function() {
+            // ... complex initialization code ...
+          }, 0);
+        });
+      </script>
+    </head>
+    ```
+    
+    Render-blocking resources delay the first paint of a page, increasing perceived load time and negatively affecting user experience metrics.
+    
+    To minimize render-blocking resources:
+    - Inline critical CSS for above-the-fold content
+    - Defer or async load non-critical JavaScript
+    - Optimize web font loading with font-display and preconnect
+    - Use resource hints (preload, prefetch, preconnect)
+    - Minimize and split CSS files based on usage
+    - Implement server-side rendering for initial content
+    - Consider using critical CSS extraction tools
+    - Optimize third-party scripts loading
+    - Implement progressive enhancement techniques
+  </Accordion>
+  
+  <Accordion title="Inefficient Component Rendering" icon="puzzle-piece">
+    ```react
+    // Anti-pattern: Inefficient component rendering in React
+    class ExpensiveList extends React.Component {
+      render() {
+        console.log('Rendering ExpensiveList');
+        
+        // Expensive calculation on every render
+        const processedItems = this.props.items.map(item => {
+          return {
+            ...item,
+            processed: expensiveCalculation(item.data)
+          };
+        });
+        
+        return (
+          <div>
+            {processedItems.map(item => (
+              <div key={item.id}>{item.processed}</div>
+            ))}
+          </div>
+        );
+      }
+    }
+    
+    // Better approach: Using memoization and pure components
+    class OptimizedList extends React.PureComponent {
+      // Memoize expensive calculations
+      processItems = memoize((items) => {
+        console.log('Processing items');
+        return items.map(item => ({
+          ...item,
+          processed: expensiveCalculation(item.data)
+        }));
+      });
+      
+      render() {
+        console.log('Rendering OptimizedList');
+        const processedItems = this.processItems(this.props.items);
+        
+        return (
+          <div>
+            {processedItems.map(item => (
+              <div key={item.id}>{item.processed}</div>
+            ))}
+          </div>
+        );
+      }
+    }
+    ```
+    
+    ```vue
+    <!-- Anti-pattern: Inefficient Vue component -->
+    <template>
+      <div>
+        <div v-for="item in processedItems" :key="item.id">
+          {{ item.name }}
+        </div>
+      </div>
+    </template>
+    
+    <script>
+    export default {
+      props: ['items'],
+      computed: {
+        processedItems() {
+          console.log('Computing processed items');
+          // Expensive calculation on every render
+          return this.items.map(item => ({
+            ...item,
+            processed: this.expensiveCalculation(item.data)
+          }));
+        }
+      },
+      methods: {
+        expensiveCalculation(data) {
+          // Expensive operation
+          return data.toString().split('').reverse().join('');
+        }
+      }
+    };
+    </script>
+    
+    <!-- Better approach: Optimized Vue component -->
+    <template>
+      <div>
+        <div v-for="item in processedItems" :key="item.id">
+          {{ item.name }}
+        </div>
+      </div>
+    </template>
+    
+    <script>
+    import { memoize } from 'lodash-es';
+    
+    export default {
+      props: ['items'],
+      created() {
+        // Memoize the expensive calculation
+        this.memoizedCalculation = memoize(this.expensiveCalculation);
+      },
+      computed: {
+        processedItems() {
+          console.log('Computing processed items');
+          return this.items.map(item => ({
+            ...item,
+            processed: this.memoizedCalculation(item.data)
+          }));
+        }
+      },
+      methods: {
+        expensiveCalculation(data) {
+          // Expensive operation
+          return data.toString().split('').reverse().join('');
+        }
+      }
+    };
+    </script>
+    ```
+    
+    Inefficient component rendering can cause unnecessary re-renders and calculations, leading to poor UI performance, especially in complex applications.
+    
+    To optimize component rendering:
+    - Use pure components or shouldComponentUpdate in React
+    - Implement memoization for expensive calculations
+    - Leverage keys properly in list rendering
+    - Use virtualization for long lists
+    - Avoid anonymous functions in render methods
+    - Implement code-splitting and lazy loading for components
+    - Use React.memo or Vue's v-once for static content
+    - Consider using windowing techniques for large datasets
+    - Optimize state management to prevent unnecessary renders
+  </Accordion>
+  
+  <Accordion title="UI Rendering Bottlenecks Prevention Checklist" icon="clipboard-check">
+    ```text
+    UI Rendering Bottlenecks Prevention Checklist:
+    
+    1. DOM Manipulation
+       - Batch DOM updates using fragments or virtual DOM
+       - Minimize direct DOM manipulation
+       - Use appropriate keys for list rendering
+       - Implement virtualization for long lists
+       - Avoid layout thrashing (interleaved reads and writes)
+    
+    2. Layout and Painting
+       - Separate reads and writes to avoid forced reflows
+       - Use CSS transforms and opacity for animations
+       - Minimize changes to layout properties
+       - Avoid querying layout properties in loops
+       - Use will-change property judiciously
+    
+    3. Asset Optimization
+       - Compress and optimize images
+       - Use responsive images with srcset and sizes
+       - Implement lazy loading for off-screen content
+       - Optimize web fonts and limit font variations
+       - Use appropriate image formats (WebP, AVIF, SVG)
+    
+    4. Animation Techniques
+       - Use CSS transitions and animations when possible
+       - Animate composited properties for GPU acceleration
+       - Use requestAnimationFrame for JavaScript animations
+       - Implement FLIP technique for complex animations
+       - Reduce the number of animated elements
+    
+    5. Resource Loading
+       - Inline critical CSS
+       - Defer or async load non-critical JavaScript
+       - Optimize web font loading
+       - Use resource hints (preload, prefetch, preconnect)
+       - Implement server-side rendering for initial content
+    
+    6. Component Optimization
+       - Use pure components or shouldComponentUpdate
+       - Implement memoization for expensive calculations
+       - Leverage code-splitting and lazy loading
+       - Optimize state management
+       - Use virtualization for large datasets
+    
+    7. Measurement and Monitoring
+       - Use browser DevTools Performance panel
+       - Monitor FPS (Frames Per Second)
+       - Track Core Web Vitals (LCP, FID, CLS)
+       - Implement real user monitoring (RUM)
+       - Set performance budgets
+    ```
+    
+    Preventing UI rendering bottlenecks requires a comprehensive approach to identifying, measuring, and optimizing rendering performance issues.
+    
+    Key prevention strategies:
+    - Optimize DOM manipulations and minimize reflows
+    - Use appropriate animation techniques
+    - Optimize assets and resource loading
+    - Implement efficient component rendering patterns
+    - Measure and monitor rendering performance
+    - Follow platform-specific best practices
+    - Consider progressive enhancement for better performance across devices
+  </Accordion>
+</AccordionGroup>

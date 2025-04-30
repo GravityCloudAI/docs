@@ -1,0 +1,2180 @@
+---
+title: 'Lazy Loading Issues'
+description: 'Common anti-patterns related to lazy loading that can impact application performance'
+---
+
+# Lazy Loading Issues
+
+Lazy loading is a design pattern that defers the initialization of objects until they are needed. While this approach can improve startup time and reduce memory usage, improper implementation can lead to performance issues. This document outlines common anti-patterns related to lazy loading and provides optimization strategies.
+
+<AccordionGroup>
+
+<Accordion title="Eager Loading When Lazy Loading is Needed" icon="bolt">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class ResourceManager {
+    private final List<Resource> resources;
+    
+    public ResourceManager() {
+        // Loading all resources at startup, even rarely used ones
+        resources = loadAllResources();
+    }
+    
+    private List<Resource> loadAllResources() {
+        List<Resource> allResources = new ArrayList<>();
+        // Load resource A (frequently used)
+        allResources.add(new ResourceA());
+        // Load resource B (frequently used)
+        allResources.add(new ResourceB());
+        // Load resource C (rarely used)
+        allResources.add(new ResourceC());
+        // Load resource D (rarely used)
+        allResources.add(new ResourceD());
+        return allResources;
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class AppModules {
+  constructor() {
+    // Loading all modules at startup
+    this.moduleA = this.loadModuleA(); // Frequently used
+    this.moduleB = this.loadModuleB(); // Frequently used
+    this.moduleC = this.loadModuleC(); // Rarely used
+    this.moduleD = this.loadModuleD(); // Rarely used
+  }
+  
+  loadModuleA() {
+    // Heavy initialization
+    return { /* module A implementation */ };
+  }
+  
+  loadModuleB() {
+    // Heavy initialization
+    return { /* module B implementation */ };
+  }
+  
+  loadModuleC() {
+    // Heavy initialization
+    return { /* module C implementation */ };
+  }
+  
+  loadModuleD() {
+    // Heavy initialization
+    return { /* module D implementation */ };
+  }
+}
+
+// All modules are loaded immediately when app starts
+const app = new AppModules();
+```
+
+#### Description
+
+This anti-pattern occurs when all resources are loaded eagerly at startup, even those that are rarely used. This leads to longer startup times and unnecessary memory consumption, especially when some resources are expensive to initialize but infrequently accessed.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class ResourceManager {
+    private final Map<String, Resource> resourceCache = new HashMap<>();
+    
+    public ResourceManager() {
+        // Only initialize frequently used resources
+        resourceCache.put("A", new ResourceA());
+        resourceCache.put("B", new ResourceB());
+        // C and D will be loaded on demand
+    }
+    
+    public Resource getResource(String resourceId) {
+        if (!resourceCache.containsKey(resourceId)) {
+            // Lazy load the resource when first requested
+            switch (resourceId) {
+                case "C":
+                    resourceCache.put("C", new ResourceC());
+                    break;
+                case "D":
+                    resourceCache.put("D", new ResourceD());
+                    break;
+                // Add more cases as needed
+            }
+        }
+        return resourceCache.get(resourceId);
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class AppModules {
+  constructor() {
+    this.modules = {};
+    // Only initialize frequently used modules
+    this.modules.A = this.loadModuleA();
+    this.modules.B = this.loadModuleB();
+    // C and D will be loaded on demand
+  }
+  
+  getModule(id) {
+    if (!this.modules[id]) {
+      // Lazy load the module when first requested
+      switch (id) {
+        case 'C':
+          this.modules[id] = this.loadModuleC();
+          break;
+        case 'D':
+          this.modules[id] = this.loadModuleD();
+          break;
+      }
+    }
+    return this.modules[id];
+  }
+  
+  loadModuleA() { return { /* module A implementation */ }; }
+  loadModuleB() { return { /* module B implementation */ }; }
+  loadModuleC() { return { /* module C implementation */ }; }
+  loadModuleD() { return { /* module D implementation */ }; }
+}
+
+const app = new AppModules();
+// Only modules A and B are loaded initially
+// Module C is loaded only when needed
+const moduleC = app.getModule('C');
+```
+
+Implement lazy loading for resources that are expensive to initialize but infrequently used. Load only essential resources at startup and defer the loading of others until they are actually needed. This improves application startup time and reduces initial memory consumption.
+
+</Accordion>
+
+<Accordion title="Thread-Unsafe Lazy Initialization" icon="triangle-exclamation">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class DatabaseConnection {
+    private static DatabaseConnection instance;
+    
+    private DatabaseConnection() {
+        // Expensive initialization
+        System.out.println("Creating database connection...");
+        try {
+            Thread.sleep(1000); // Simulating expensive operation
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    // Not thread-safe lazy initialization
+    public static DatabaseConnection getInstance() {
+        if (instance == null) {
+            instance = new DatabaseConnection();
+        }
+        return instance;
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+// In a Node.js application with multiple worker threads
+let databaseConnection = null;
+
+function getDatabaseConnection() {
+  // Not thread-safe in environments with true parallelism
+  if (databaseConnection === null) {
+    console.log('Creating new database connection...');
+    // Expensive initialization
+    databaseConnection = {
+      connect: function() { /* connection logic */ },
+      query: function(sql) { /* query logic */ }
+    };
+  }
+  return databaseConnection;
+}
+```
+
+#### Description
+
+This anti-pattern involves implementing lazy initialization without proper thread synchronization. In multi-threaded environments, this can lead to race conditions where multiple threads might initialize the same resource concurrently, potentially creating duplicate instances or causing partial initialization issues.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class DatabaseConnection {
+    // Volatile ensures visibility across threads
+    private static volatile DatabaseConnection instance;
+    
+    private DatabaseConnection() {
+        // Expensive initialization
+        System.out.println("Creating database connection...");
+        try {
+            Thread.sleep(1000); // Simulating expensive operation
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    // Thread-safe lazy initialization using double-checked locking
+    public static DatabaseConnection getInstance() {
+        if (instance == null) {
+            synchronized (DatabaseConnection.class) {
+                if (instance == null) {
+                    instance = new DatabaseConnection();
+                }
+            }
+        }
+        return instance;
+    }
+}
+
+// Alternative: Using holder class idiom (preferred in Java)
+public class DatabaseConnectionHolder {
+    private DatabaseConnectionHolder() {}
+    
+    private static class InstanceHolder {
+        // Initialization on demand by the JVM, which is thread-safe
+        private static final DatabaseConnectionHolder INSTANCE = new DatabaseConnectionHolder();
+    }
+    
+    public static DatabaseConnectionHolder getInstance() {
+        return InstanceHolder.INSTANCE;
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+// For Node.js with worker threads, use a proper mutex or singleton pattern
+const { Mutex } = require('async-mutex');
+const connectionMutex = new Mutex();
+let databaseConnection = null;
+
+async function getDatabaseConnection() {
+  if (databaseConnection === null) {
+    // Acquire lock before checking/initializing
+    const release = await connectionMutex.acquire();
+    try {
+      // Double-check after acquiring lock
+      if (databaseConnection === null) {
+        console.log('Creating new database connection...');
+        databaseConnection = {
+          connect: function() { /* connection logic */ },
+          query: function(sql) { /* query logic */ }
+        };
+      }
+    } finally {
+      // Always release the lock
+      release();
+    }
+  }
+  return databaseConnection;
+}
+```
+
+Use proper thread synchronization mechanisms when implementing lazy initialization in multi-threaded environments. For Java, consider using the double-checked locking pattern with volatile fields, or better yet, the holder class idiom. For JavaScript in environments with true parallelism (like Node.js with worker threads), use appropriate locking mechanisms like mutexes.
+
+</Accordion>
+
+<Accordion title="Blocking UI Thread During Lazy Loading" icon="circle-pause">
+
+#### Anti-Pattern
+
+**Java Example (JavaFX):**
+```java
+public class ImageViewer extends Application {
+    @Override
+    public void start(Stage primaryStage) {
+        Button loadButton = new Button("Load High-Res Image");
+        ImageView imageView = new ImageView();
+        
+        loadButton.setOnAction(event -> {
+            // Blocking the UI thread during lazy loading
+            Image highResImage = loadHighResolutionImage();
+            imageView.setImage(highResImage);
+        });
+        
+        VBox root = new VBox(loadButton, imageView);
+        primaryStage.setScene(new Scene(root, 800, 600));
+        primaryStage.show();
+    }
+    
+    private Image loadHighResolutionImage() {
+        // Expensive operation that blocks the UI thread
+        try {
+            Thread.sleep(3000); // Simulating slow image loading
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return new Image("high-res-image.jpg");
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+document.getElementById('loadButton').addEventListener('click', function() {
+  // Blocking the main thread during lazy loading
+  const largeDataset = loadLargeDataset();
+  renderDataToUI(largeDataset);
+});
+
+function loadLargeDataset() {
+  // Expensive synchronous operation
+  console.log('Loading large dataset...');
+  const data = [];
+  for (let i = 0; i < 1000000; i++) {
+    data.push({ id: i, value: `Item ${i}` });
+  }
+  return data;
+}
+
+function renderDataToUI(data) {
+  const container = document.getElementById('dataContainer');
+  data.forEach(item => {
+    const div = document.createElement('div');
+    div.textContent = item.value;
+    container.appendChild(div);
+  });
+}
+```
+
+#### Description
+
+This anti-pattern occurs when lazy loading operations are performed on the UI thread, causing the user interface to freeze or become unresponsive during the loading process. This creates a poor user experience, especially when loading large resources or performing time-consuming operations.
+
+#### Optimization
+
+**Java Example (JavaFX):**
+```java
+public class ImageViewer extends Application {
+    @Override
+    public void start(Stage primaryStage) {
+        Button loadButton = new Button("Load High-Res Image");
+        ImageView imageView = new ImageView();
+        ProgressIndicator progressIndicator = new ProgressIndicator();
+        progressIndicator.setVisible(false);
+        
+        loadButton.setOnAction(event -> {
+            // Show progress indicator
+            progressIndicator.setVisible(true);
+            loadButton.setDisable(true);
+            
+            // Load image in background thread
+            Task<Image> loadTask = new Task<>() {
+                @Override
+                protected Image call() throws Exception {
+                    // Expensive operation now runs in background
+                    Thread.sleep(3000); // Simulating slow image loading
+                    return new Image("high-res-image.jpg");
+                }
+            };
+            
+            // Update UI when complete (on UI thread)
+            loadTask.setOnSucceeded(e -> {
+                imageView.setImage(loadTask.getValue());
+                progressIndicator.setVisible(false);
+                loadButton.setDisable(false);
+            });
+            
+            // Start the background task
+            new Thread(loadTask).start();
+        });
+        
+        VBox root = new VBox(loadButton, progressIndicator, imageView);
+        primaryStage.setScene(new Scene(root, 800, 600));
+        primaryStage.show();
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+document.getElementById('loadButton').addEventListener('click', function() {
+  // Show loading indicator
+  const loadingIndicator = document.getElementById('loadingIndicator');
+  loadingIndicator.style.display = 'block';
+  document.getElementById('loadButton').disabled = true;
+  
+  // Use setTimeout to move the operation off the main thread
+  setTimeout(() => {
+    // For more complex operations, consider using Web Workers
+    const largeDataset = loadLargeDataset();
+    
+    // Update UI after data is loaded
+    renderDataToUI(largeDataset);
+    loadingIndicator.style.display = 'none';
+    document.getElementById('loadButton').disabled = false;
+  }, 0);
+});
+
+// For even better performance, use a Web Worker
+function loadWithWebWorker() {
+  const worker = new Worker('data-loader.js');
+  
+  worker.onmessage = function(e) {
+    renderDataToUI(e.data);
+    document.getElementById('loadingIndicator').style.display = 'none';
+    document.getElementById('loadButton').disabled = false;
+  };
+  
+  worker.postMessage('start');
+}
+
+// data-loader.js (Web Worker)
+// self.onmessage = function() {
+//   const data = [];
+//   for (let i = 0; i < 1000000; i++) {
+//     data.push({ id: i, value: `Item ${i}` });
+//   }
+//   self.postMessage(data);
+// };
+```
+
+Perform lazy loading operations in background threads or asynchronously to keep the UI responsive. In Java, use Task or CompletableFuture for background operations. In JavaScript, use asynchronous patterns like Promises, async/await, or Web Workers for computationally intensive tasks. Always provide visual feedback to users during loading operations.
+
+</Accordion>
+
+<Accordion title="Redundant Lazy Loading Checks" icon="repeat">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class ConfigurationManager {
+    private Map<String, Object> configCache;
+    
+    public Object getConfig(String key) {
+        // Redundant check for initialization on every call
+        if (configCache == null) {
+            configCache = new HashMap<>();
+        }
+        
+        // Redundant check for the specific config on every call
+        if (!configCache.containsKey(key)) {
+            // Load from disk or network
+            Object config = loadConfigFromSource(key);
+            configCache.put(key, config);
+        }
+        
+        return configCache.get(key);
+    }
+    
+    private Object loadConfigFromSource(String key) {
+        // Expensive operation to load config
+        try {
+            Thread.sleep(500); // Simulating I/O or network delay
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return "Config value for " + key;
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class ResourceLoader {
+  constructor() {
+    // Cache is not initialized in constructor
+  }
+  
+  getResource(resourceId) {
+    // Redundant initialization check on every call
+    if (!this.resourceCache) {
+      this.resourceCache = {};
+    }
+    
+    // Redundant resource check on every call
+    if (!this.resourceCache[resourceId]) {
+      console.log(`Loading resource ${resourceId}...`);
+      // Expensive operation
+      this.resourceCache[resourceId] = this.fetchResourceFromServer(resourceId);
+    }
+    
+    return this.resourceCache[resourceId];
+  }
+  
+  fetchResourceFromServer(resourceId) {
+    // Simulate server request
+    return { id: resourceId, data: `Data for ${resourceId}` };
+  }
+}
+
+const loader = new ResourceLoader();
+// Every call to getResource performs redundant checks
+const resource1 = loader.getResource('resource1');
+const resource2 = loader.getResource('resource2');
+```
+
+#### Description
+
+This anti-pattern involves performing redundant initialization checks on every access to a lazily loaded resource. While the resource itself may be properly lazy-loaded, the repeated checks can add unnecessary overhead, especially in frequently accessed code paths.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class ConfigurationManager {
+    // Initialize the cache in the constructor
+    private final Map<String, Object> configCache = new HashMap<>();
+    
+    public Object getConfig(String key) {
+        // Only check for the specific config, not for cache initialization
+        if (!configCache.containsKey(key)) {
+            // Load from disk or network
+            Object config = loadConfigFromSource(key);
+            configCache.put(key, config);
+        }
+        
+        return configCache.get(key);
+    }
+    
+    private Object loadConfigFromSource(String key) {
+        // Expensive operation to load config
+        try {
+            Thread.sleep(500); // Simulating I/O or network delay
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return "Config value for " + key;
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class ResourceLoader {
+  constructor() {
+    // Initialize the cache in the constructor
+    this.resourceCache = {};
+  }
+  
+  getResource(resourceId) {
+    // Only check for the specific resource
+    if (!this.resourceCache[resourceId]) {
+      console.log(`Loading resource ${resourceId}...`);
+      // Expensive operation
+      this.resourceCache[resourceId] = this.fetchResourceFromServer(resourceId);
+    }
+    
+    return this.resourceCache[resourceId];
+  }
+  
+  fetchResourceFromServer(resourceId) {
+    // Simulate server request
+    return { id: resourceId, data: `Data for ${resourceId}` };
+  }
+}
+
+const loader = new ResourceLoader();
+// Cache is already initialized, only resource check is performed
+const resource1 = loader.getResource('resource1');
+const resource2 = loader.getResource('resource2');
+```
+
+Initialize data structures in constructors or during first access, then only check for specific resources in subsequent calls. This reduces the number of redundant checks and improves performance in frequently accessed code paths. For singleton patterns, consider using initialization-on-demand holder idiom in Java or module patterns in JavaScript.
+
+</Accordion>
+
+<Accordion title="Lazy Loading Without Timeout or Circuit Breaker" icon="stopwatch">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class RemoteResourceLoader {
+    public Resource loadResource(String resourceId) {
+        try {
+            // Lazy loading from remote server without timeout
+            URL url = new URL("https://api.example.com/resources/" + resourceId);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            
+            // No timeout set - could hang indefinitely
+            try (InputStream inputStream = connection.getInputStream()) {
+                // Parse the response
+                return parseResource(inputStream);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
+    private Resource parseResource(InputStream inputStream) {
+        // Parsing logic
+        return new Resource();
+    }
+    
+    class Resource {
+        // Resource implementation
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+function fetchUserData(userId) {
+  // Lazy loading from API without timeout or error handling
+  return fetch(`https://api.example.com/users/${userId}`)
+    .then(response => response.json())
+    .then(data => {
+      // Process and return the data
+      return data;
+    });
+  // No timeout, no retry logic, no circuit breaker
+}
+
+// Usage
+fetchUserData('user123')
+  .then(userData => {
+    // Use the user data
+    console.log(userData);
+  })
+  .catch(error => {
+    console.error('Error fetching user data:', error);
+  });
+```
+
+#### Description
+
+This anti-pattern involves implementing lazy loading for remote resources without proper timeout handling or circuit breaker patterns. This can lead to application hangs or degraded performance when remote services are slow or unresponsive, potentially affecting the entire application.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class RemoteResourceLoader {
+    // Circuit breaker state
+    private boolean circuitOpen = false;
+    private long circuitResetTime = 0;
+    private int failureCount = 0;
+    private static final int FAILURE_THRESHOLD = 3;
+    private static final long CIRCUIT_RESET_TIMEOUT_MS = 60000; // 1 minute
+    
+    public Resource loadResource(String resourceId) {
+        // Check if circuit breaker is open
+        if (circuitOpen) {
+            if (System.currentTimeMillis() < circuitResetTime) {
+                // Circuit is open, fail fast
+                System.out.println("Circuit breaker open, returning fallback resource");
+                return getFallbackResource(resourceId);
+            } else {
+                // Try to reset the circuit
+                circuitOpen = false;
+                failureCount = 0;
+            }
+        }
+        
+        try {
+            URL url = new URL("https://api.example.com/resources/" + resourceId);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            
+            // Set timeouts
+            connection.setConnectTimeout(5000); // 5 seconds for connection
+            connection.setReadTimeout(10000);   // 10 seconds for read
+            
+            try (InputStream inputStream = connection.getInputStream()) {
+                // Parse the response
+                Resource resource = parseResource(inputStream);
+                // Reset failure count on success
+                failureCount = 0;
+                return resource;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            // Increment failure count
+            failureCount++;
+            
+            // Check if we should open the circuit
+            if (failureCount >= FAILURE_THRESHOLD) {
+                circuitOpen = true;
+                circuitResetTime = System.currentTimeMillis() + CIRCUIT_RESET_TIMEOUT_MS;
+                System.out.println("Circuit breaker tripped, will reset after " + CIRCUIT_RESET_TIMEOUT_MS + "ms");
+            }
+            
+            return getFallbackResource(resourceId);
+        }
+    }
+    
+    private Resource getFallbackResource(String resourceId) {
+        // Return cached or default resource
+        return new Resource();
+    }
+    
+    private Resource parseResource(InputStream inputStream) {
+        // Parsing logic
+        return new Resource();
+    }
+    
+    class Resource {
+        // Resource implementation
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+// Simple circuit breaker implementation
+class CircuitBreaker {
+  constructor(options = {}) {
+    this.failureThreshold = options.failureThreshold || 3;
+    this.resetTimeout = options.resetTimeout || 30000; // 30 seconds
+    this.isOpen = false;
+    this.failureCount = 0;
+    this.resetTime = 0;
+  }
+  
+  async execute(fn, fallbackFn) {
+    if (this.isOpen) {
+      if (Date.now() < this.resetTime) {
+        console.log('Circuit is open, executing fallback');
+        return fallbackFn();
+      }
+      // Try to reset the circuit
+      this.isOpen = false;
+      this.failureCount = 0;
+    }
+    
+    try {
+      // Execute with timeout
+      const result = await Promise.race([
+        fn(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Operation timed out')), 5000)
+        )
+      ]);
+      
+      // Reset failure count on success
+      this.failureCount = 0;
+      return result;
+    } catch (error) {
+      this.failureCount++;
+      console.error(`Operation failed: ${error.message}`);
+      
+      if (this.failureCount >= this.failureThreshold) {
+        this.isOpen = true;
+        this.resetTime = Date.now() + this.resetTimeout;
+        console.log(`Circuit opened, will reset after ${this.resetTimeout}ms`);
+      }
+      
+      return fallbackFn();
+    }
+  }
+}
+
+// Usage
+const userDataCircuit = new CircuitBreaker();
+
+function fetchUserData(userId) {
+  return userDataCircuit.execute(
+    // Main function with timeout
+    async () => {
+      const response = await fetch(`https://api.example.com/users/${userId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    },
+    // Fallback function
+    () => {
+      console.log('Using cached or default user data');
+      return getCachedUserData(userId) || { id: userId, name: 'Unknown', isDefault: true };
+    }
+  );
+}
+
+function getCachedUserData(userId) {
+  // Return cached data if available
+  return null; // Implement cache lookup
+}
+```
+
+Implement proper timeout handling and circuit breaker patterns when lazy loading remote resources. Set appropriate connection and read timeouts, implement retry logic with exponential backoff for transient failures, and use circuit breakers to fail fast when remote services are consistently unresponsive. Always provide fallback mechanisms to ensure the application remains functional even when remote resources are unavailable.
+
+</Accordion>
+
+<Accordion title="Inefficient Dependency Chain in Lazy Loading" icon="link">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class ModuleManager {
+    private Module moduleA;
+    private Module moduleB;
+    private Module moduleC;
+    
+    public Module getModuleA() {
+        if (moduleA == null) {
+            moduleA = new ModuleA();
+        }
+        return moduleA;
+    }
+    
+    public Module getModuleB() {
+        if (moduleB == null) {
+            // ModuleB depends on ModuleA
+            Module a = getModuleA();
+            moduleB = new ModuleB(a);
+        }
+        return moduleB;
+    }
+    
+    public Module getModuleC() {
+        if (moduleC == null) {
+            // ModuleC depends on ModuleB which depends on ModuleA
+            // This creates a chain of lazy loading
+            Module b = getModuleB();
+            moduleC = new ModuleC(b);
+        }
+        return moduleC;
+    }
+}
+
+class ModuleA implements Module {
+    public ModuleA() {
+        // Expensive initialization
+        try { Thread.sleep(500); } catch (InterruptedException e) {}
+    }
+}
+
+class ModuleB implements Module {
+    public ModuleB(Module dependency) {
+        // Expensive initialization
+        try { Thread.sleep(500); } catch (InterruptedException e) {}
+    }
+}
+
+class ModuleC implements Module {
+    public ModuleC(Module dependency) {
+        // Expensive initialization
+        try { Thread.sleep(500); } catch (InterruptedException e) {}
+    }
+}
+
+interface Module {}
+```
+
+**JavaScript Example:**
+```javascript
+class AppModules {
+  getModuleA() {
+    if (!this.moduleA) {
+      console.log('Initializing Module A');
+      // Expensive initialization
+      this.moduleA = { name: 'Module A' };
+    }
+    return this.moduleA;
+  }
+  
+  getModuleB() {
+    if (!this.moduleB) {
+      // ModuleB depends on ModuleA
+      const moduleA = this.getModuleA();
+      console.log('Initializing Module B');
+      // Expensive initialization
+      this.moduleB = { name: 'Module B', dependency: moduleA };
+    }
+    return this.moduleB;
+  }
+  
+  getModuleC() {
+    if (!this.moduleC) {
+      // ModuleC depends on ModuleB which depends on ModuleA
+      // This creates a chain of lazy loading
+      const moduleB = this.getModuleB();
+      console.log('Initializing Module C');
+      // Expensive initialization
+      this.moduleC = { name: 'Module C', dependency: moduleB };
+    }
+    return this.moduleC;
+  }
+}
+
+// When moduleC is requested, it triggers the entire chain
+const app = new AppModules();
+const moduleC = app.getModuleC(); // Initializes A, B, and C in sequence
+```
+
+#### Description
+
+This anti-pattern occurs when lazy-loaded components form a long dependency chain, where each component depends on another lazy-loaded component. When a component at the end of the chain is requested, it triggers sequential initialization of all dependencies, leading to cascading delays and poor user experience.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class ModuleManager {
+    private Module moduleA;
+    private Module moduleB;
+    private Module moduleC;
+    private final Map<String, CompletableFuture<Module>> moduleInitTasks = new HashMap<>();
+    
+    public ModuleManager() {
+        // Pre-initialize futures for all modules
+        moduleInitTasks.put("A", new CompletableFuture<>());
+        moduleInitTasks.put("B", new CompletableFuture<>());
+        moduleInitTasks.put("C", new CompletableFuture<>());
+    }
+    
+    public CompletableFuture<Module> getModuleA() {
+        CompletableFuture<Module> future = moduleInitTasks.get("A");
+        if (!future.isDone()) {
+            // Initialize asynchronously if not already done
+            CompletableFuture.runAsync(() -> {
+                moduleA = new ModuleA();
+                future.complete(moduleA);
+            });
+        }
+        return future;
+    }
+    
+    public CompletableFuture<Module> getModuleB() {
+        CompletableFuture<Module> future = moduleInitTasks.get("B");
+        if (!future.isDone()) {
+            // Start initializing A if needed, then initialize B when A is ready
+            getModuleA().thenAcceptAsync(a -> {
+                moduleB = new ModuleB(a);
+                future.complete(moduleB);
+            });
+        }
+        return future;
+    }
+    
+    public CompletableFuture<Module> getModuleC() {
+        CompletableFuture<Module> future = moduleInitTasks.get("C");
+        if (!future.isDone()) {
+            // Start initializing B if needed, then initialize C when B is ready
+            getModuleB().thenAcceptAsync(b -> {
+                moduleC = new ModuleC(b);
+                future.complete(moduleC);
+            });
+        }
+        return future;
+    }
+    
+    // For eager initialization of the entire chain
+    public void preloadAllModules() {
+        getModuleC(); // This will trigger initialization of A, B, and C in parallel where possible
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class AppModules {
+  constructor() {
+    // Initialize promises for all modules
+    this.modulePromises = {
+      A: null,
+      B: null,
+      C: null
+    };
+  }
+  
+  getModuleA() {
+    if (!this.modulePromises.A) {
+      this.modulePromises.A = new Promise(resolve => {
+        console.log('Initializing Module A');
+        // Simulate async initialization
+        setTimeout(() => {
+          const moduleA = { name: 'Module A' };
+          resolve(moduleA);
+        }, 100);
+      });
+    }
+    return this.modulePromises.A;
+  }
+  
+  getModuleB() {
+    if (!this.modulePromises.B) {
+      // Start loading A if not already loading
+      const moduleAPromise = this.getModuleA();
+      
+      this.modulePromises.B = moduleAPromise.then(moduleA => {
+        console.log('Initializing Module B');
+        // Simulate async initialization
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const moduleB = { name: 'Module B', dependency: moduleA };
+            resolve(moduleB);
+          }, 100);
+        });
+      });
+    }
+    return this.modulePromises.B;
+  }
+  
+  getModuleC() {
+    if (!this.modulePromises.C) {
+      // Start loading B if not already loading
+      const moduleBPromise = this.getModuleB();
+      
+      this.modulePromises.C = moduleBPromise.then(moduleB => {
+        console.log('Initializing Module C');
+        // Simulate async initialization
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const moduleC = { name: 'Module C', dependency: moduleB };
+            resolve(moduleC);
+          }, 100);
+        });
+      });
+    }
+    return this.modulePromises.C;
+  }
+  
+  // For eager initialization of the entire chain
+  preloadAllModules() {
+    this.getModuleC(); // This will trigger initialization of A, B, and C
+    return this.modulePromises.C; // Return the promise for module C
+  }
+}
+
+// Usage
+const app = new AppModules();
+
+// Option 1: Preload all modules at an appropriate time
+app.preloadAllModules().then(moduleC => {
+  console.log('All modules loaded');
+});
+
+// Option 2: Load on demand with better parallelization
+app.getModuleC().then(moduleC => {
+  console.log('Module C and dependencies loaded');
+});
+```
+
+Use asynchronous initialization with promises or futures to parallelize the loading of dependencies where possible. Implement a dependency graph to manage initialization order and dependencies. Consider preloading critical modules during application idle time. For complex dependency chains, use a dedicated dependency injection framework that supports lazy loading and asynchronous initialization.
+
+</Accordion>
+
+<Accordion title="Lazy Loading Without Progress Indication" icon="spinner">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class ImageGalleryApp extends Application {
+    @Override
+    public void start(Stage primaryStage) {
+        GridPane gallery = new GridPane();
+        Button loadGalleryBtn = new Button("Load Gallery");
+        
+        loadGalleryBtn.setOnAction(event -> {
+            // User clicks button, but gets no feedback that loading has started
+            loadGalleryBtn.setDisable(true);
+            
+            // Lazy loading high-resolution images without progress indication
+            for (int i = 0; i < 20; i++) {
+                ImageView imageView = new ImageView();
+                gallery.add(imageView, i % 4, i / 4);
+                
+                // Load high-res image (blocking or in background, but no progress shown)
+                Image image = new Image("https://example.com/gallery/image" + i + ".jpg", true);
+                imageView.setImage(image);
+            }
+            
+            loadGalleryBtn.setDisable(false);
+        });
+        
+        VBox root = new VBox(loadGalleryBtn, gallery);
+        primaryStage.setScene(new Scene(root, 800, 600));
+        primaryStage.show();
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+document.getElementById('loadDataButton').addEventListener('click', function() {
+  // Disable button without any other feedback
+  this.disabled = true;
+  
+  // Lazy load large dataset without progress indication
+  fetch('https://api.example.com/large-dataset')
+    .then(response => response.json())
+    .then(data => {
+      // Process data and update UI
+      renderDataTable(data);
+      this.disabled = false;
+    })
+    .catch(error => {
+      console.error('Error loading data:', error);
+      this.disabled = false;
+    });
+});
+
+function renderDataTable(data) {
+  const container = document.getElementById('dataContainer');
+  // Render potentially thousands of rows
+  data.forEach(item => {
+    const row = document.createElement('tr');
+    // Add cells to row
+    row.innerHTML = `<td>${item.id}</td><td>${item.name}</td><td>${item.value}</td>`;
+    container.appendChild(row);
+  });
+}
+```
+
+#### Description
+
+This anti-pattern occurs when implementing lazy loading without providing any visual feedback to users. When users trigger a lazy loading operation, they have no indication that the system is working, how long the operation might take, or if it has failed. This creates a poor user experience and can lead to users repeatedly triggering the same operation, thinking the system is unresponsive.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class ImageGalleryApp extends Application {
+    @Override
+    public void start(Stage primaryStage) {
+        GridPane gallery = new GridPane();
+        Button loadGalleryBtn = new Button("Load Gallery");
+        ProgressBar progressBar = new ProgressBar(0);
+        Label statusLabel = new Label("Ready");
+        progressBar.setVisible(false);
+        
+        loadGalleryBtn.setOnAction(event -> {
+            // Show progress indicators
+            loadGalleryBtn.setDisable(true);
+            progressBar.setVisible(true);
+            statusLabel.setText("Loading gallery...");
+            
+            // Create a background task for loading
+            Task<List<Image>> loadTask = new Task<>() {
+                @Override
+                protected List<Image> call() throws Exception {
+                    List<Image> images = new ArrayList<>();
+                    for (int i = 0; i < 20; i++) {
+                        // Update progress as each image loads
+                        updateProgress(i, 20);
+                        updateMessage("Loading image " + (i+1) + " of 20");
+                        
+                        // Load high-res image
+                        Image image = new Image("https://example.com/gallery/image" + i + ".jpg", true);
+                        images.add(image);
+                    }
+                    return images;
+                }
+            };
+            
+            // Bind UI elements to task progress
+            progressBar.progressProperty().bind(loadTask.progressProperty());
+            statusLabel.textProperty().bind(loadTask.messageProperty());
+            
+            // Handle task completion
+            loadTask.setOnSucceeded(e -> {
+                List<Image> loadedImages = loadTask.getValue();
+                int index = 0;
+                for (Image image : loadedImages) {
+                    ImageView imageView = new ImageView(image);
+                    gallery.add(imageView, index % 4, index / 4);
+                    index++;
+                }
+                
+                // Reset UI
+                progressBar.setVisible(false);
+                statusLabel.setText("Gallery loaded successfully");
+                loadGalleryBtn.setDisable(false);
+                
+                // Unbind properties
+                progressBar.progressProperty().unbind();
+                statusLabel.textProperty().unbind();
+            });
+            
+            // Handle task failure
+            loadTask.setOnFailed(e -> {
+                statusLabel.textProperty().unbind();
+                statusLabel.setText("Failed to load gallery: " + loadTask.getException().getMessage());
+                progressBar.setVisible(false);
+                loadGalleryBtn.setDisable(false);
+            });
+            
+            // Start the background task
+            new Thread(loadTask).start();
+        });
+        
+        VBox root = new VBox(10, loadGalleryBtn, progressBar, statusLabel, gallery);
+        primaryStage.setScene(new Scene(root, 800, 600));
+        primaryStage.show();
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+document.getElementById('loadDataButton').addEventListener('click', function() {
+  const button = this;
+  const progressBar = document.getElementById('progressBar');
+  const statusText = document.getElementById('statusText');
+  
+  // Show progress indicators
+  button.disabled = true;
+  progressBar.style.display = 'block';
+  progressBar.value = 0;
+  statusText.textContent = 'Fetching data...';
+  
+  // Fetch with progress if browser supports it
+  if (window.fetch && 'body' in Response.prototype) {
+    fetchWithProgress('https://api.example.com/large-dataset')
+      .then(data => {
+        statusText.textContent = 'Processing data...';
+        return data.json();
+      })
+      .then(data => {
+        // Process data and update UI with chunked rendering
+        renderDataTableInChunks(data, () => {
+          // Complete UI update
+          button.disabled = false;
+          progressBar.style.display = 'none';
+          statusText.textContent = 'Data loaded successfully';
+        });
+      })
+      .catch(error => {
+        console.error('Error loading data:', error);
+        statusText.textContent = `Error: ${error.message}`;
+        button.disabled = false;
+        progressBar.style.display = 'none';
+      });
+  } else {
+    // Fallback for browsers without fetch streaming support
+    fetch('https://api.example.com/large-dataset')
+      .then(response => {
+        statusText.textContent = 'Processing data...';
+        return response.json();
+      })
+      .then(data => {
+        renderDataTableInChunks(data, () => {
+          button.disabled = false;
+          progressBar.style.display = 'none';
+          statusText.textContent = 'Data loaded successfully';
+        });
+      })
+      .catch(error => {
+        console.error('Error loading data:', error);
+        statusText.textContent = `Error: ${error.message}`;
+        button.disabled = false;
+        progressBar.style.display = 'none';
+      });
+  }
+});
+
+// Fetch with progress reporting
+function fetchWithProgress(url) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const progressBar = document.getElementById('progressBar');
+    
+    xhr.open('GET', url);
+    xhr.onprogress = function(event) {
+      if (event.lengthComputable) {
+        const percentComplete = (event.loaded / event.total) * 100;
+        progressBar.value = percentComplete;
+      }
+    };
+    xhr.onload = function() {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(new Response(xhr.response));
+      } else {
+        reject(new Error(`HTTP Error: ${xhr.status}`));
+      }
+    };
+    xhr.onerror = function() {
+      reject(new Error('Network Error'));
+    };
+    xhr.send();
+  });
+}
+
+// Render large datasets in chunks to avoid UI freezing
+function renderDataTableInChunks(data, onComplete) {
+  const container = document.getElementById('dataContainer');
+  const chunkSize = 100; // Process 100 items at a time
+  const totalItems = data.length;
+  let processedItems = 0;
+  
+  function processChunk() {
+    const chunk = data.slice(processedItems, processedItems + chunkSize);
+    const fragment = document.createDocumentFragment();
+    
+    chunk.forEach(item => {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${item.id}</td><td>${item.name}</td><td>${item.value}</td>`;
+      fragment.appendChild(row);
+    });
+    
+    container.appendChild(fragment);
+    processedItems += chunk.length;
+    
+    // Update progress
+    const progressBar = document.getElementById('progressBar');
+    progressBar.value = (processedItems / totalItems) * 100;
+    document.getElementById('statusText').textContent = 
+      `Rendering data... ${processedItems} of ${totalItems} items`;
+    
+    if (processedItems < totalItems) {
+      // Schedule next chunk with requestAnimationFrame for better UI responsiveness
+      window.requestAnimationFrame(processChunk);
+    } else {
+      onComplete();
+    }
+  }
+  
+  // Start processing the first chunk
+  window.requestAnimationFrame(processChunk);
+}
+```
+
+Always provide clear visual feedback during lazy loading operations. Use progress bars, spinners, or status messages to indicate that the system is working. For operations with known size or duration, show percentage-based progress. For unknown durations, use indeterminate progress indicators. Process large datasets in chunks to maintain UI responsiveness, and provide meaningful error messages if loading fails. Consider implementing skeleton screens for content that is being loaded to improve perceived performance.
+
+</Accordion>
+
+<Accordion title="Recursive Lazy Loading" icon="diagram-project">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class RecursiveTreeLoader {
+    public TreeNode loadTree(int nodeId) {
+        // Load the current node
+        TreeNode node = loadNodeFromDatabase(nodeId);
+        
+        // Recursively load all children immediately
+        List<Integer> childIds = getChildNodeIds(nodeId);
+        for (Integer childId : childIds) {
+            TreeNode childNode = loadTree(childId); // Recursive call
+            node.addChild(childNode);
+        }
+        
+        return node;
+    }
+    
+    private TreeNode loadNodeFromDatabase(int nodeId) {
+        // Simulate database access
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+        return new TreeNode(nodeId, "Node " + nodeId);
+    }
+    
+    private List<Integer> getChildNodeIds(int nodeId) {
+        // Simulate database query for child IDs
+        List<Integer> childIds = new ArrayList<>();
+        // Each node has 3 children (except leaf nodes)
+        if (nodeId < 100) { // Limit depth to avoid excessive recursion
+            childIds.add(nodeId * 3 + 1);
+            childIds.add(nodeId * 3 + 2);
+            childIds.add(nodeId * 3 + 3);
+        }
+        return childIds;
+    }
+    
+    public static class TreeNode {
+        private final int id;
+        private final String name;
+        private final List<TreeNode> children = new ArrayList<>();
+        
+        public TreeNode(int id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+        
+        public void addChild(TreeNode child) {
+            children.add(child);
+        }
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class RecursiveMenuLoader {
+  constructor() {
+    this.apiBaseUrl = 'https://api.example.com/menu';
+  }
+  
+  async loadMenu(menuId) {
+    // Load the current menu item
+    const menuItem = await this.fetchMenuItem(menuId);
+    
+    // Recursively load all submenu items immediately
+    if (menuItem.hasSubmenus) {
+      menuItem.submenus = [];
+      for (const submenuId of menuItem.submenuIds) {
+        // Recursive call - each submenu loads its own submenus
+        const submenuItem = await this.loadMenu(submenuId);
+        menuItem.submenus.push(submenuItem);
+      }
+    }
+    
+    return menuItem;
+  }
+  
+  async fetchMenuItem(menuId) {
+    // Simulate API call
+    console.log(`Fetching menu item ${menuId}`);
+    return new Promise(resolve => {
+      setTimeout(() => {
+        // Generate some submenu IDs for non-leaf items
+        const hasSubmenus = menuId < 100; // Limit depth
+        const submenuIds = hasSubmenus 
+          ? [menuId * 2, menuId * 2 + 1] // Each menu has 2 submenus
+          : [];
+        
+        resolve({
+          id: menuId,
+          name: `Menu Item ${menuId}`,
+          hasSubmenus,
+          submenuIds
+        });
+      }, 100); // Simulate network delay
+    });
+  }
+}
+
+// Usage
+const menuLoader = new RecursiveMenuLoader();
+menuLoader.loadMenu(1).then(rootMenu => {
+  console.log('Entire menu structure loaded');
+  // By now, the entire menu tree has been loaded recursively
+});
+```
+
+#### Description
+
+This anti-pattern occurs when lazy loading is implemented recursively without proper boundaries or pagination. In hierarchical data structures like trees or nested menus, each node triggers the loading of all its children, which in turn load their children, and so on. This can lead to an explosion of network requests, excessive memory consumption, and poor performance, especially for deep or wide hierarchies.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class LazyTreeLoader {
+    // Cache to avoid reloading the same nodes
+    private final Map<Integer, TreeNode> nodeCache = new HashMap<>();
+    
+    public TreeNode loadTreeLevel(int rootNodeId, int maxDepth) {
+        return loadTreeLevelRecursive(rootNodeId, 0, maxDepth);
+    }
+    
+    private TreeNode loadTreeLevelRecursive(int nodeId, int currentDepth, int maxDepth) {
+        // Check cache first
+        if (nodeCache.containsKey(nodeId)) {
+            return nodeCache.get(nodeId);
+        }
+        
+        // Load the current node
+        TreeNode node = loadNodeFromDatabase(nodeId);
+        nodeCache.put(nodeId, node);
+        
+        // Only load children if we haven't reached max depth
+        if (currentDepth < maxDepth) {
+            List<Integer> childIds = getChildNodeIds(nodeId);
+            for (Integer childId : childIds) {
+                TreeNode childNode = loadTreeLevelRecursive(childId, currentDepth + 1, maxDepth);
+                node.addChild(childNode);
+            }
+        } else if (currentDepth == maxDepth) {
+            // At max depth, just check if there are children but don't load them
+            List<Integer> childIds = getChildNodeIds(nodeId);
+            if (!childIds.isEmpty()) {
+                node.setHasMoreChildren(true);
+            }
+        }
+        
+        return node;
+    }
+    
+    // Method to load additional levels on demand
+    public void expandNode(TreeNode parentNode, int nodeId, int additionalLevels) {
+        if (parentNode.hasMoreChildren()) {
+            List<Integer> childIds = getChildNodeIds(nodeId);
+            for (Integer childId : childIds) {
+                TreeNode childNode = loadTreeLevelRecursive(childId, 0, additionalLevels);
+                parentNode.addChild(childNode);
+            }
+            parentNode.setHasMoreChildren(false);
+        }
+    }
+    
+    private TreeNode loadNodeFromDatabase(int nodeId) {
+        // Simulate database access
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+        return new TreeNode(nodeId, "Node " + nodeId);
+    }
+    
+    private List<Integer> getChildNodeIds(int nodeId) {
+        // Simulate database query for child IDs
+        List<Integer> childIds = new ArrayList<>();
+        // Each node has 3 children (except leaf nodes)
+        if (nodeId < 100) { // Limit depth to avoid excessive recursion
+            childIds.add(nodeId * 3 + 1);
+            childIds.add(nodeId * 3 + 2);
+            childIds.add(nodeId * 3 + 3);
+        }
+        return childIds;
+    }
+    
+    public static class TreeNode {
+        private final int id;
+        private final String name;
+        private final List<TreeNode> children = new ArrayList<>();
+        private boolean hasMoreChildren;
+        
+        public TreeNode(int id, String name) {
+            this.id = id;
+            this.name = name;
+            this.hasMoreChildren = false;
+        }
+        
+        public void addChild(TreeNode child) {
+            children.add(child);
+        }
+        
+        public boolean hasMoreChildren() {
+            return hasMoreChildren;
+        }
+        
+        public void setHasMoreChildren(boolean hasMoreChildren) {
+            this.hasMoreChildren = hasMoreChildren;
+        }
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class LazyMenuLoader {
+  constructor() {
+    this.apiBaseUrl = 'https://api.example.com/menu';
+    this.menuCache = new Map(); // Cache to avoid reloading items
+  }
+  
+  async loadMenuLevel(menuId, maxDepth = 1) {
+    return this.loadMenuLevelRecursive(menuId, 0, maxDepth);
+  }
+  
+  async loadMenuLevelRecursive(menuId, currentDepth, maxDepth) {
+    // Check cache first
+    if (this.menuCache.has(menuId)) {
+      return this.menuCache.get(menuId);
+    }
+    
+    // Load the current menu item
+    const menuItem = await this.fetchMenuItem(menuId);
+    this.menuCache.set(menuId, menuItem);
+    
+    // Only load submenus if we haven't reached max depth
+    if (currentDepth < maxDepth && menuItem.hasSubmenus) {
+      menuItem.submenus = [];
+      menuItem.loadedAllSubmenus = true;
+      
+      // Load all submenus for this level in parallel
+      const submenuPromises = menuItem.submenuIds.map(submenuId => 
+        this.loadMenuLevelRecursive(submenuId, currentDepth + 1, maxDepth)
+      );
+      
+      const submenuItems = await Promise.all(submenuPromises);
+      menuItem.submenus = submenuItems;
+    } else if (currentDepth === maxDepth && menuItem.hasSubmenus) {
+      // At max depth, indicate there are more items but don't load them
+      menuItem.submenus = [];
+      menuItem.loadedAllSubmenus = false;
+    }
+    
+    return menuItem;
+  }
+  
+  // Method to expand a node on demand
+  async expandMenuItem(menuItem, additionalLevels = 1) {
+    if (menuItem.hasSubmenus && !menuItem.loadedAllSubmenus) {
+      const submenuPromises = menuItem.submenuIds.map(submenuId => 
+        this.loadMenuLevelRecursive(submenuId, 0, additionalLevels)
+      );
+      
+      const submenuItems = await Promise.all(submenuPromises);
+      menuItem.submenus = submenuItems;
+      menuItem.loadedAllSubmenus = true;
+      return menuItem;
+    }
+    return menuItem;
+  }
+  
+  async fetchMenuItem(menuId) {
+    // Simulate API call
+    console.log(`Fetching menu item ${menuId}`);
+    return new Promise(resolve => {
+      setTimeout(() => {
+        // Generate some submenu IDs for non-leaf items
+        const hasSubmenus = menuId < 100; // Limit depth
+        const submenuIds = hasSubmenus 
+          ? [menuId * 2, menuId * 2 + 1] // Each menu has 2 submenus
+          : [];
+        
+        resolve({
+          id: menuId,
+          name: `Menu Item ${menuId}`,
+          hasSubmenus,
+          submenuIds
+        });
+      }, 100); // Simulate network delay
+    });
+  }
+}
+
+// Usage
+const menuLoader = new LazyMenuLoader();
+
+// Initial load - only first level
+menuLoader.loadMenuLevel(1, 1).then(rootMenu => {
+  console.log('First level loaded');
+  renderMenu(rootMenu);
+  
+  // When user expands a submenu, load its children
+  function handleMenuExpand(menuItem) {
+    menuLoader.expandMenuItem(menuItem, 1).then(updatedItem => {
+      console.log(`Expanded menu item ${updatedItem.id}`);
+      updateMenuDisplay(updatedItem);
+    });
+  }
+});
+```
+
+#### Optimization Strategies
+
+1. **Implement Level-Based Loading**: Load hierarchical data one level at a time instead of recursively loading the entire tree.
+
+2. **Use Pagination**: For nodes with many children, implement pagination to load children in batches.
+
+3. **Cache Loaded Nodes**: Maintain a cache of already loaded nodes to avoid redundant loading.
+
+4. **Implement Expand/Collapse Functionality**: Allow users to explicitly expand nodes they're interested in, rather than automatically loading everything.
+
+5. **Use Asynchronous Loading with Promises/Futures**: Load child nodes asynchronously to avoid blocking the UI thread.
+
+6. **Implement Virtual Scrolling**: For large lists or trees, only render the visible portion and load more items as the user scrolls.
+
+7. **Set Maximum Depth**: Establish a maximum depth for automatic loading to prevent excessive recursion.
+
+8. **Batch Network Requests**: Combine multiple requests into a single batch request when possible to reduce network overhead.
+
+By implementing these strategies, you can maintain the benefits of lazy loading while avoiding the performance pitfalls of unbounded recursive loading.
+
+</Accordion>
+
+<Accordion title="Lazy Loading Without Fallback Mechanism" icon="life-ring">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class ImageLoader {
+    public Image loadImage(String url) {
+        try {
+            // Attempt to load the image from the network
+            return new Image(url);
+        } catch (Exception e) {
+            // No fallback mechanism, just propagate the error
+            throw new RuntimeException("Failed to load image: " + url, e);
+        }
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+function loadUserProfile(userId) {
+  // Attempt to load user profile with no fallback
+  return fetch(`https://api.example.com/users/${userId}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    });
+}
+
+// Usage
+loadUserProfile('user123')
+  .then(profile => {
+    displayUserProfile(profile);
+  })
+  .catch(error => {
+    // Just show an error message, no fallback content
+    showErrorMessage(`Failed to load profile: ${error.message}`);
+  });
+```
+
+#### Description
+
+This anti-pattern occurs when lazy loading is implemented without proper fallback mechanisms. When the lazy-loaded resource fails to load (due to network issues, server errors, or other problems), the application has no alternative content to display, resulting in a degraded or broken user experience.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class ImageLoader {
+    // Cache for previously loaded images
+    private final Map<String, Image> imageCache = new HashMap<>();
+    // Default placeholder image
+    private final Image placeholderImage = new Image("placeholder.png");
+    
+    public Image loadImage(String url) {
+        // First check the cache
+        if (imageCache.containsKey(url)) {
+            return imageCache.get(url);
+        }
+        
+        try {
+            // Attempt to load from network
+            Image image = new Image(url, true); // Load in background
+            
+            // Add listener to handle loading errors
+            image.errorProperty().addListener((observable, oldValue, newValue) -> {
+                if (newValue) {
+                    System.err.println("Failed to load image: " + url);
+                    // Replace with placeholder in cache
+                    imageCache.put(url, placeholderImage);
+                }
+            });
+            
+            // Add to cache when successfully loaded
+            image.progressProperty().addListener((observable, oldValue, newValue) -> {
+                if (newValue.doubleValue() == 1.0) {
+                    imageCache.put(url, image);
+                }
+            });
+            
+            // Return placeholder while loading
+            return placeholderImage;
+        } catch (Exception e) {
+            System.err.println("Error initializing image load: " + e.getMessage());
+            // Return placeholder on error
+            return placeholderImage;
+        }
+    }
+    
+    // Method to preload important images
+    public void preloadImages(List<String> urls) {
+        for (String url : urls) {
+            // Start loading in background
+            loadImage(url);
+        }
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+// Cache for user profiles
+const profileCache = new Map();
+
+// Default profile data
+const defaultProfile = {
+  id: 'unknown',
+  name: 'Guest User',
+  avatar: '/images/default-avatar.png',
+  isDefault: true
+};
+
+function loadUserProfile(userId) {
+  // First check the cache
+  if (profileCache.has(userId)) {
+    return Promise.resolve(profileCache.get(userId));
+  }
+  
+  // Set a timeout to ensure the request doesn't hang indefinitely
+  return Promise.race([
+    fetch(`https://api.example.com/users/${userId}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(profile => {
+        // Cache the successfully loaded profile
+        profileCache.set(userId, profile);
+        return profile;
+      }),
+    // Timeout after 5 seconds
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timed out')), 5000)
+    )
+  ])
+  .catch(error => {
+    console.error(`Error loading profile for ${userId}:`, error);
+    
+    // Try to load from localStorage as a secondary fallback
+    const cachedProfile = localStorage.getItem(`user_${userId}`);
+    if (cachedProfile) {
+      try {
+        const profile = JSON.parse(cachedProfile);
+        return profile;
+      } catch (e) {
+        console.error('Error parsing cached profile:', e);
+      }
+    }
+    
+    // Return default profile as last resort
+    return { ...defaultProfile, id: userId };
+  });
+}
+
+// Usage with fallback handling
+function displayUserSection(userId) {
+  // Show loading state
+  showLoadingIndicator();
+  
+  loadUserProfile(userId)
+    .then(profile => {
+      // Check if we got the default profile
+      if (profile.isDefault) {
+        // Show a retry button along with the default profile
+        displayDefaultProfileWithRetry(profile, userId);
+      } else {
+        // Show the actual profile
+        displayUserProfile(profile);
+        // Cache in localStorage for offline fallback
+        localStorage.setItem(`user_${userId}`, JSON.stringify(profile));
+      }
+    })
+    .finally(() => {
+      hideLoadingIndicator();
+    });
+}
+```
+
+#### Optimization Strategies
+
+1. **Implement Multiple Fallback Layers**: Create a hierarchy of fallback sources - network, cache, local storage, and finally default content.
+
+2. **Use Placeholders**: Display placeholder content while the actual content is being loaded.
+
+3. **Cache Successfully Loaded Resources**: Store previously loaded resources to avoid repeated loading failures.
+
+4. **Implement Retry Logic**: Automatically retry failed loading attempts with exponential backoff.
+
+5. **Provide Degraded Functionality**: When a resource can't be loaded, still provide basic functionality rather than failing completely.
+
+6. **Preload Critical Resources**: Identify and preload essential resources during idle time to reduce the chance of loading failures when they're needed.
+
+7. **Implement Offline Support**: Use service workers or other techniques to enable offline functionality.
+
+8. **Monitor and Log Failures**: Track loading failures to identify patterns and improve the system.
+
+By implementing proper fallback mechanisms, you can ensure that your application remains functional and provides a good user experience even when lazy loading fails.
+
+</Accordion>
+
+<Accordion title="Inefficient Lazy Loading Initialization Order" icon="sort-numeric-down">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class ApplicationLoader {
+    private Module moduleA;
+    private Module moduleB;
+    private Module moduleC;
+    private Module moduleD;
+    
+    public void initializeApplication() {
+        // Random initialization order without considering dependencies or usage patterns
+        moduleC = loadModuleC(); // Rarely used, loaded first
+        moduleA = loadModuleA(); // Frequently used, loaded second
+        moduleD = loadModuleD(); // Rarely used, loaded third
+        moduleB = loadModuleB(); // Frequently used, loaded last
+    }
+    
+    private Module loadModuleA() {
+        System.out.println("Loading Module A (frequently used)");
+        try { Thread.sleep(500); } catch (InterruptedException e) {}
+        return new ModuleImpl("A");
+    }
+    
+    private Module loadModuleB() {
+        System.out.println("Loading Module B (frequently used)");
+        try { Thread.sleep(500); } catch (InterruptedException e) {}
+        return new ModuleImpl("B");
+    }
+    
+    private Module loadModuleC() {
+        System.out.println("Loading Module C (rarely used)");
+        try { Thread.sleep(1000); } catch (InterruptedException e) {}
+        return new ModuleImpl("C");
+    }
+    
+    private Module loadModuleD() {
+        System.out.println("Loading Module D (rarely used)");
+        try { Thread.sleep(1000); } catch (InterruptedException e) {}
+        return new ModuleImpl("D");
+    }
+    
+    private static class ModuleImpl implements Module {
+        private final String name;
+        
+        public ModuleImpl(String name) {
+            this.name = name;
+        }
+    }
+    
+    private interface Module {}
+}
+```
+
+**JavaScript Example:**
+```javascript
+class AppInitializer {
+  constructor() {
+    // Random initialization order without considering dependencies or usage patterns
+    this.initializeComponents();
+  }
+  
+  async initializeComponents() {
+    // Inefficient loading order
+    await this.loadAnalytics();      // Rarely used, loaded first
+    await this.loadUserInterface(); // Critical, loaded second
+    await this.loadSettings();      // Frequently used, loaded third
+    await this.loadReporting();     // Rarely used, loaded fourth
+  }
+  
+  async loadUserInterface() {
+    console.log('Loading UI components (critical)');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return { name: 'UI Components' };
+  }
+  
+  async loadSettings() {
+    console.log('Loading settings (frequently used)');
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return { name: 'Settings' };
+  }
+  
+  async loadAnalytics() {
+    console.log('Loading analytics (rarely used)');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return { name: 'Analytics' };
+  }
+  
+  async loadReporting() {
+    console.log('Loading reporting (rarely used)');
+    await new Promise(resolve => setTimeout(resolve, 800));
+    return { name: 'Reporting' };
+  }
+}
+
+// App initialization
+const app = new AppInitializer();
+// User has to wait for all components to load before using the app
+```
+
+#### Description
+
+This anti-pattern occurs when lazy-loaded components are initialized in an inefficient order, without considering their importance, dependencies, or usage patterns. Critical components that users need immediately are loaded after less important ones, leading to poor perceived performance and unnecessary delays in application readiness.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class OptimizedApplicationLoader {
+    private Module moduleA; // Frequently used
+    private Module moduleB; // Frequently used
+    private Module moduleC; // Rarely used
+    private Module moduleD; // Rarely used
+    
+    // Usage statistics to track which modules are actually used
+    private final Map<String, Integer> moduleUsage = new HashMap<>();
+    
+    public void initializeApplication() {
+        // Initialize critical modules first
+        CompletableFuture<Module> futureA = CompletableFuture.supplyAsync(this::loadModuleA);
+        CompletableFuture<Module> futureB = CompletableFuture.supplyAsync(this::loadModuleB);
+        
+        // Wait for critical modules to complete
+        try {
+            moduleA = futureA.get();
+            moduleB = futureB.get();
+            System.out.println("Critical modules loaded, application is ready for use");
+            
+            // Start loading non-critical modules in background
+            CompletableFuture.supplyAsync(this::loadModuleC)
+                .thenAccept(module -> moduleC = module);
+            CompletableFuture.supplyAsync(this::loadModuleD)
+                .thenAccept(module -> moduleD = module);
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    // Methods to access modules, with usage tracking
+    public Module getModuleA() {
+        incrementUsage("A");
+        return moduleA;
+    }
+    
+    public Module getModuleB() {
+        incrementUsage("B");
+        return moduleB;
+    }
+    
+    public Module getModuleC() {
+        incrementUsage("C");
+        // Lazy load if not already loaded
+        if (moduleC == null) {
+            moduleC = loadModuleC();
+        }
+        return moduleC;
+    }
+    
+    public Module getModuleD() {
+        incrementUsage("D");
+        // Lazy load if not already loaded
+        if (moduleD == null) {
+            moduleD = loadModuleD();
+        }
+        return moduleD;
+    }
+    
+    private void incrementUsage(String moduleName) {
+        moduleUsage.put(moduleName, moduleUsage.getOrDefault(moduleName, 0) + 1);
+    }
+    
+    // Loading methods (same as before)
+    private Module loadModuleA() { /* ... */ }
+    private Module loadModuleB() { /* ... */ }
+    private Module loadModuleC() { /* ... */ }
+    private Module loadModuleD() { /* ... */ }
+    
+    // Method to optimize loading order for next startup based on usage
+    public void saveUsageStatistics() {
+        // Save module usage to preferences or file for next startup
+        System.out.println("Module usage: " + moduleUsage);
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class OptimizedAppInitializer {
+  constructor() {
+    this.components = {};
+    this.usageStats = {};
+    
+    // Load critical components immediately, defer others
+    this.initializeCriticalComponents()
+      .then(() => {
+        console.log('App ready for use with critical components');
+        // Load remaining components in background
+        this.initializeNonCriticalComponents();
+      });
+  }
+  
+  async initializeCriticalComponents() {
+    // Load UI and settings in parallel (critical components)
+    const [ui, settings] = await Promise.all([
+      this.loadUserInterface(),
+      this.loadSettings()
+    ]);
+    
+    this.components.ui = ui;
+    this.components.settings = settings;
+  }
+  
+  async initializeNonCriticalComponents() {
+    // Load non-critical components in background
+    // Could prioritize based on previous usage statistics
+    Promise.all([
+      this.loadAnalytics(),
+      this.loadReporting()
+    ]).then(([analytics, reporting]) => {
+      this.components.analytics = analytics;
+      this.components.reporting = reporting;
+      console.log('All components loaded');
+    });
+  }
+  
+  // Component getters with usage tracking
+  getUI() {
+    this.trackUsage('ui');
+    return this.components.ui;
+  }
+  
+  getSettings() {
+    this.trackUsage('settings');
+    return this.components.settings;
+  }
+  
+  getAnalytics() {
+    this.trackUsage('analytics');
+    // Lazy load if not already loaded
+    if (!this.components.analytics) {
+      this.loadAnalytics().then(analytics => {
+        this.components.analytics = analytics;
+      });
+      return null; // Or return a placeholder
+    }
+    return this.components.analytics;
+  }
+  
+  getReporting() {
+    this.trackUsage('reporting');
+    // Lazy load if not already loaded
+    if (!this.components.reporting) {
+      this.loadReporting().then(reporting => {
+        this.components.reporting = reporting;
+      });
+      return null; // Or return a placeholder
+    }
+    return this.components.reporting;
+  }
+  
+  trackUsage(componentName) {
+    this.usageStats[componentName] = (this.usageStats[componentName] || 0) + 1;
+    // Could periodically save to localStorage for future optimization
+    if (this.usageStats[componentName] % 10 === 0) {
+      localStorage.setItem('componentUsage', JSON.stringify(this.usageStats));
+    }
+  }
+  
+  // Loading methods (same as before)
+  async loadUserInterface() { /* ... */ }
+  async loadSettings() { /* ... */ }
+  async loadAnalytics() { /* ... */ }
+  async loadReporting() { /* ... */ }
+}
+
+// App initialization
+const app = new OptimizedAppInitializer();
+// App is usable as soon as critical components are loaded
+```
+
+#### Optimization Strategies
+
+1. **Prioritize Critical Components**: Load essential components first to make the application usable as quickly as possible.
+
+2. **Use Parallel Loading**: Load independent components in parallel to reduce overall initialization time.
+
+3. **Defer Non-Critical Components**: Load non-essential components after the application is ready for use.
+
+4. **Track Usage Patterns**: Monitor which components are used most frequently and prioritize them in future loading sequences.
+
+5. **Consider Dependencies**: Load components in an order that respects their dependencies to avoid blocking.
+
+6. **Implement Predictive Loading**: Use analytics to predict which components users are likely to need next and preload them.
+
+7. **Adapt to User Behavior**: Customize loading order based on individual user behavior patterns.
+
+8. **Provide Visual Feedback**: Show loading progress for critical components to improve perceived performance.
+
+By optimizing the initialization order of lazy-loaded components, you can significantly improve application startup time and user experience, ensuring that the most important functionality is available as quickly as possible.
+
+</Accordion>
+
+</AccordionGroup>

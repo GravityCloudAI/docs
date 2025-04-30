@@ -1,0 +1,1013 @@
+---
+title: 'Caching Problems'
+description: 'Common anti-patterns related to caching that can impact application performance'
+---
+
+# Caching Problems
+
+Caching is a technique used to store copies of data in a high-speed data storage layer to improve retrieval times. While caching can significantly improve application performance, improper implementation can lead to various issues. This document outlines common anti-patterns related to caching and provides optimization strategies.
+
+<AccordionGroup>
+
+<Accordion title="Cache Invalidation Failures" icon="trash">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class ProductService {
+    private final Map<Long, Product> productCache = new HashMap<>();
+    private final ProductRepository repository;
+    
+    public ProductService(ProductRepository repository) {
+        this.repository = repository;
+    }
+    
+    public Product getProduct(Long id) {
+        // Check if product exists in cache
+        if (productCache.containsKey(id)) {
+            return productCache.get(id);
+        }
+        
+        // If not in cache, get from database and cache it
+        Product product = repository.findById(id);
+        if (product != null) {
+            productCache.put(id, product);
+        }
+        return product;
+    }
+    
+    public void updateProduct(Product product) {
+        // Update product in database
+        repository.save(product);
+        
+        // Cache invalidation is missing here!
+        // The cache still contains the old version of the product
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class UserService {
+  constructor() {
+    this.userCache = new Map();
+    this.api = new ApiClient();
+  }
+  
+  async getUser(userId) {
+    // Check if user exists in cache
+    if (this.userCache.has(userId)) {
+      return this.userCache.get(userId);
+    }
+    
+    // If not in cache, fetch from API and cache it
+    const user = await this.api.fetchUser(userId);
+    this.userCache.set(userId, user);
+    return user;
+  }
+  
+  async updateUser(userId, userData) {
+    // Update user via API
+    await this.api.updateUser(userId, userData);
+    
+    // Cache invalidation is missing here!
+    // The cache still contains the old user data
+  }
+}
+
+// Usage
+const userService = new UserService();
+
+// First call fetches and caches
+const user = await userService.getUser('user123');
+console.log(user); // {id: 'user123', name: 'John', email: 'john@example.com'}
+
+// Update user
+await userService.updateUser('user123', {name: 'John Updated'});
+
+// Second call returns stale data from cache
+const updatedUser = await userService.getUser('user123');
+console.log(updatedUser); // Still {id: 'user123', name: 'John', email: 'john@example.com'}
+```
+
+#### Description
+
+This anti-pattern occurs when an application fails to properly invalidate or update cached data after the underlying data has changed. This leads to stale data being served to users, potentially causing inconsistencies, incorrect business decisions, or confusing user experiences.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class ProductService {
+    private final Map<Long, Product> productCache = new HashMap<>();
+    private final ProductRepository repository;
+    
+    public ProductService(ProductRepository repository) {
+        this.repository = repository;
+    }
+    
+    public Product getProduct(Long id) {
+        // Check if product exists in cache
+        if (productCache.containsKey(id)) {
+            return productCache.get(id);
+        }
+        
+        // If not in cache, get from database and cache it
+        Product product = repository.findById(id);
+        if (product != null) {
+            productCache.put(id, product);
+        }
+        return product;
+    }
+    
+    public void updateProduct(Product product) {
+        // Update product in database
+        repository.save(product);
+        
+        // Properly invalidate cache
+        productCache.remove(product.getId());
+        // Or update the cache with the new version
+        // productCache.put(product.getId(), product);
+    }
+    
+    // Additional method to handle cache invalidation for bulk updates
+    public void invalidateCache() {
+        productCache.clear();
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class UserService {
+  constructor() {
+    this.userCache = new Map();
+    this.api = new ApiClient();
+  }
+  
+  async getUser(userId) {
+    // Check if user exists in cache
+    if (this.userCache.has(userId)) {
+      return this.userCache.get(userId);
+    }
+    
+    // If not in cache, fetch from API and cache it
+    const user = await this.api.fetchUser(userId);
+    this.userCache.set(userId, user);
+    return user;
+  }
+  
+  async updateUser(userId, userData) {
+    // Update user via API
+    const updatedUser = await this.api.updateUser(userId, userData);
+    
+    // Properly update cache with new data
+    this.userCache.set(userId, updatedUser);
+    return updatedUser;
+  }
+  
+  // Method to invalidate a specific user in cache
+  invalidateUser(userId) {
+    this.userCache.delete(userId);
+  }
+  
+  // Method to invalidate entire cache
+  invalidateCache() {
+    this.userCache.clear();
+  }
+}
+
+// Usage
+const userService = new UserService();
+
+// First call fetches and caches
+const user = await userService.getUser('user123');
+console.log(user); // {id: 'user123', name: 'John', email: 'john@example.com'}
+
+// Update user (cache is updated)
+await userService.updateUser('user123', {name: 'John Updated'});
+
+// Second call returns updated data from cache
+const updatedUser = await userService.getUser('user123');
+console.log(updatedUser); // {id: 'user123', name: 'John Updated', email: 'john@example.com'}
+```
+
+Implement proper cache invalidation strategies to ensure data consistency. When data is updated, either remove the corresponding cache entry or update it with the new value. For distributed systems, consider using cache invalidation events or time-based expiration policies. Always ensure that all code paths that modify data also handle cache invalidation appropriately.
+
+</Accordion>
+
+<Accordion title="Cache Stampede" icon="people-group">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class ExpensiveDataService {
+    private final Map<String, CachedData> cache = new ConcurrentHashMap<>();
+    private final ExpensiveDataRepository repository;
+    
+    public ExpensiveDataService(ExpensiveDataRepository repository) {
+        this.repository = repository;
+    }
+    
+    public Data getData(String key) {
+        CachedData cachedData = cache.get(key);
+        
+        // Check if data is in cache and not expired
+        if (cachedData != null && !cachedData.isExpired()) {
+            return cachedData.getData();
+        }
+        
+        // If not in cache or expired, fetch from database
+        Data freshData = repository.fetchExpensiveData(key);
+        cache.put(key, new CachedData(freshData, System.currentTimeMillis() + 60000)); // 1 minute TTL
+        return freshData;
+    }
+    
+    private static class CachedData {
+        private final Data data;
+        private final long expiryTime;
+        
+        public CachedData(Data data, long expiryTime) {
+            this.data = data;
+            this.expiryTime = expiryTime;
+        }
+        
+        public Data getData() {
+            return data;
+        }
+        
+        public boolean isExpired() {
+            return System.currentTimeMillis() > expiryTime;
+        }
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class DatabaseCache {
+  constructor(dbClient) {
+    this.cache = new Map();
+    this.dbClient = dbClient;
+    this.cacheTTL = 60000; // 1 minute in milliseconds
+  }
+  
+  async getRecord(recordId) {
+    const cachedRecord = this.cache.get(recordId);
+    
+    // Check if record is in cache and not expired
+    if (cachedRecord && Date.now() < cachedRecord.expiresAt) {
+      return cachedRecord.data;
+    }
+    
+    // If not in cache or expired, fetch from database
+    const data = await this.dbClient.fetchRecord(recordId);
+    
+    // Store in cache with expiration time
+    this.cache.set(recordId, {
+      data,
+      expiresAt: Date.now() + this.cacheTTL
+    });
+    
+    return data;
+  }
+}
+
+// Usage in a high-traffic web server
+app.get('/api/products/:id', async (req, res) => {
+  const productId = req.params.id;
+  const dbCache = new DatabaseCache(dbClient);
+  
+  try {
+    // If many requests come in at once for the same expired product,
+    // all will miss the cache and hit the database simultaneously
+    const product = await dbCache.getRecord(productId);
+    res.json(product);
+  } catch (error) {
+    res.status(500).send('Error fetching product');
+  }
+});
+```
+
+#### Description
+
+Cache stampede (also known as thundering herd or cache avalanche) occurs when many concurrent requests attempt to access a cached item that is either expired or missing, causing all of them to simultaneously try to fetch the data from the underlying data source. This can overwhelm the database or service, leading to increased latency, timeouts, or even system failures.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class ExpensiveDataService {
+    private final Map<String, CachedData> cache = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<Data>> ongoingFetches = new ConcurrentHashMap<>();
+    private final ExpensiveDataRepository repository;
+    
+    public ExpensiveDataService(ExpensiveDataRepository repository) {
+        this.repository = repository;
+    }
+    
+    public CompletableFuture<Data> getData(String key) {
+        CachedData cachedData = cache.get(key);
+        
+        // Check if data is in cache and not expired
+        if (cachedData != null && !cachedData.isExpired()) {
+            return CompletableFuture.completedFuture(cachedData.getData());
+        }
+        
+        // Check if there's already an ongoing fetch for this key
+        CompletableFuture<Data> ongoingFetch = ongoingFetches.get(key);
+        if (ongoingFetch != null) {
+            // Return the existing future to avoid duplicate fetches
+            return ongoingFetch;
+        }
+        
+        // Create a new fetch operation
+        CompletableFuture<Data> newFetch = CompletableFuture.supplyAsync(() -> {
+            try {
+                // Fetch from database
+                Data freshData = repository.fetchExpensiveData(key);
+                
+                // Update cache
+                cache.put(key, new CachedData(freshData, System.currentTimeMillis() + 60000)); // 1 minute TTL
+                
+                return freshData;
+            } finally {
+                // Remove from ongoing fetches when complete
+                ongoingFetches.remove(key);
+            }
+        });
+        
+        // Register the ongoing fetch
+        ongoingFetches.put(key, newFetch);
+        
+        return newFetch;
+    }
+    
+    // Proactive cache refresh before expiration
+    public void startBackgroundRefresh() {
+        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+        executor.scheduleAtFixedRate(() -> {
+            for (Map.Entry<String, CachedData> entry : cache.entrySet()) {
+                String key = entry.getKey();
+                CachedData cachedData = entry.getValue();
+                
+                // If approaching expiration (e.g., 75% of TTL elapsed) and no ongoing fetch
+                long ttl = 60000; // 1 minute in milliseconds
+                long refreshThreshold = System.currentTimeMillis() + (ttl / 4);
+                
+                if (cachedData.getExpiryTime() < refreshThreshold && !ongoingFetches.containsKey(key)) {
+                    // Refresh in background
+                    getData(key);
+                }
+            }
+        }, 15, 15, TimeUnit.SECONDS);
+    }
+    
+    private static class CachedData {
+        private final Data data;
+        private final long expiryTime;
+        
+        public CachedData(Data data, long expiryTime) {
+            this.data = data;
+            this.expiryTime = expiryTime;
+        }
+        
+        public Data getData() {
+            return data;
+        }
+        
+        public long getExpiryTime() {
+            return expiryTime;
+        }
+        
+        public boolean isExpired() {
+            return System.currentTimeMillis() > expiryTime;
+        }
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class DatabaseCache {
+  constructor(dbClient) {
+    this.cache = new Map();
+    this.fetchPromises = new Map();
+    this.dbClient = dbClient;
+    this.cacheTTL = 60000; // 1 minute in milliseconds
+    
+    // Start background refresh
+    this.startBackgroundRefresh();
+  }
+  
+  async getRecord(recordId) {
+    const cachedRecord = this.cache.get(recordId);
+    
+    // Check if record is in cache and not expired
+    if (cachedRecord && Date.now() < cachedRecord.expiresAt) {
+      return cachedRecord.data;
+    }
+    
+    // Check if there's already an ongoing fetch for this record
+    if (this.fetchPromises.has(recordId)) {
+      // Return the existing promise to avoid duplicate fetches
+      return this.fetchPromises.get(recordId);
+    }
+    
+    // Create a new fetch promise
+    const fetchPromise = this.fetchAndCacheRecord(recordId);
+    
+    // Register the ongoing fetch
+    this.fetchPromises.set(recordId, fetchPromise);
+    
+    try {
+      return await fetchPromise;
+    } finally {
+      // Remove from ongoing fetches when complete
+      this.fetchPromises.delete(recordId);
+    }
+  }
+  
+  async fetchAndCacheRecord(recordId) {
+    try {
+      // Add small jitter to prevent synchronized expiration
+      const jitter = Math.random() * 5000; // Random jitter up to 5 seconds
+      
+      const data = await this.dbClient.fetchRecord(recordId);
+      
+      // Store in cache with expiration time
+      this.cache.set(recordId, {
+        data,
+        expiresAt: Date.now() + this.cacheTTL + jitter
+      });
+      
+      return data;
+    } catch (error) {
+      // If fetch fails, remove from ongoing fetches
+      this.fetchPromises.delete(recordId);
+      throw error;
+    }
+  }
+  
+  // Proactively refresh cache before items expire
+  startBackgroundRefresh() {
+    setInterval(() => {
+      const now = Date.now();
+      
+      this.cache.forEach((record, recordId) => {
+        // If approaching expiration (e.g., 75% of TTL elapsed) and no ongoing fetch
+        const refreshThreshold = record.expiresAt - (this.cacheTTL * 0.25);
+        
+        if (now > refreshThreshold && !this.fetchPromises.has(recordId)) {
+          // Refresh in background without blocking
+          this.getRecord(recordId).catch(error => {
+            console.error(`Background refresh failed for ${recordId}:`, error);
+          });
+        }
+      });
+    }, 15000); // Check every 15 seconds
+  }
+}
+
+// Usage in a high-traffic web server
+const dbCache = new DatabaseCache(dbClient); // Single instance for the server
+
+app.get('/api/products/:id', async (req, res) => {
+  const productId = req.params.id;
+  
+  try {
+    // All concurrent requests for the same product will share the same fetch operation
+    const product = await dbCache.getRecord(productId);
+    res.json(product);
+  } catch (error) {
+    res.status(500).send('Error fetching product');
+  }
+});
+```
+
+#### Optimization Strategies
+
+1. **Request Coalescing**: When multiple requests for the same resource arrive simultaneously, only one request should fetch from the underlying data source while others wait for that result.
+
+2. **Staggered Expiration Times**: Add random jitter to cache expiration times to prevent many items from expiring simultaneously.
+
+3. **Background Refresh**: Proactively refresh cache items before they expire, ideally during low-traffic periods.
+
+4. **Soft Expiration**: Continue serving stale data while asynchronously refreshing the cache.
+
+5. **Cache Lock**: Use a distributed lock to ensure only one process can refresh a particular cache entry at a time.
+
+6. **Fallback to Stale Data**: If fetching fresh data fails, temporarily continue serving stale data rather than failing completely.
+
+7. **Circuit Breaker Pattern**: Implement circuit breakers to prevent overwhelming the backend system during outages.
+
+8. **Tiered Caching**: Implement multiple layers of caching with different expiration policies.
+
+By implementing these strategies, you can prevent cache stampedes and ensure your application remains responsive even under high load or when cached data expires.
+
+</Accordion>
+
+<Accordion title="Inefficient Cache Eviction Policies" icon="broom">
+
+#### Anti-Pattern
+
+**Java Example:**
+```java
+public class SimpleCache<K, V> {
+    private final Map<K, V> cache = new HashMap<>();
+    private final int maxSize;
+    
+    public SimpleCache(int maxSize) {
+        this.maxSize = maxSize;
+    }
+    
+    public V get(K key) {
+        return cache.get(key);
+    }
+    
+    public void put(K key, V value) {
+        // Check if cache is full
+        if (cache.size() >= maxSize) {
+            // Inefficient: randomly remove an entry when cache is full
+            K randomKey = cache.keySet().iterator().next();
+            cache.remove(randomKey);
+        }
+        
+        cache.put(key, value);
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class SimpleCache {
+  constructor(maxSize) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
+  }
+  
+  get(key) {
+    return this.cache.get(key);
+  }
+  
+  set(key, value) {
+    // Check if cache is full
+    if (this.cache.size >= this.maxSize) {
+      // Inefficient: clear the entire cache when it's full
+      this.cache.clear();
+    }
+    
+    this.cache.set(key, value);
+  }
+}
+
+// Usage
+const cache = new SimpleCache(100);
+cache.set('user:1', { name: 'John', age: 30 });
+// ... more items added
+// When cache reaches 100 items, the next item will cause the entire cache to be cleared
+```
+
+#### Description
+
+This anti-pattern occurs when an application uses inefficient or inappropriate cache eviction policies. Common issues include clearing the entire cache when it's full, randomly removing entries without considering their usage patterns, or using a one-size-fits-all approach for all types of data. This leads to poor cache hit ratios, unnecessary recomputation of values, and degraded application performance.
+
+#### Optimization
+
+**Java Example:**
+```java
+public class LRUCache<K, V> {
+    private final LinkedHashMap<K, V> cache;
+    private final int maxSize;
+    
+    public LRUCache(int maxSize) {
+        this.maxSize = maxSize;
+        // Use LinkedHashMap with access order to implement LRU
+        this.cache = new LinkedHashMap<K, V>(maxSize, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+                return size() > maxSize;
+            }
+        };
+    }
+    
+    public V get(K key) {
+        return cache.get(key);
+    }
+    
+    public void put(K key, V value) {
+        cache.put(key, value);
+    }
+}
+
+// Alternative implementation with more control and metrics
+public class AdvancedCache<K, V> {
+    private final Map<K, CacheEntry<V>> cache = new HashMap<>();
+    private final int maxSize;
+    private final EvictionPolicy evictionPolicy;
+    
+    // Cache statistics
+    private long hits = 0;
+    private long misses = 0;
+    
+    public AdvancedCache(int maxSize, EvictionPolicy evictionPolicy) {
+        this.maxSize = maxSize;
+        this.evictionPolicy = evictionPolicy;
+    }
+    
+    public V get(K key) {
+        CacheEntry<V> entry = cache.get(key);
+        if (entry == null) {
+            misses++;
+            return null;
+        }
+        
+        // Update access statistics
+        entry.incrementAccessCount();
+        entry.setLastAccessTime(System.currentTimeMillis());
+        hits++;
+        
+        return entry.getValue();
+    }
+    
+    public void put(K key, V value) {
+        // Check if cache is full
+        if (cache.size() >= maxSize && !cache.containsKey(key)) {
+            // Apply the selected eviction policy
+            evict();
+        }
+        
+        // Add or update the entry
+        CacheEntry<V> entry = cache.get(key);
+        if (entry == null) {
+            entry = new CacheEntry<>(value);
+            cache.put(key, entry);
+        } else {
+            entry.setValue(value);
+            entry.setLastUpdateTime(System.currentTimeMillis());
+        }
+    }
+    
+    private void evict() {
+        switch (evictionPolicy) {
+            case LRU:
+                evictLRU();
+                break;
+            case LFU:
+                evictLFU();
+                break;
+            case FIFO:
+                evictFIFO();
+                break;
+        }
+    }
+    
+    private void evictLRU() {
+        K oldestKey = null;
+        long oldestAccessTime = Long.MAX_VALUE;
+        
+        for (Map.Entry<K, CacheEntry<V>> entry : cache.entrySet()) {
+            if (entry.getValue().getLastAccessTime() < oldestAccessTime) {
+                oldestAccessTime = entry.getValue().getLastAccessTime();
+                oldestKey = entry.getKey();
+            }
+        }
+        
+        if (oldestKey != null) {
+            cache.remove(oldestKey);
+        }
+    }
+    
+    private void evictLFU() {
+        K leastFrequentKey = null;
+        long leastFrequentCount = Long.MAX_VALUE;
+        
+        for (Map.Entry<K, CacheEntry<V>> entry : cache.entrySet()) {
+            if (entry.getValue().getAccessCount() < leastFrequentCount) {
+                leastFrequentCount = entry.getValue().getAccessCount();
+                leastFrequentKey = entry.getKey();
+            }
+        }
+        
+        if (leastFrequentKey != null) {
+            cache.remove(leastFrequentKey);
+        }
+    }
+    
+    private void evictFIFO() {
+        K oldestKey = null;
+        long oldestCreationTime = Long.MAX_VALUE;
+        
+        for (Map.Entry<K, CacheEntry<V>> entry : cache.entrySet()) {
+            if (entry.getValue().getCreationTime() < oldestCreationTime) {
+                oldestCreationTime = entry.getValue().getCreationTime();
+                oldestKey = entry.getKey();
+            }
+        }
+        
+        if (oldestKey != null) {
+            cache.remove(oldestKey);
+        }
+    }
+    
+    public double getHitRatio() {
+        long total = hits + misses;
+        return total == 0 ? 0 : (double) hits / total;
+    }
+    
+    public enum EvictionPolicy {
+        LRU, // Least Recently Used
+        LFU, // Least Frequently Used
+        FIFO // First In First Out
+    }
+    
+    private static class CacheEntry<V> {
+        private V value;
+        private final long creationTime;
+        private long lastAccessTime;
+        private long lastUpdateTime;
+        private long accessCount;
+        
+        public CacheEntry(V value) {
+            this.value = value;
+            this.creationTime = System.currentTimeMillis();
+            this.lastAccessTime = this.creationTime;
+            this.lastUpdateTime = this.creationTime;
+            this.accessCount = 0;
+        }
+        
+        public V getValue() {
+            return value;
+        }
+        
+        public void setValue(V value) {
+            this.value = value;
+        }
+        
+        public long getCreationTime() {
+            return creationTime;
+        }
+        
+        public long getLastAccessTime() {
+            return lastAccessTime;
+        }
+        
+        public void setLastAccessTime(long lastAccessTime) {
+            this.lastAccessTime = lastAccessTime;
+        }
+        
+        public long getLastUpdateTime() {
+            return lastUpdateTime;
+        }
+        
+        public void setLastUpdateTime(long lastUpdateTime) {
+            this.lastUpdateTime = lastUpdateTime;
+        }
+        
+        public long getAccessCount() {
+            return accessCount;
+        }
+        
+        public void incrementAccessCount() {
+            this.accessCount++;
+        }
+    }
+}
+```
+
+**JavaScript Example:**
+```javascript
+class LRUCache {
+  constructor(maxSize) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
+    this.hits = 0;
+    this.misses = 0;
+  }
+  
+  get(key) {
+    if (!this.cache.has(key)) {
+      this.misses++;
+      return undefined;
+    }
+    
+    // Get the entry
+    const entry = this.cache.get(key);
+    
+    // Update access statistics
+    entry.lastAccessed = Date.now();
+    entry.accessCount++;
+    this.hits++;
+    
+    // LRU implementation: remove and re-add to put at the end of the insertion order
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    
+    return entry.value;
+  }
+  
+  set(key, value) {
+    // If key already exists, update it
+    if (this.cache.has(key)) {
+      const entry = this.cache.get(key);
+      entry.value = value;
+      entry.lastUpdated = Date.now();
+      
+      // Move to the end of insertion order
+      this.cache.delete(key);
+      this.cache.set(key, entry);
+      return;
+    }
+    
+    // Check if cache is full
+    if (this.cache.size >= this.maxSize) {
+      // LRU: Remove the first item (oldest by insertion order in Map)
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    
+    // Add new entry
+    this.cache.set(key, {
+      value,
+      created: Date.now(),
+      lastAccessed: Date.now(),
+      lastUpdated: Date.now(),
+      accessCount: 0
+    });
+  }
+  
+  getHitRatio() {
+    const total = this.hits + this.misses;
+    return total === 0 ? 0 : this.hits / total;
+  }
+  
+  clear() {
+    this.cache.clear();
+    this.hits = 0;
+    this.misses = 0;
+  }
+}
+
+// More sophisticated cache with configurable eviction policies
+class AdvancedCache {
+  constructor(maxSize, evictionPolicy = 'LRU') {
+    this.cache = new Map();
+    this.maxSize = maxSize;
+    this.evictionPolicy = evictionPolicy; // 'LRU', 'LFU', or 'FIFO'
+    this.hits = 0;
+    this.misses = 0;
+  }
+  
+  get(key) {
+    if (!this.cache.has(key)) {
+      this.misses++;
+      return undefined;
+    }
+    
+    const entry = this.cache.get(key);
+    entry.lastAccessed = Date.now();
+    entry.accessCount++;
+    this.hits++;
+    
+    return entry.value;
+  }
+  
+  set(key, value) {
+    // If key exists, update it
+    if (this.cache.has(key)) {
+      const entry = this.cache.get(key);
+      entry.value = value;
+      entry.lastUpdated = Date.now();
+      return;
+    }
+    
+    // Check if cache is full
+    if (this.cache.size >= this.maxSize) {
+      this.evict();
+    }
+    
+    // Add new entry
+    this.cache.set(key, {
+      value,
+      created: Date.now(),
+      lastAccessed: Date.now(),
+      lastUpdated: Date.now(),
+      accessCount: 0
+    });
+  }
+  
+  evict() {
+    switch (this.evictionPolicy) {
+      case 'LRU':
+        this.evictLRU();
+        break;
+      case 'LFU':
+        this.evictLFU();
+        break;
+      case 'FIFO':
+        this.evictFIFO();
+        break;
+      default:
+        this.evictLRU();
+    }
+  }
+  
+  evictLRU() {
+    let oldestKey = null;
+    let oldestAccessTime = Infinity;
+    
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.lastAccessed < oldestAccessTime) {
+        oldestAccessTime = entry.lastAccessed;
+        oldestKey = key;
+      }
+    }
+    
+    if (oldestKey) {
+      this.cache.delete(oldestKey);
+    }
+  }
+  
+  evictLFU() {
+    let leastFrequentKey = null;
+    let leastFrequentCount = Infinity;
+    
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.accessCount < leastFrequentCount) {
+        leastFrequentCount = entry.accessCount;
+        leastFrequentKey = key;
+      }
+    }
+    
+    if (leastFrequentKey) {
+      this.cache.delete(leastFrequentKey);
+    }
+  }
+  
+  evictFIFO() {
+    let oldestKey = null;
+    let oldestCreationTime = Infinity;
+    
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.created < oldestCreationTime) {
+        oldestCreationTime = entry.created;
+        oldestKey = key;
+      }
+    }
+    
+    if (oldestKey) {
+      this.cache.delete(oldestKey);
+    }
+  }
+  
+  getHitRatio() {
+    const total = this.hits + this.misses;
+    return total === 0 ? 0 : this.hits / total;
+  }
+}
+
+// Usage
+const lruCache = new LRUCache(1000);
+const advancedCache = new AdvancedCache(1000, 'LFU'); // Use LFU for frequently accessed items
+```
+
+#### Optimization Strategies
+
+1. **Choose Appropriate Eviction Policies**:
+   - **LRU (Least Recently Used)**: Best for data with temporal locality.
+   - **LFU (Least Frequently Used)**: Best for data with frequency-based access patterns.
+   - **FIFO (First In First Out)**: Simple but effective for data with uniform access patterns.
+   - **Time-Based Expiration**: Good for data that becomes stale after a certain period.
+
+2. **Use Different Policies for Different Data Types**:
+   - Configuration data might benefit from time-based expiration.
+   - User session data might benefit from LRU.
+   - Popular content might benefit from LFU.
+
+3. **Implement Size-Aware Caching**:
+   - Consider both the number of items and their size.
+   - Evict larger items first when memory pressure is high.
+
+4. **Monitor Cache Effectiveness**:
+   - Track hit/miss ratios to evaluate policy effectiveness.
+   - Adjust cache sizes and policies based on metrics.
+
+5. **Consider Hybrid Approaches**:
+   - Combine multiple policies (e.g., TinyLFU with window TinyLFU).
+   - Use adaptive policies that change based on workload.
+
+6. **Implement Segmented Caching**:
+   - Divide the cache into segments with different policies.
+   - Allocate more space to segments with higher hit rates.
+
+7. **Pre-emptive Eviction**:
+   - Proactively evict items that are likely to become stale.
+   - Use predictive models to anticipate which items will be needed.
+
+By implementing appropriate cache eviction policies, you can significantly improve cache hit ratios, reduce resource consumption, and enhance application performance.
+
+</Accordion>
+
+</AccordionGroup>
