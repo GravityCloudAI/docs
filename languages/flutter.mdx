@@ -1,0 +1,819 @@
+---
+title: 'Flutter'
+description: 'Flutter is Googles UI toolkit for building beautiful, natively compiled applications for mobile, web, and desktop from a single codebase using the Dart programming language.'
+---
+
+<AccordionGroup>
+  <Accordion title="Flutter Anti-Patterns Overview" icon="flutter">
+    Flutter, despite its powerful cross-platform capabilities, has several common anti-patterns that can lead to performance issues, maintenance problems, and poor user experience. Here are the most important anti-patterns to avoid when writing Flutter code.
+  </Accordion>
+  
+  <Accordion title="Rebuilding Entire Widget Trees" icon="warning">
+    ```dart
+    // Anti-pattern: Rebuilding entire widget tree on state change
+    class CounterPage extends StatefulWidget {
+      @override
+      _CounterPageState createState() => _CounterPageState();
+    }
+    
+    class _CounterPageState extends State<CounterPage> {
+      int _counter = 0;
+      
+      void _incrementCounter() {
+        setState(() {
+          _counter++;
+        });
+      }
+      
+      @override
+      Widget build(BuildContext context) {
+        return Scaffold(
+          appBar: AppBar(title: Text('Counter')),
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('You have pushed the button this many times:'),
+                Text('$_counter', style: TextStyle(fontSize: 24)),
+                ExpensiveWidget(), // Rebuilds unnecessarily
+              ],
+            ),
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: _incrementCounter,
+            child: Icon(Icons.add),
+          ),
+        );
+      }
+    }
+    
+    // Better approach: Extract widgets and use const constructors
+    class CounterPage extends StatefulWidget {
+      @override
+      _CounterPageState createState() => _CounterPageState();
+    }
+    
+    class _CounterPageState extends State<CounterPage> {
+      int _counter = 0;
+      
+      void _incrementCounter() {
+        setState(() {
+          _counter++;
+        });
+      }
+      
+      @override
+      Widget build(BuildContext context) {
+        return Scaffold(
+          appBar: const AppBar(title: Text('Counter')),
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('You have pushed the button this many times:'),
+                CounterDisplay(count: _counter),
+                const ExpensiveWidget(), // Won't rebuild
+              ],
+            ),
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: _incrementCounter,
+            child: const Icon(Icons.add),
+          ),
+        );
+      }
+    }
+    
+    class CounterDisplay extends StatelessWidget {
+      final int count;
+      
+      const CounterDisplay({Key? key, required this.count}) : super(key: key);
+      
+      @override
+      Widget build(BuildContext context) {
+        return Text('$count', style: const TextStyle(fontSize: 24));
+      }
+    }
+    ```
+    Rebuilding entire widget trees on state changes causes unnecessary work. Extract widgets, use `const` constructors for static widgets, and consider using packages like `provider` or `flutter_bloc` for more granular rebuilds.
+  </Accordion>
+  
+  <Accordion title="Not Using Keys Properly" icon="warning">
+    ```dart
+    // Anti-pattern: Not using keys for dynamic lists
+    ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        return ListTile(
+          title: Text(items[index].title),
+        );
+      },
+    )
+    
+    // Better approach: Use keys for dynamic lists
+    ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        return ListTile(
+          key: ValueKey(items[index].id), // Use unique identifier as key
+          title: Text(items[index].title),
+        );
+      },
+    )
+    ```
+    Not using keys for dynamic lists can lead to unexpected behavior when items are added, removed, or reordered. Always use keys with unique identifiers for list items.
+  </Accordion>
+  
+  <Accordion title="Mixing Business Logic with UI" icon="warning">
+    ```dart
+    // Anti-pattern: Business logic in widget
+    class UserProfilePage extends StatefulWidget {
+      @override
+      _UserProfilePageState createState() => _UserProfilePageState();
+    }
+    
+    class _UserProfilePageState extends State<UserProfilePage> {
+      User? _user;
+      bool _isLoading = true;
+      
+      @override
+      void initState() {
+        super.initState();
+        _fetchUserData();
+      }
+      
+      Future<void> _fetchUserData() async {
+        setState(() => _isLoading = true);
+        try {
+          // API call directly in widget
+          final response = await http.get(Uri.parse('https://api.example.com/user/123'));
+          if (response.statusCode == 200) {
+            setState(() {
+              _user = User.fromJson(jsonDecode(response.body));
+              _isLoading = false;
+            });
+          } else {
+            throw Exception('Failed to load user');
+          }
+        } catch (e) {
+          setState(() => _isLoading = false);
+          // Error handling
+        }
+      }
+      
+      @override
+      Widget build(BuildContext context) {
+        // UI implementation
+      }
+    }
+    
+    // Better approach: Separate business logic
+    // UserRepository class
+    class UserRepository {
+      Future<User> fetchUser(String id) async {
+        final response = await http.get(Uri.parse('https://api.example.com/user/$id'));
+        if (response.statusCode == 200) {
+          return User.fromJson(jsonDecode(response.body));
+        } else {
+          throw Exception('Failed to load user');
+        }
+      }
+    }
+    
+    // UserViewModel or BLoC
+    class UserViewModel extends ChangeNotifier {
+      final UserRepository _repository;
+      User? user;
+      bool isLoading = true;
+      String? error;
+      
+      UserViewModel(this._repository);
+      
+      Future<void> fetchUser(String id) async {
+        isLoading = true;
+        error = null;
+        notifyListeners();
+        
+        try {
+          user = await _repository.fetchUser(id);
+        } catch (e) {
+          error = e.toString();
+        } finally {
+          isLoading = false;
+          notifyListeners();
+        }
+      }
+    }
+    
+    // Widget using ViewModel
+    class UserProfilePage extends StatelessWidget {
+      @override
+      Widget build(BuildContext context) {
+        return ChangeNotifierProvider(
+          create: (_) => UserViewModel(UserRepository())..fetchUser('123'),
+          child: Consumer<UserViewModel>(
+            builder: (context, viewModel, _) {
+              if (viewModel.isLoading) {
+                return Center(child: CircularProgressIndicator());
+              }
+              if (viewModel.error != null) {
+                return Center(child: Text('Error: ${viewModel.error}'));
+              }
+              return UserProfileView(user: viewModel.user!);
+            },
+          ),
+        );
+      }
+    }
+    ```
+    Mixing business logic with UI makes code hard to test and maintain. Separate concerns using patterns like BLoC, Provider, or Riverpod.
+  </Accordion>
+  
+  <Accordion title="Inefficient List Building" icon="warning">
+    ```dart
+    // Anti-pattern: Building lists inefficiently
+    List<Widget> buildItems() {
+      List<Widget> widgets = [];
+      for (var item in items) {
+        widgets.add(ListTile(title: Text(item.title)));
+      }
+      return widgets;
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      return ListView(
+        children: buildItems(),
+      );
+    }
+    
+    // Better approach: Use ListView.builder
+    @override
+    Widget build(BuildContext context) {
+      return ListView.builder(
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          return ListTile(title: Text(items[index].title));
+        },
+      );
+    }
+    ```
+    Building lists by adding widgets to a list is inefficient for large lists. Use `ListView.builder`, `GridView.builder`, or other builder constructors for efficient list rendering.
+  </Accordion>
+  
+  <Accordion title="Excessive Nesting" icon="warning">
+    ```dart
+    // Anti-pattern: Excessive widget nesting
+    Widget build(BuildContext context) {
+      return Scaffold(
+        body: Center(
+          child: Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  child: Text(
+                    'Welcome',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'This is a sample app',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Better approach: Extract widgets and reduce nesting
+    Widget build(BuildContext context) {
+      return Scaffold(
+        body: Center(
+          child: WelcomeCard(),
+        ),
+      );
+    }
+    
+    class WelcomeCard extends StatelessWidget {
+      const WelcomeCard({Key? key}) : super(key: key);
+      
+      @override
+      Widget build(BuildContext context) {
+        return Card(
+          elevation: 5,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                WelcomeHeader(),
+                SizedBox(height: 16),
+                WelcomeMessage(),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+    
+    class WelcomeHeader extends StatelessWidget {
+      const WelcomeHeader({Key? key}) : super(key: key);
+      
+      @override
+      Widget build(BuildContext context) {
+        return Text(
+          'Welcome',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        );
+      }
+    }
+    
+    class WelcomeMessage extends StatelessWidget {
+      const WelcomeMessage({Key? key}) : super(key: key);
+      
+      @override
+      Widget build(BuildContext context) {
+        return Text(
+          'This is a sample app',
+          style: TextStyle(fontSize: 16),
+        );
+      }
+    }
+    ```
+    Excessive nesting makes code hard to read and maintain. Extract widgets into smaller components and use existing Flutter widgets like `Card` instead of custom containers.
+  </Accordion>
+  
+  <Accordion title="Not Using const Constructors" icon="warning">
+    ```dart
+    // Anti-pattern: Not using const constructors
+    Widget build(BuildContext context) {
+      return Container(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(Icons.star, size: 50, color: Colors.yellow),
+            Text('Rating', style: TextStyle(fontSize: 20)),
+          ],
+        ),
+      );
+    }
+    
+    // Better approach: Use const constructors
+    Widget build(BuildContext context) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: const [
+            Icon(Icons.star, size: 50, color: Colors.yellow),
+            Text('Rating', style: TextStyle(fontSize: 20)),
+          ],
+        ),
+      );
+    }
+    ```
+    Not using `const` constructors for widgets with immutable properties causes unnecessary rebuilds. Use `const` for widgets with fixed properties to improve performance.
+  </Accordion>
+  
+  <Accordion title="Improper State Management" icon="warning">
+    ```dart
+    // Anti-pattern: Global variables for state
+    User currentUser;
+    List<Message> messages = [];
+    
+    class ChatPage extends StatefulWidget {
+      @override
+      _ChatPageState createState() => _ChatPageState();
+    }
+    
+    class _ChatPageState extends State<ChatPage> {
+      void sendMessage(String text) {
+        final message = Message(text: text, sender: currentUser);
+        setState(() {
+          messages.add(message);
+        });
+      }
+      
+      @override
+      Widget build(BuildContext context) {
+        // UI implementation
+      }
+    }
+    
+    // Better approach: Proper state management
+    class ChatPage extends StatelessWidget {
+      @override
+      Widget build(BuildContext context) {
+        return ChangeNotifierProvider(
+          create: (_) => ChatViewModel(),
+          child: ChatView(),
+        );
+      }
+    }
+    
+    class ChatViewModel extends ChangeNotifier {
+      final List<Message> _messages = [];
+      User? _currentUser;
+      
+      List<Message> get messages => List.unmodifiable(_messages);
+      User? get currentUser => _currentUser;
+      
+      void setUser(User user) {
+        _currentUser = user;
+        notifyListeners();
+      }
+      
+      void sendMessage(String text) {
+        if (_currentUser == null) return;
+        
+        final message = Message(text: text, sender: _currentUser!);
+        _messages.add(message);
+        notifyListeners();
+      }
+    }
+    
+    class ChatView extends StatelessWidget {
+      @override
+      Widget build(BuildContext context) {
+        final viewModel = Provider.of<ChatViewModel>(context);
+        
+        return Scaffold(
+          appBar: AppBar(title: Text('Chat')),
+          body: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  itemCount: viewModel.messages.length,
+                  itemBuilder: (context, index) {
+                    return MessageBubble(message: viewModel.messages[index]);
+                  },
+                ),
+              ),
+              MessageInput(
+                onSend: viewModel.sendMessage,
+              ),
+            ],
+          ),
+        );
+      }
+    }
+    ```
+    Using global variables or improper state management makes apps hard to maintain and test. Use proper state management solutions like Provider, Riverpod, or BLoC.
+  </Accordion>
+  
+  <Accordion title="Not Using Lazy Loading" icon="warning">
+    ```dart
+    // Anti-pattern: Loading all data at once
+    class ProductsPage extends StatefulWidget {
+      @override
+      _ProductsPageState createState() => _ProductsPageState();
+    }
+    
+    class _ProductsPageState extends State<ProductsPage> {
+      List<Product> products = [];
+      bool isLoading = true;
+      
+      @override
+      void initState() {
+        super.initState();
+        _loadAllProducts();
+      }
+      
+      Future<void> _loadAllProducts() async {
+        setState(() => isLoading = true);
+        try {
+          // Loading all products at once
+          final response = await http.get(Uri.parse('https://api.example.com/products'));
+          if (response.statusCode == 200) {
+            final List<dynamic> data = jsonDecode(response.body);
+            setState(() {
+              products = data.map((json) => Product.fromJson(json)).toList();
+              isLoading = false;
+            });
+          }
+        } catch (e) {
+          setState(() => isLoading = false);
+        }
+      }
+      
+      @override
+      Widget build(BuildContext context) {
+        return Scaffold(
+          appBar: AppBar(title: Text('Products')),
+          body: isLoading
+              ? Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    return ProductListItem(product: products[index]);
+                  },
+                ),
+        );
+      }
+    }
+    
+    // Better approach: Use pagination/lazy loading
+    class ProductsPage extends StatefulWidget {
+      @override
+      _ProductsPageState createState() => _ProductsPageState();
+    }
+    
+    class _ProductsPageState extends State<ProductsPage> {
+      final List<Product> products = [];
+      bool isLoading = false;
+      bool hasMore = true;
+      int page = 1;
+      final int pageSize = 20;
+      final ScrollController _scrollController = ScrollController();
+      
+      @override
+      void initState() {
+        super.initState();
+        _loadMoreProducts();
+        _scrollController.addListener(_scrollListener);
+      }
+      
+      @override
+      void dispose() {
+        _scrollController.removeListener(_scrollListener);
+        _scrollController.dispose();
+        super.dispose();
+      }
+      
+      void _scrollListener() {
+        if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8 &&
+            !isLoading && hasMore) {
+          _loadMoreProducts();
+        }
+      }
+      
+      Future<void> _loadMoreProducts() async {
+        if (isLoading || !hasMore) return;
+        
+        setState(() => isLoading = true);
+        try {
+          final response = await http.get(
+            Uri.parse('https://api.example.com/products?page=$page&limit=$pageSize'),
+          );
+          
+          if (response.statusCode == 200) {
+            final List<dynamic> data = jsonDecode(response.body);
+            final newProducts = data.map((json) => Product.fromJson(json)).toList();
+            
+            setState(() {
+              products.addAll(newProducts);
+              isLoading = false;
+              page++;
+              hasMore = newProducts.length == pageSize;
+            });
+          }
+        } catch (e) {
+          setState(() => isLoading = false);
+        }
+      }
+      
+      @override
+      Widget build(BuildContext context) {
+        return Scaffold(
+          appBar: AppBar(title: Text('Products')),
+          body: ListView.builder(
+            controller: _scrollController,
+            itemCount: products.length + (hasMore ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index == products.length) {
+                return Center(child: CircularProgressIndicator());
+              }
+              return ProductListItem(product: products[index]);
+            },
+          ),
+        );
+      }
+    }
+    ```
+    Loading all data at once can cause performance issues and poor user experience. Implement pagination or infinite scrolling for large data sets.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Image Loading" icon="warning">
+    ```dart
+    // Anti-pattern: Not optimizing image loading
+    Image.network('https://example.com/large_image.jpg')
+    
+    // Better approach: Use cached_network_image
+    CachedNetworkImage(
+      imageUrl: 'https://example.com/large_image.jpg',
+      placeholder: (context, url) => Center(child: CircularProgressIndicator()),
+      errorWidget: (context, url, error) => Icon(Icons.error),
+      fit: BoxFit.cover,
+    )
+    ```
+    Not optimizing image loading can lead to poor performance and user experience. Use packages like `cached_network_image` for efficient image loading, caching, and error handling.
+  </Accordion>
+  
+  <Accordion title="Not Using Theme Properly" icon="warning">
+    ```dart
+    // Anti-pattern: Hardcoded styles
+    Text(
+      'Hello World',
+      style: TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        color: Colors.blue,
+      ),
+    )
+    
+    // Better approach: Use theme
+    Text(
+      'Hello World',
+      style: Theme.of(context).textTheme.headline5?.copyWith(
+        color: Theme.of(context).primaryColor,
+      ),
+    )
+    
+    // Even better: Define a consistent theme
+    MaterialApp(
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        textTheme: TextTheme(
+          headline5: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+          // Other text styles
+        ),
+        // Other theme properties
+      ),
+      home: MyHomePage(),
+    )
+    ```
+    Hardcoding styles makes it difficult to maintain a consistent look and feel. Use Flutter's theming system to define and apply consistent styles throughout your app.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```dart
+    // Anti-pattern: Poor error handling
+    Future<void> fetchData() async {
+      final response = await http.get(Uri.parse('https://api.example.com/data'));
+      final data = jsonDecode(response.body);
+      // No error handling
+    }
+    
+    // Better approach: Proper error handling
+    Future<Result<Data>> fetchData() async {
+      try {
+        final response = await http.get(Uri.parse('https://api.example.com/data'));
+        if (response.statusCode == 200) {
+          final data = Data.fromJson(jsonDecode(response.body));
+          return Result.success(data);
+        } else {
+          return Result.failure(
+            HttpError(
+              statusCode: response.statusCode,
+              message: 'Failed to fetch data',
+            ),
+          );
+        }
+      } on SocketException {
+        return Result.failure(ConnectionError('No internet connection'));
+      } on FormatException {
+        return Result.failure(ParseError('Invalid response format'));
+      } catch (e) {
+        return Result.failure(UnknownError(e.toString()));
+      }
+    }
+    
+    // Result class
+    class Result<T> {
+      final T? data;
+      final AppError? error;
+      
+      Result.success(this.data) : error = null;
+      Result.failure(this.error) : data = null;
+      
+      bool get isSuccess => error == null;
+      bool get isFailure => error != null;
+    }
+    
+    // Usage
+    FutureBuilder<Result<Data>>(
+      future: fetchData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError) {
+          return ErrorView(message: 'Unexpected error: ${snapshot.error}');
+        }
+        
+        final result = snapshot.data;
+        if (result == null || result.isFailure) {
+          return ErrorView(
+            error: result?.error ?? UnknownError('No data received'),
+            onRetry: () => setState(() {}),
+          );
+        }
+        
+        return DataView(data: result.data!);
+      },
+    )
+    ```
+    Poor error handling leads to crashes and poor user experience. Implement proper error handling with specific error types and user-friendly error messages.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Code Organization" icon="warning">
+    ```dart
+    // Anti-pattern: Everything in one file
+    // main.dart with models, services, widgets, etc.
+    
+    // Better approach: Proper code organization
+    // Project structure
+    // lib/
+    //  ├── main.dart
+    //  ├── app.dart
+    //  ├── models/
+    //  │    ├── user.dart
+    //  │    └── product.dart
+    //  ├── services/
+    //  │    ├── api_service.dart
+    //  │    └── auth_service.dart
+    //  ├── screens/
+    //  │    ├── home_screen.dart
+    //  │    └── profile_screen.dart
+    //  ├── widgets/
+    //  │    ├── product_card.dart
+    //  │    └── custom_button.dart
+    //  └── utils/
+    //       ├── constants.dart
+    //       └── helpers.dart
+    ```
+    Poor code organization makes it difficult to maintain and scale your app. Organize your code into a clear directory structure with separate files for models, services, screens, and widgets.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Navigation" icon="warning">
+    ```dart
+    // Anti-pattern: Manual navigation management
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ProductDetailPage(product: product)),
+      );
+    }
+    
+    // Better approach: Named routes
+    // In MaterialApp
+    MaterialApp(
+      initialRoute: '/',
+      routes: {
+        '/': (context) => HomePage(),
+        '/products': (context) => ProductsPage(),
+        '/product_detail': (context) => ProductDetailPage(),
+        '/cart': (context) => CartPage(),
+      },
+    )
+    
+    // Navigation
+    onPressed: () {
+      Navigator.pushNamed(
+        context,
+        '/product_detail',
+        arguments: product,
+      );
+    }
+    
+    // In ProductDetailPage
+    @override
+    Widget build(BuildContext context) {
+      final product = ModalRoute.of(context)!.settings.arguments as Product;
+      // Use product
+    }
+    
+    // Even better: Use a navigation package like go_router or auto_route
+    ```
+    Manual navigation management can lead to inconsistent navigation behavior. Use named routes or a navigation package for more structured navigation.
+  </Accordion>
+</AccordionGroup>

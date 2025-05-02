@@ -1,0 +1,623 @@
+---
+title: 'React Native'
+description: 'React Native is an open-source framework for building native mobile applications using JavaScript and React. It allows developers to use the same codebase for iOS and Android platforms.'
+---
+
+<AccordionGroup>
+  <Accordion title="React Native Anti-Patterns Overview" icon="mobile">
+    React Native, while powerful for cross-platform mobile development, has several common anti-patterns that can lead to performance issues, maintenance problems, and poor user experience. Here are the most important anti-patterns to avoid when writing React Native code.
+  </Accordion>
+  
+  <Accordion title="Inefficient List Rendering" icon="warning">
+    ```jsx
+    // Anti-pattern: Inefficient list rendering
+    function ProductList({ products }) {
+      return (
+        <ScrollView>
+          {products.map(product => (
+            <ProductItem key={product.id} product={product} />
+          ))}
+        </ScrollView>
+      );
+    }
+    
+    // Better approach: Use FlatList
+    function ProductList({ products }) {
+      return (
+        <FlatList
+          data={products}
+          keyExtractor={item => item.id.toString()}
+          renderItem={({ item }) => <ProductItem product={item} />}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+        />
+      );
+    }
+    ```
+    Using `ScrollView` with `map` for long lists leads to performance issues as it renders all items at once. Use `FlatList` or `SectionList` for efficient list rendering with windowing and recycling.
+  </Accordion>
+  
+  <Accordion title="Not Using React Native's PureComponent or memo" icon="warning">
+    ```jsx
+    // Anti-pattern: Regular component for static content
+    function ProfileHeader({ user }) {
+      return (
+        <View style={styles.header}>
+          <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.bio}>{user.bio}</Text>
+        </View>
+      );
+    }
+    
+    // Better approach: Use memo for functional components
+    const ProfileHeader = React.memo(function ProfileHeader({ user }) {
+      return (
+        <View style={styles.header}>
+          <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.bio}>{user.bio}</Text>
+        </View>
+      );
+    });
+    
+    // Or use PureComponent for class components
+    class ProfileHeader extends React.PureComponent {
+      render() {
+        const { user } = this.props;
+        return (
+          <View style={styles.header}>
+            <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            <Text style={styles.name}>{user.name}</Text>
+            <Text style={styles.bio}>{user.bio}</Text>
+          </View>
+        );
+      }
+    }
+    ```
+    Regular components re-render even when props haven't changed. Use `React.memo` for functional components or `PureComponent` for class components to prevent unnecessary re-renders.
+  </Accordion>
+  
+  <Accordion title="Layout Thrashing" icon="warning">
+    ```jsx
+    // Anti-pattern: Layout thrashing
+    function AnimatedComponent() {
+      const [width, setWidth] = useState(100);
+      
+      useEffect(() => {
+        // This causes multiple layout recalculations
+        setWidth(100);
+        setWidth(150);
+        setWidth(200);
+      }, []);
+      
+      return (
+        <Animated.View style={{ width }}>
+          <Text>Content</Text>
+        </Animated.View>
+      );
+    }
+    
+    // Better approach: Batch layout changes
+    function AnimatedComponent() {
+      const width = useRef(new Animated.Value(100)).current;
+      
+      useEffect(() => {
+        // This batches the animation
+        Animated.timing(width, {
+          toValue: 200,
+          duration: 300,
+          useNativeDriver: false,
+        }).start();
+      }, []);
+      
+      return (
+        <Animated.View style={{ width }}>
+          <Text>Content</Text>
+        </Animated.View>
+      );
+    }
+    ```
+    Multiple state updates that affect layout cause performance issues. Batch layout changes and use the Animated API with `useNativeDriver` when possible.
+  </Accordion>
+  
+  <Accordion title="Not Using useCallback for Event Handlers" icon="warning">
+    ```jsx
+    // Anti-pattern: Recreating functions on each render
+    function ProductItem({ product, onAddToCart }) {
+      // This function is recreated on every render
+      const handlePress = () => {
+        onAddToCart(product.id);
+      };
+      
+      return (
+        <TouchableOpacity onPress={handlePress}>
+          <Text>{product.name}</Text>
+        </TouchableOpacity>
+      );
+    }
+    
+    // Better approach: Use useCallback
+    function ProductItem({ product, onAddToCart }) {
+      // This function is memoized
+      const handlePress = useCallback(() => {
+        onAddToCart(product.id);
+      }, [product.id, onAddToCart]);
+      
+      return (
+        <TouchableOpacity onPress={handlePress}>
+          <Text>{product.name}</Text>
+        </TouchableOpacity>
+      );
+    }
+    ```
+    Creating new function instances on every render can cause unnecessary re-renders in child components. Use `useCallback` to memoize functions.
+  </Accordion>
+  
+  <Accordion title="Inline Styles" icon="warning">
+    ```jsx
+    // Anti-pattern: Inline styles
+    function UserCard({ user }) {
+      return (
+        <View style={{ 
+          padding: 10, 
+          margin: 5, 
+          backgroundColor: '#fff',
+          borderRadius: 5,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          elevation: 2
+        }}>
+          <Text style={{ fontSize: 16, fontWeight: 'bold' }}>{user.name}</Text>
+          <Text style={{ color: '#666' }}>{user.email}</Text>
+        </View>
+      );
+    }
+    
+    // Better approach: Use StyleSheet
+    const styles = StyleSheet.create({
+      card: {
+        padding: 10,
+        margin: 5,
+        backgroundColor: '#fff',
+        borderRadius: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        elevation: 2
+      },
+      name: {
+        fontSize: 16,
+        fontWeight: 'bold'
+      },
+      email: {
+        color: '#666'
+      }
+    });
+    
+    function UserCard({ user }) {
+      return (
+        <View style={styles.card}>
+          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.email}>{user.email}</Text>
+        </View>
+      );
+    }
+    ```
+    Inline styles are recreated on every render and can't be optimized by React Native. Use `StyleSheet.create()` to define styles outside the component.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Image Optimization" icon="warning">
+    ```jsx
+    // Anti-pattern: Not optimizing images
+    function ProfileScreen({ user }) {
+      return (
+        <View>
+          <Image 
+            source={{ uri: user.highResAvatar }} 
+            style={{ width: 50, height: 50 }} 
+          />
+        </View>
+      );
+    }
+    
+    // Better approach: Optimize images
+    function ProfileScreen({ user }) {
+      return (
+        <View>
+          <Image 
+            source={{ uri: `${user.avatar}?width=100&height=100` }} 
+            style={{ width: 50, height: 50 }}
+            resizeMode="cover"
+            fadeDuration={300}
+          />
+        </View>
+      );
+    }
+    ```
+    Loading full-size images for small UI elements wastes bandwidth and memory. Request appropriately sized images and use proper `resizeMode`.
+  </Accordion>
+  
+  <Accordion title="Not Using React Navigation Properly" icon="warning">
+    ```jsx
+    // Anti-pattern: Creating navigator inside component
+    function App() {
+      return (
+        <NavigationContainer>
+          <Stack.Navigator>
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Details" component={DetailsScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      );
+    }
+    
+    // Better approach: Separate navigation configuration
+    const Stack = createStackNavigator();
+    
+    function AppNavigator() {
+      return (
+        <Stack.Navigator 
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: '#f4511e',
+            },
+            headerTintColor: '#fff',
+          }}
+        >
+          <Stack.Screen 
+            name="Home" 
+            component={HomeScreen} 
+            options={({ route }) => ({ title: route.params?.title || 'Home' })} 
+          />
+          <Stack.Screen name="Details" component={DetailsScreen} />
+        </Stack.Navigator>
+      );
+    }
+    
+    function App() {
+      return (
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      );
+    }
+    ```
+    Poor navigation structure leads to maintainability issues. Separate navigation configuration from components and use proper screen options.
+  </Accordion>
+  
+  <Accordion title="Not Handling Platform Differences Properly" icon="warning">
+    ```jsx
+    // Anti-pattern: Platform-specific code scattered throughout
+    function Button({ title, onPress }) {
+      return (
+        <TouchableOpacity 
+          onPress={onPress}
+          style={{
+            padding: 10,
+            backgroundColor: Platform.OS === 'ios' ? '#007AFF' : '#2196F3',
+            borderRadius: Platform.OS === 'ios' ? 10 : 4,
+          }}
+        >
+          <Text style={{ 
+            color: 'white',
+            fontWeight: Platform.OS === 'ios' ? '600' : 'bold',
+          }}>
+            {title}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    
+    // Better approach: Use Platform.select or separate files
+    const styles = StyleSheet.create({
+      button: {
+        padding: 10,
+        ...Platform.select({
+          ios: {
+            backgroundColor: '#007AFF',
+            borderRadius: 10,
+          },
+          android: {
+            backgroundColor: '#2196F3',
+            borderRadius: 4,
+          },
+        }),
+      },
+      buttonText: {
+        color: 'white',
+        ...Platform.select({
+          ios: { fontWeight: '600' },
+          android: { fontWeight: 'bold' },
+        }),
+      },
+    });
+    
+    function Button({ title, onPress }) {
+      return (
+        <TouchableOpacity onPress={onPress} style={styles.button}>
+          <Text style={styles.buttonText}>{title}</Text>
+        </TouchableOpacity>
+      );
+    }
+    
+    // Or use platform-specific files:
+    // Button.ios.js and Button.android.js
+    ```
+    Scattering platform-specific code makes components hard to maintain. Use `Platform.select()` or platform-specific files (e.g., `Component.ios.js` and `Component.android.js`).
+  </Accordion>
+  
+  <Accordion title="Not Using Proper State Management" icon="warning">
+    ```jsx
+    // Anti-pattern: Prop drilling for global state
+    function App() {
+      const [user, setUser] = useState(null);
+      const [cart, setCart] = useState([]);
+      
+      return (
+        <View>
+          <Header user={user} cart={cart} />
+          <Main user={user} cart={cart} setCart={setCart} />
+          <Footer user={user} />
+        </View>
+      );
+    }
+    
+    // Better approach: Use Context API or Redux
+    const UserContext = createContext();
+    const CartContext = createContext();
+    
+    function App() {
+      const [user, setUser] = useState(null);
+      const [cart, setCart] = useState([]);
+      
+      return (
+        <UserContext.Provider value={{ user, setUser }}>
+          <CartContext.Provider value={{ cart, setCart }}>
+            <View>
+              <Header />
+              <Main />
+              <Footer />
+            </View>
+          </CartContext.Provider>
+        </UserContext.Provider>
+      );
+    }
+    
+    function Header() {
+      const { user } = useContext(UserContext);
+      const { cart } = useContext(CartContext);
+      return <View>{/* Use user and cart */}</View>;
+    }
+    ```
+    Prop drilling makes components tightly coupled and hard to maintain. Use Context API for simpler apps or Redux/MobX for complex state management.
+  </Accordion>
+  
+  <Accordion title="Not Handling Permissions Properly" icon="warning">
+    ```jsx
+    // Anti-pattern: Not handling permissions properly
+    function CameraScreen() {
+      const takePicture = async () => {
+        try {
+          const photo = await camera.takePictureAsync();
+          // Process photo
+        } catch (error) {
+          console.error('Failed to take picture:', error);
+        }
+      };
+      
+      return (
+        <View>
+          <Camera ref={ref => (camera = ref)} />
+          <Button title="Take Picture" onPress={takePicture} />
+        </View>
+      );
+    }
+    
+    // Better approach: Check and request permissions
+    function CameraScreen() {
+      const [hasPermission, setHasPermission] = useState(null);
+      const [camera, setCamera] = useState(null);
+      
+      useEffect(() => {
+        (async () => {
+          const { status } = await Camera.requestPermissionsAsync();
+          setHasPermission(status === 'granted');
+        })();
+      }, []);
+      
+      const takePicture = async () => {
+        if (camera) {
+          try {
+            const photo = await camera.takePictureAsync();
+            // Process photo
+          } catch (error) {
+            console.error('Failed to take picture:', error);
+          }
+        }
+      };
+      
+      if (hasPermission === null) {
+        return <View><Text>Requesting camera permission...</Text></View>;
+      }
+      
+      if (hasPermission === false) {
+        return <View><Text>No access to camera</Text></View>;
+      }
+      
+      return (
+        <View>
+          <Camera ref={ref => setCamera(ref)} />
+          <Button title="Take Picture" onPress={takePicture} />
+        </View>
+      );
+    }
+    ```
+    Not handling permissions properly leads to crashes and poor user experience. Always check and request permissions before using device features.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Boundaries" icon="warning">
+    ```jsx
+    // Anti-pattern: No error handling
+    function App() {
+      return (
+        <View>
+          <Header />
+          <UserProfile /> {/* If this crashes, the whole app crashes */}
+          <Footer />
+        </View>
+      );
+    }
+    
+    // Better approach: Use error boundaries
+    class ErrorBoundary extends React.Component {
+      state = { hasError: false };
+      
+      static getDerivedStateFromError() {
+        return { hasError: true };
+      }
+      
+      componentDidCatch(error, errorInfo) {
+        // Log error to error reporting service
+        logErrorToService(error, errorInfo);
+      }
+      
+      render() {
+        if (this.state.hasError) {
+          return (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>Something went wrong</Text>
+              <Button 
+                title="Try Again" 
+                onPress={() => this.setState({ hasError: false })} 
+              />
+            </View>
+          );
+        }
+        
+        return this.props.children;
+      }
+    }
+    
+    function App() {
+      return (
+        <View>
+          <Header />
+          <ErrorBoundary>
+            <UserProfile />
+          </ErrorBoundary>
+          <Footer />
+        </View>
+      );
+    }
+    ```
+    Without error boundaries, a single component crash can bring down the entire app. Use error boundaries to gracefully handle component errors.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Accessibility Features" icon="warning">
+    ```jsx
+    // Anti-pattern: Not considering accessibility
+    function LoginButton({ onPress }) {
+      return (
+        <TouchableOpacity onPress={onPress}>
+          <Text>Log In</Text>
+        </TouchableOpacity>
+      );
+    }
+    
+    // Better approach: Include accessibility props
+    function LoginButton({ onPress }) {
+      return (
+        <TouchableOpacity 
+          onPress={onPress}
+          accessible={true}
+          accessibilityLabel="Log in to your account"
+          accessibilityHint="Navigates to the login screen"
+          accessibilityRole="button"
+        >
+          <Text>Log In</Text>
+        </TouchableOpacity>
+      );
+    }
+    ```
+    Ignoring accessibility makes your app unusable for many users. Include accessibility props like `accessible`, `accessibilityLabel`, and `accessibilityHint`.
+  </Accordion>
+  
+  <Accordion title="Not Optimizing App Launch Time" icon="warning">
+    ```jsx
+    // Anti-pattern: Heavy operations in App component
+    function App() {
+      // Heavy initialization during app launch
+      const data = processLargeData();
+      initializeAllServices();
+      
+      return (
+        <NavigationContainer>
+          <AppNavigator initialData={data} />
+        </NavigationContainer>
+      );
+    }
+    
+    // Better approach: Defer non-critical operations
+    function App() {
+      const [isReady, setIsReady] = useState(false);
+      const [initialData, setInitialData] = useState(null);
+      
+      useEffect(() => {
+        async function prepare() {
+          try {
+            // Only initialize critical services synchronously
+            initializeCriticalServices();
+            
+            // Defer non-critical operations
+            setTimeout(() => {
+              initializeAnalytics();
+              initializeNonCriticalServices();
+            }, 1000);
+            
+            // Load initial data asynchronously
+            const data = await loadInitialDataAsync();
+            setInitialData(data);
+          } catch (e) {
+            console.warn(e);
+          } finally {
+            setIsReady(true);
+          }
+        }
+        
+        prepare();
+      }, []);
+      
+      if (!isReady) {
+        return <AppLoading />;
+      }
+      
+      return (
+        <NavigationContainer>
+          <AppNavigator initialData={initialData} />
+        </NavigationContainer>
+      );
+    }
+    ```
+    Heavy operations during app launch increase startup time. Defer non-critical operations and use splash screens with `AppLoading` component.
+  </Accordion>
+  
+  <Accordion title="Not Using Hermes Engine" icon="warning">
+    ```jsx
+    // In android/app/build.gradle
+    
+    // Anti-pattern: Not enabling Hermes
+    project.ext.react = [
+        enableHermes: false // Not using Hermes engine
+    ]
+    
+    // Better approach: Enable Hermes
+    project.ext.react = [
+        enableHermes: true // Using Hermes engine for better performance
+    ]
+    ```
+    Not using Hermes (JavaScript engine optimized for React Native) can result in slower startup times and higher memory usage. Enable Hermes for better performance, especially on Android.
+  </Accordion>
+</AccordionGroup>

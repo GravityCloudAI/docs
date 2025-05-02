@@ -1,0 +1,530 @@
+---
+title: 'React'
+description: 'React is a JavaScript library for building user interfaces, particularly single-page applications. It is maintained by Meta and a community of individual developers and companies.'
+---
+
+<AccordionGroup>
+  <Accordion title="React Anti-Patterns Overview" icon="react">
+    React, despite its popularity and robust ecosystem, has several common anti-patterns that can lead to performance issues, maintenance problems, and bugs. Here are the most important anti-patterns to avoid when writing React code.
+  </Accordion>
+  
+  <Accordion title="Prop Drilling" icon="warning">
+    ```jsx
+    // Anti-pattern: Prop drilling through multiple components
+    function App() {
+      const [user, setUser] = useState({ name: 'John' });
+      return <MainContent user={user} setUser={setUser} />;
+    }
+    
+    function MainContent({ user, setUser }) {
+      return <Sidebar user={user} setUser={setUser} />;
+    }
+    
+    function Sidebar({ user, setUser }) {
+      return <UserProfile user={user} setUser={setUser} />;
+    }
+    
+    function UserProfile({ user, setUser }) {
+      return <div>{user.name}</div>;
+    }
+    
+    // Better approach: Use Context API
+    const UserContext = createContext();
+    
+    function App() {
+      const [user, setUser] = useState({ name: 'John' });
+      return (
+        <UserContext.Provider value={{ user, setUser }}>
+          <MainContent />
+        </UserContext.Provider>
+      );
+    }
+    
+    function MainContent() {
+      return <Sidebar />;
+    }
+    
+    function Sidebar() {
+      return <UserProfile />;
+    }
+    
+    function UserProfile() {
+      const { user } = useContext(UserContext);
+      return <div>{user.name}</div>;
+    }
+    ```
+    Prop drilling makes components tightly coupled and harder to maintain. Use Context API or state management libraries like Redux for sharing state across components.
+  </Accordion>
+  
+  <Accordion title="Huge Component Files" icon="warning">
+    ```jsx
+    // Anti-pattern: Huge component with multiple responsibilities
+    function Dashboard() {
+      const [users, setUsers] = useState([]);
+      const [posts, setPosts] = useState([]);
+      const [comments, setComments] = useState([]);
+      const [activeTab, setActiveTab] = useState('users');
+      
+      useEffect(() => {
+        fetchUsers().then(data => setUsers(data));
+        fetchPosts().then(data => setPosts(data));
+        fetchComments().then(data => setComments(data));
+      }, []);
+      
+      const handleUserClick = (userId) => { /* ... */ };
+      const handlePostClick = (postId) => { /* ... */ };
+      const handleCommentDelete = (commentId) => { /* ... */ };
+      
+      return (
+        <div>
+          <Tabs activeTab={activeTab} onChange={setActiveTab} />
+          {activeTab === 'users' && (
+            <UserList users={users} onUserClick={handleUserClick} />
+          )}
+          {activeTab === 'posts' && (
+            <PostList posts={posts} onPostClick={handlePostClick} />
+          )}
+          {activeTab === 'comments' && (
+            <CommentList 
+              comments={comments} 
+              onCommentDelete={handleCommentDelete} 
+            />
+          )}
+        </div>
+      );
+    }
+    
+    // Better approach: Split into smaller components
+    function Dashboard() {
+      const [activeTab, setActiveTab] = useState('users');
+      
+      return (
+        <div>
+          <Tabs activeTab={activeTab} onChange={setActiveTab} />
+          {activeTab === 'users' && <UserTab />}
+          {activeTab === 'posts' && <PostTab />}
+          {activeTab === 'comments' && <CommentTab />}
+        </div>
+      );
+    }
+    
+    function UserTab() {
+      const [users, setUsers] = useState([]);
+      
+      useEffect(() => {
+        fetchUsers().then(data => setUsers(data));
+      }, []);
+      
+      const handleUserClick = (userId) => { /* ... */ };
+      
+      return <UserList users={users} onUserClick={handleUserClick} />;
+    }
+    
+    // Similar implementations for PostTab and CommentTab
+    ```
+    Large components are difficult to understand, test, and maintain. Split them into smaller, focused components with single responsibilities.
+  </Accordion>
+  
+  <Accordion title="Inline Function Definitions" icon="warning">
+    ```jsx
+    // Anti-pattern: Inline function definitions
+    function UserList({ users }) {
+      return (
+        <ul>
+          {users.map(user => (
+            <li key={user.id} onClick={() => console.log(user.id)}>
+              {user.name}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    
+    // Better approach: Define functions outside render
+    function UserList({ users }) {
+      const handleClick = useCallback((userId) => {
+        console.log(userId);
+      }, []);
+      
+      return (
+        <ul>
+          {users.map(user => (
+            <li key={user.id} onClick={() => handleClick(user.id)}>
+              {user.name}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    ```
+    Inline function definitions create new function instances on every render, which can lead to unnecessary re-renders of child components. Use `useCallback` to memoize functions.
+  </Accordion>
+  
+  <Accordion title="Not Using React Keys Properly" icon="warning">
+    ```jsx
+    // Anti-pattern: Using index as key
+    function TodoList({ todos }) {
+      return (
+        <ul>
+          {todos.map((todo, index) => (
+            <li key={index}>{todo.text}</li>
+          ))}
+        </ul>
+      );
+    }
+    
+    // Better approach: Use unique IDs
+    function TodoList({ todos }) {
+      return (
+        <ul>
+          {todos.map(todo => (
+            <li key={todo.id}>{todo.text}</li>
+          ))}
+        </ul>
+      );
+    }
+    ```
+    Using array indices as keys can lead to performance issues and bugs when items are added, removed, or reordered. Use stable, unique identifiers for keys.
+  </Accordion>
+  
+  <Accordion title="Overusing useState" icon="warning">
+    ```jsx
+    // Anti-pattern: Overusing useState
+    function UserForm() {
+      const [firstName, setFirstName] = useState('');
+      const [lastName, setLastName] = useState('');
+      const [email, setEmail] = useState('');
+      const [phone, setPhone] = useState('');
+      const [address, setAddress] = useState('');
+      const [city, setCity] = useState('');
+      const [state, setState] = useState('');
+      const [zip, setZip] = useState('');
+      
+      // Multiple handlers for each field
+      const handleFirstNameChange = (e) => setFirstName(e.target.value);
+      const handleLastNameChange = (e) => setLastName(e.target.value);
+      // ... more handlers
+      
+      return (
+        <form>
+          <input value={firstName} onChange={handleFirstNameChange} />
+          <input value={lastName} onChange={handleLastNameChange} />
+          {/* More inputs */}
+        </form>
+      );
+    }
+    
+    // Better approach: Use useReducer for complex state
+    function formReducer(state, action) {
+      return { ...state, [action.field]: action.value };
+    }
+    
+    function UserForm() {
+      const [formState, dispatch] = useReducer(formReducer, {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        zip: ''
+      });
+      
+      const handleChange = (e) => {
+        dispatch({ field: e.target.name, value: e.target.value });
+      };
+      
+      return (
+        <form>
+          <input 
+            name="firstName" 
+            value={formState.firstName} 
+            onChange={handleChange} 
+          />
+          <input 
+            name="lastName" 
+            value={formState.lastName} 
+            onChange={handleChange} 
+          />
+          {/* More inputs */}
+        </form>
+      );
+    }
+    ```
+    Using multiple `useState` hooks for related data makes state management complex. Use `useReducer` for complex state or objects with multiple fields.
+  </Accordion>
+  
+  <Accordion title="Side Effects in Render" icon="warning">
+    ```jsx
+    // Anti-pattern: Side effects in render
+    function UserProfile({ userId }) {
+      const [user, setUser] = useState(null);
+      
+      // Wrong: API call in render
+      if (!user) {
+        fetchUser(userId).then(data => setUser(data));
+      }
+      
+      return user ? <div>{user.name}</div> : <div>Loading...</div>;
+    }
+    
+    // Better approach: Use useEffect
+    function UserProfile({ userId }) {
+      const [user, setUser] = useState(null);
+      const [loading, setLoading] = useState(true);
+      
+      useEffect(() => {
+        setLoading(true);
+        fetchUser(userId)
+          .then(data => setUser(data))
+          .finally(() => setLoading(false));
+      }, [userId]);
+      
+      return loading ? <div>Loading...</div> : <div>{user.name}</div>;
+    }
+    ```
+    Performing side effects during render can cause infinite loops and unexpected behavior. Use `useEffect` for side effects.
+  </Accordion>
+  
+  <Accordion title="Not Memoizing Expensive Calculations" icon="warning">
+    ```jsx
+    // Anti-pattern: Recalculating on every render
+    function ProductList({ products }) {
+      // This will run on every render
+      const sortedProducts = products
+        .filter(p => p.inStock)
+        .sort((a, b) => a.price - b.price);
+      
+      return (
+        <ul>
+          {sortedProducts.map(product => (
+            <li key={product.id}>{product.name} - ${product.price}</li>
+          ))}
+        </ul>
+      );
+    }
+    
+    // Better approach: Use useMemo
+    function ProductList({ products }) {
+      const sortedProducts = useMemo(() => {
+        return products
+          .filter(p => p.inStock)
+          .sort((a, b) => a.price - b.price);
+      }, [products]);
+      
+      return (
+        <ul>
+          {sortedProducts.map(product => (
+            <li key={product.id}>{product.name} - ${product.price}</li>
+          ))}
+        </ul>
+      );
+    }
+    ```
+    Expensive calculations are recomputed on every render, impacting performance. Use `useMemo` to memoize expensive calculations.
+  </Accordion>
+  
+  <Accordion title="Not Using React.memo for Pure Components" icon="warning">
+    ```jsx
+    // Anti-pattern: Not memoizing pure components
+    function ProductItem({ product, onAddToCart }) {
+      return (
+        <div>
+          <h3>{product.name}</h3>
+          <p>${product.price}</p>
+          <button onClick={() => onAddToCart(product.id)}>
+            Add to Cart
+          </button>
+        </div>
+      );
+    }
+    
+    // Better approach: Use React.memo
+    const ProductItem = React.memo(function ProductItem({ product, onAddToCart }) {
+      return (
+        <div>
+          <h3>{product.name}</h3>
+          <p>${product.price}</p>
+          <button onClick={() => onAddToCart(product.id)}>
+            Add to Cart
+          </button>
+        </div>
+      );
+    });
+    ```
+    Components re-render even when their props haven't changed, causing unnecessary renders. Use `React.memo` to skip re-rendering when props are unchanged.
+  </Accordion>
+  
+  <Accordion title="Improper useEffect Dependencies" icon="warning">
+    ```jsx
+    // Anti-pattern: Missing or incorrect dependencies
+    function UserProfile({ userId }) {
+      const [user, setUser] = useState(null);
+      
+      // Missing dependency
+      useEffect(() => {
+        fetchUser(userId).then(data => setUser(data));
+      }, []); // userId should be in the dependency array
+      
+      return user ? <div>{user.name}</div> : <div>Loading...</div>;
+    }
+    
+    // Better approach: Proper dependencies
+    function UserProfile({ userId }) {
+      const [user, setUser] = useState(null);
+      
+      useEffect(() => {
+        fetchUser(userId).then(data => setUser(data));
+      }, [userId]); // Correctly includes userId
+      
+      return user ? <div>{user.name}</div> : <div>Loading...</div>;
+    }
+    ```
+    Missing or incorrect dependencies in `useEffect` can lead to stale closures and bugs. Always include all values from the component scope that the effect uses.
+  </Accordion>
+  
+  <Accordion title="Not Using Fragment for Multiple Elements" icon="warning">
+    ```jsx
+    // Anti-pattern: Unnecessary div wrapper
+    function UserInfo({ user }) {
+      return (
+        <div>
+          <h2>{user.name}</h2>
+          <p>{user.email}</p>
+        </div>
+      );
+    }
+    
+    // Better approach: Use Fragment
+    function UserInfo({ user }) {
+      return (
+        <>
+          <h2>{user.name}</h2>
+          <p>{user.email}</p>
+        </>
+      );
+    }
+    ```
+    Unnecessary wrapper divs add to the DOM depth and can break layouts. Use React Fragments (`<>...</>` or `<React.Fragment>`) to group elements without adding extra nodes to the DOM.
+  </Accordion>
+  
+  <Accordion title="Not Using Error Boundaries" icon="warning">
+    ```jsx
+    // Anti-pattern: No error handling
+    function App() {
+      return (
+        <div>
+          <Header />
+          <UserProfile /> {/* If this crashes, the whole app crashes */}
+          <Footer />
+        </div>
+      );
+    }
+    
+    // Better approach: Use Error Boundaries
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+      }
+      
+      static getDerivedStateFromError(error) {
+        return { hasError: true };
+      }
+      
+      componentDidCatch(error, errorInfo) {
+        logErrorToService(error, errorInfo);
+      }
+      
+      render() {
+        if (this.state.hasError) {
+          return <h1>Something went wrong.</h1>;
+        }
+        
+        return this.props.children;
+      }
+    }
+    
+    function App() {
+      return (
+        <div>
+          <Header />
+          <ErrorBoundary>
+            <UserProfile />
+          </ErrorBoundary>
+          <Footer />
+        </div>
+      );
+    }
+    ```
+    Without error boundaries, a runtime error in a component can break the entire application. Use error boundaries to gracefully handle errors and display fallback UIs.
+  </Accordion>
+  
+  <Accordion title="Not Using Controlled Components for Forms" icon="warning">
+    ```jsx
+    // Anti-pattern: Uncontrolled component
+    function LoginForm() {
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const username = e.target.elements.username.value;
+        const password = e.target.elements.password.value;
+        // Submit logic
+      };
+      
+      return (
+        <form onSubmit={handleSubmit}>
+          <input name="username" />
+          <input name="password" type="password" />
+          <button type="submit">Login</button>
+        </form>
+      );
+    }
+    
+    // Better approach: Controlled component
+    function LoginForm() {
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
+      
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        // Submit logic with username and password
+      };
+      
+      return (
+        <form onSubmit={handleSubmit}>
+          <input 
+            value={username} 
+            onChange={(e) => setUsername(e.target.value)} 
+          />
+          <input 
+            type="password"
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+          />
+          <button type="submit">Login</button>
+        </form>
+      );
+    }
+    ```
+    Uncontrolled components make it harder to validate and manipulate form data. Use controlled components for better control over form inputs and validation.
+  </Accordion>
+  
+  <Accordion title="Not Using React DevTools" icon="warning">
+    ```jsx
+    // Anti-pattern: Debugging with console.log
+    function ComplexComponent({ data }) {
+      console.log('Component rendered', data);
+      // Component logic
+      return <div>{/* JSX */}</div>;
+    }
+    
+    // Better approach: Use React DevTools and named components
+    function ComplexComponent({ data }) {
+      // No console.log, use React DevTools instead
+      return <div>{/* JSX */}</div>;
+    }
+    ```
+    Using `console.log` for debugging is inefficient. Use React DevTools for inspecting component hierarchies, props, state, and performance.
+  </Accordion>
+</AccordionGroup>

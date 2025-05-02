@@ -1,0 +1,383 @@
+---
+title: 'Apache Camel'
+description: 'Apache Camel is an open-source integration framework that empowers you to quickly and easily integrate various systems consuming or producing data. It provides a rule-based routing and mediation engine.'
+---
+
+<AccordionGroup>
+  <Accordion title="Apache Camel Anti-Patterns Overview" icon="camel">
+    Apache Camel, despite its powerful integration capabilities, has several common anti-patterns that can lead to performance issues, maintenance problems, and integration failures. Here are the most important anti-patterns to avoid when developing with Apache Camel.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Exception Handling" icon="warning">
+    ```java
+    // Anti-pattern: No exception handling
+    from("direct:start")
+        .to("http://api.example.com/data")
+        .to("file:output");
+    
+    // Better approach: Use proper exception handling
+    from("direct:start")
+        .doTry()
+            .to("http://api.example.com/data")
+            .to("file:output")
+        .doCatch(Exception.class)
+            .log(LoggingLevel.ERROR, "Error processing message: ${exception.message}")
+            .to("direct:errorHandler")
+        .doFinally()
+            .to("direct:cleanup")
+        .end();
+    ```
+    Not handling exceptions properly can lead to message loss and system failures. Use Camel's exception handling mechanisms like `doTry`/`doCatch`/`doFinally` or `onException` to handle errors gracefully.
+  </Accordion>
+  
+  <Accordion title="Using Direct Component for High-Volume Processing" icon="warning">
+    ```java
+    // Anti-pattern: Using direct component for high-volume processing
+    from("direct:processOrders")
+        .process(this::processOrder)
+        .to("direct:updateInventory");
+    
+    from("direct:updateInventory")
+        .process(this::updateInventory)
+        .to("direct:notifyShipping");
+    
+    // Better approach: Use SEDA or JMS for high-volume processing
+    from("seda:processOrders?concurrentConsumers=5")
+        .process(this::processOrder)
+        .to("seda:updateInventory");
+    
+    from("seda:updateInventory?concurrentConsumers=3")
+        .process(this::updateInventory)
+        .to("seda:notifyShipping");
+    ```
+    The `direct` component is synchronous and can become a bottleneck for high-volume processing. Use asynchronous components like `seda`, `vm`, or `jms` for high-volume scenarios to enable parallel processing.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Transaction Management" icon="warning">
+    ```java
+    // Anti-pattern: No transaction management
+    from("jms:queue:orders")
+        .to("jdbc:dataSource")
+        .to("jms:queue:processed");
+    
+    // Better approach: Use proper transaction management
+    from("jms:queue:orders?transacted=true")
+        .transacted()
+        .to("jdbc:dataSource")
+        .to("jms:queue:processed");
+    ```
+    Not using transactions when working with resources like databases and message queues can lead to data inconsistency. Use Camel's transaction support to ensure all-or-nothing operations.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Logging" icon="warning">
+    ```java
+    // Anti-pattern: Inadequate logging
+    from("file:input")
+        .process(this::processFile)
+        .to("file:output");
+    
+    // Better approach: Use proper logging
+    from("file:input")
+        .log(LoggingLevel.INFO, "Processing file ${header.CamelFileName}")
+        .process(this::processFile)
+        .log(LoggingLevel.INFO, "Successfully processed file ${header.CamelFileName}")
+        .to("file:output")
+        .log(LoggingLevel.INFO, "File ${header.CamelFileName} moved to output directory");
+    ```
+    Inadequate logging makes it difficult to monitor and troubleshoot integration flows. Use Camel's logging DSL to add appropriate log statements at key points in your routes.
+  </Accordion>
+  
+  <Accordion title="Not Using Content-Based Router Properly" icon="warning">
+    ```java
+    // Anti-pattern: Complex nested choice statements
+    from("direct:start")
+        .choice()
+            .when(header("type").isEqualTo("A"))
+                .choice()
+                    .when(header("priority").isEqualTo("high"))
+                        .to("direct:highPriorityA")
+                    .when(header("priority").isEqualTo("medium"))
+                        .to("direct:mediumPriorityA")
+                    .otherwise()
+                        .to("direct:lowPriorityA")
+                .endChoice()
+            .when(header("type").isEqualTo("B"))
+                // Similar nested structure
+            .otherwise()
+                // More nesting
+        .endChoice();
+    
+    // Better approach: Flatten routing logic
+    from("direct:start")
+        .choice()
+            .when(and(header("type").isEqualTo("A"), header("priority").isEqualTo("high")))
+                .to("direct:highPriorityA")
+            .when(and(header("type").isEqualTo("A"), header("priority").isEqualTo("medium")))
+                .to("direct:mediumPriorityA")
+            .when(header("type").isEqualTo("A"))
+                .to("direct:lowPriorityA")
+            // Similar flattened conditions for type B
+            .otherwise()
+                .to("direct:default")
+        .endChoice();
+    ```
+    Complex nested routing logic is hard to maintain and understand. Flatten your routing conditions or split them into separate routes for better maintainability.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling Strategies" icon="warning">
+    ```java
+    // Anti-pattern: Same error handling for all errors
+    errorHandler(deadLetterChannel("jms:queue:dead"));
+    
+    from("direct:start")
+        .to("http://api.example.com/data")
+        .to("file:output");
+    
+    // Better approach: Different strategies for different errors
+    onException(ConnectException.class)
+        .maximumRedeliveries(5)
+        .redeliveryDelay(1000)
+        .backOffMultiplier(2)
+        .useExponentialBackOff()
+        .handled(true)
+        .log(LoggingLevel.WARN, "Connection issue, will retry: ${exception.message}");
+    
+    onException(ValidationException.class)
+        .handled(true)
+        .to("direct:validationError")
+        .log(LoggingLevel.ERROR, "Validation error: ${exception.message}");
+    
+    onException(Exception.class)
+        .handled(false)
+        .to("jms:queue:dead")
+        .log(LoggingLevel.ERROR, "Unhandled error: ${exception.message}");
+    
+    from("direct:start")
+        .to("http://api.example.com/data")
+        .to("file:output");
+    ```
+    Using the same error handling strategy for all errors is not optimal. Define specific error handling strategies for different types of exceptions.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Data Transformation" icon="warning">
+    ```java
+    // Anti-pattern: Complex transformations in processors
+    from("direct:start")
+        .process(exchange -> {
+            // Complex manual XML to JSON transformation
+            String xml = exchange.getIn().getBody(String.class);
+            // Manual parsing, manipulation, and conversion
+            String json = convertXmlToJson(xml); // Custom method
+            exchange.getIn().setBody(json);
+        })
+        .to("http://api.example.com/data");
+    
+    // Better approach: Use Camel's transformation capabilities
+    from("direct:start")
+        .unmarshal().jacksonxml()
+        .marshal().json()
+        .to("http://api.example.com/data");
+    ```
+    Implementing complex transformations in processors makes code hard to maintain. Use Camel's built-in data transformation capabilities or dedicated transformation components.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Component Configuration" icon="warning">
+    ```java
+    // Anti-pattern: Hardcoded component configuration
+    from("file:/input?delay=5000&recursive=true")
+        .to("http://api.example.com/data?connectTimeout=5000&socketTimeout=10000")
+        .to("file:/output?fileExist=Append");
+    
+    // Better approach: Externalize component configuration
+    // In application.properties
+    // camel.component.file.input.path=/input
+    // camel.component.file.input.delay=5000
+    // camel.component.file.input.recursive=true
+    // camel.component.http.connectTimeout=5000
+    // camel.component.http.socketTimeout=10000
+    // camel.component.file.output.path=/output
+    // camel.component.file.output.fileExist=Append
+    
+    // In Java code
+    from("{{file.input}}")
+        .to("{{http.endpoint}}")
+        .to("{{file.output}}");
+    ```
+    Hardcoding component configurations makes them difficult to change across environments. Externalize configurations using properties or Spring Boot configuration.
+  </Accordion>
+  
+  <Accordion title="Not Using Idempotent Consumer" icon="warning">
+    ```java
+    // Anti-pattern: Not handling duplicate messages
+    from("jms:queue:orders")
+        .to("direct:processOrder");
+    
+    // Better approach: Use idempotent consumer
+    from("jms:queue:orders")
+        .idempotentConsumer(
+            header("OrderId"),
+            MemoryIdempotentRepository.memoryIdempotentRepository(200)
+        )
+        .to("direct:processOrder");
+    
+    // Even better: Use persistent repository
+    @Bean
+    public IdempotentRepository<?> idempotentRepository(DataSource dataSource) {
+        return JdbcMessageIdRepository.jdbcMessageIdRepository(dataSource, "orders");
+    }
+    
+    from("jms:queue:orders")
+        .idempotentConsumer(
+            header("OrderId"),
+            idempotentRepository
+        )
+        .to("direct:processOrder");
+    ```
+    Not handling duplicate messages can lead to data inconsistency. Use the idempotent consumer pattern to filter out duplicate messages.
+  </Accordion>
+  
+  <Accordion title="Not Using Circuit Breaker" icon="warning">
+    ```java
+    // Anti-pattern: No circuit breaker for external services
+    from("direct:start")
+        .to("http://api.example.com/data")
+        .to("direct:processResponse");
+    
+    // Better approach: Use circuit breaker
+    from("direct:start")
+        .circuitBreaker()
+            .resilience4jConfiguration()
+                .failureRateThreshold(50)
+                .waitDurationInOpenState(1000)
+                .slidingWindowSize(10)
+            .end()
+            .to("http://api.example.com/data")
+        .onFallback()
+            .transform().constant("Fallback response")
+        .end()
+        .to("direct:processResponse");
+    ```
+    Without circuit breakers, failures in external services can cascade through your system. Use circuit breakers to prevent cascading failures and provide fallback mechanisms.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Testing" icon="warning">
+    ```java
+    // Anti-pattern: Manual testing or no testing
+    
+    // Better approach: Use Camel testing framework
+    @RunWith(CamelSpringBootRunner.class)
+    @SpringBootTest
+    public class OrderRouteTest {
+        
+        @Autowired
+        private CamelContext camelContext;
+        
+        @Autowired
+        private ProducerTemplate producerTemplate;
+        
+        @EndpointInject("mock:result")
+        private MockEndpoint mockEndpoint;
+        
+        @Test
+        public void testOrderProcessing() throws Exception {
+            // Setup expectations
+            mockEndpoint.expectedMessageCount(1);
+            mockEndpoint.expectedBodiesReceived("Processed order: 12345");
+            
+            // Send test message
+            producerTemplate.sendBodyAndHeader("direct:processOrder", "Order data", "OrderId", "12345");
+            
+            // Verify expectations
+            mockEndpoint.assertIsSatisfied();
+        }
+    }
+    ```
+    Not properly testing Camel routes can lead to production issues. Use Camel's testing framework with mock endpoints to test your routes thoroughly.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Monitoring" icon="warning">
+    ```java
+    // Anti-pattern: No monitoring
+    
+    // Better approach: Enable JMX and metrics
+    @Bean
+    public CamelContextConfiguration camelContextConfiguration() {
+        return new CamelContextConfiguration() {
+            @Override
+            public void beforeApplicationStart(CamelContext camelContext) {
+                // Enable JMX
+                camelContext.setManagementStrategy(new DefaultManagementStrategy());
+                camelContext.getManagementStrategy().setManagementAgent(new DefaultManagementAgent(camelContext));
+                camelContext.getManagementStrategy().getManagementAgent().setCreateConnector(true);
+                
+                // Enable metrics
+                camelContext.setUseMDCLogging(true);
+                camelContext.addRoutePolicyFactory(new MetricsRoutePolicyFactory());
+            }
+            
+            @Override
+            public void afterApplicationStart(CamelContext camelContext) {
+                // Additional post-start configuration
+            }
+        };
+    }
+    ```
+    Without proper monitoring, it's difficult to identify issues and performance bottlenecks. Enable JMX, metrics, and logging to monitor your Camel applications effectively.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Route Organization" icon="warning">
+    ```java
+    // Anti-pattern: All routes in one class
+    @Component
+    public class AllRoutes extends RouteBuilder {
+        @Override
+        public void configure() throws Exception {
+            // Order processing routes
+            from("jms:queue:orders").to("direct:processOrder");
+            from("direct:processOrder").process(this::processOrder).to("direct:updateInventory");
+            from("direct:updateInventory").process(this::updateInventory).to("direct:notifyShipping");
+            
+            // Customer management routes
+            from("jms:queue:customers").to("direct:processCustomer");
+            from("direct:processCustomer").process(this::processCustomer).to("direct:updateCRM");
+            
+            // Product management routes
+            from("jms:queue:products").to("direct:processProduct");
+            from("direct:processProduct").process(this::processProduct).to("direct:updateCatalog");
+            
+            // Many more routes...
+        }
+    }
+    
+    // Better approach: Organize routes by domain
+    @Component
+    public class OrderRoutes extends RouteBuilder {
+        @Override
+        public void configure() throws Exception {
+            from("jms:queue:orders").to("direct:processOrder");
+            from("direct:processOrder").process(this::processOrder).to("direct:updateInventory");
+            from("direct:updateInventory").process(this::updateInventory).to("direct:notifyShipping");
+        }
+    }
+    
+    @Component
+    public class CustomerRoutes extends RouteBuilder {
+        @Override
+        public void configure() throws Exception {
+            from("jms:queue:customers").to("direct:processCustomer");
+            from("direct:processCustomer").process(this::processCustomer).to("direct:updateCRM");
+        }
+    }
+    
+    @Component
+    public class ProductRoutes extends RouteBuilder {
+        @Override
+        public void configure() throws Exception {
+            from("jms:queue:products").to("direct:processProduct");
+            from("direct:processProduct").process(this::processProduct).to("direct:updateCatalog");
+        }
+    }
+    ```
+    Putting all routes in one class makes the code hard to maintain. Organize routes by domain or functionality in separate classes.
+  </Accordion>
+</AccordionGroup>

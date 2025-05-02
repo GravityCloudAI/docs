@@ -1,0 +1,456 @@
+---
+title: 'Node.js'
+description: 'Node.js is a JavaScript runtime built on Chrome\'s V8 JavaScript engine, enabling server-side JavaScript execution. It uses an event-driven, non-blocking I/O model that makes it lightweight and efficient for building scalable network applications.'
+---
+
+<AccordionGroup>
+  <Accordion title="Node.js Anti-Patterns Overview" icon="nodejs">
+    Node.js, despite its popularity and efficiency, has several common anti-patterns that can lead to performance issues, memory leaks, and maintenance problems. Here are the most important anti-patterns to avoid when writing Node.js code.
+  </Accordion>
+  
+  <Accordion title="Not Handling Errors Properly" icon="warning">
+    ```javascript
+    // Anti-pattern: Not handling errors
+    fs.readFile('/file-path.txt', (err, data) => {
+      // No error handling
+      const content = data.toString();
+      console.log(content);
+    });
+    
+    // Better approach: Handle errors properly
+    fs.readFile('/file-path.txt', (err, data) => {
+      if (err) {
+        console.error('Error reading file:', err);
+        return;
+      }
+      
+      const content = data.toString();
+      console.log(content);
+    });
+    
+    // Even better: Use promises with async/await and try/catch
+    async function readFileContent() {
+      try {
+        const data = await fs.promises.readFile('/file-path.txt');
+        const content = data.toString();
+        console.log(content);
+      } catch (err) {
+        console.error('Error reading file:', err);
+      }
+    }
+    ```
+    Not handling errors can lead to application crashes and unpredictable behavior. Always check for errors in callbacks or use try/catch with async/await.
+  </Accordion>
+  
+  <Accordion title="Callback Hell" icon="warning">
+    ```javascript
+    // Anti-pattern: Callback hell (Pyramid of Doom)
+    function processData() {
+      fetchData(function(err, data) {
+        if (err) {
+          console.error(err);
+          return;
+        }
+        
+        processFirstStep(data, function(err, firstResult) {
+          if (err) {
+            console.error(err);
+            return;
+          }
+          
+          processSecondStep(firstResult, function(err, secondResult) {
+            if (err) {
+              console.error(err);
+              return;
+            }
+            
+            processFinalStep(secondResult, function(err, finalResult) {
+              if (err) {
+                console.error(err);
+                return;
+              }
+              
+              console.log('Final result:', finalResult);
+            });
+          });
+        });
+      });
+    }
+    
+    // Better approach: Use Promises
+    function processData() {
+      return fetchData()
+        .then(data => processFirstStep(data))
+        .then(firstResult => processSecondStep(firstResult))
+        .then(secondResult => processFinalStep(secondResult))
+        .then(finalResult => {
+          console.log('Final result:', finalResult);
+          return finalResult;
+        })
+        .catch(err => {
+          console.error('Error in processing:', err);
+          throw err;
+        });
+    }
+    
+    // Even better: Use async/await
+    async function processData() {
+      try {
+        const data = await fetchData();
+        const firstResult = await processFirstStep(data);
+        const secondResult = await processSecondStep(firstResult);
+        const finalResult = await processFinalStep(secondResult);
+        
+        console.log('Final result:', finalResult);
+        return finalResult;
+      } catch (err) {
+        console.error('Error in processing:', err);
+        throw err;
+      }
+    }
+    ```
+    Deeply nested callbacks make code hard to read and maintain. Use Promises or async/await to write more linear, readable code.
+  </Accordion>
+  
+  <Accordion title="Not Using Streams for Large Data" icon="warning">
+    ```javascript
+    // Anti-pattern: Loading entire file into memory
+    function processLargeFile(filePath) {
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          console.error(err);
+          return;
+        }
+        
+        // Process entire file in memory
+        const lines = data.toString().split('\n');
+        lines.forEach(line => {
+          // Process each line
+        });
+      });
+    }
+    
+    // Better approach: Use streams
+    function processLargeFile(filePath) {
+      const readStream = fs.createReadStream(filePath, { encoding: 'utf8' });
+      const lineReader = readline.createInterface({
+        input: readStream,
+        crlfDelay: Infinity
+      });
+      
+      lineReader.on('line', (line) => {
+        // Process each line without loading entire file
+      });
+      
+      lineReader.on('close', () => {
+        console.log('File processing completed');
+      });
+      
+      readStream.on('error', (err) => {
+        console.error('Error reading file:', err);
+      });
+    }
+    ```
+    Loading large files entirely into memory can cause out-of-memory errors. Use streams to process data in chunks.
+  </Accordion>
+  
+  <Accordion title="Blocking the Event Loop" icon="warning">
+    ```javascript
+    // Anti-pattern: Blocking the event loop
+    function calculateFibonacci(n) {
+      if (n <= 1) return n;
+      return calculateFibonacci(n - 1) + calculateFibonacci(n - 2);
+    }
+    
+    app.get('/fibonacci/:n', (req, res) => {
+      const n = parseInt(req.params.n);
+      // This blocks the event loop for large values of n
+      const result = calculateFibonacci(n);
+      res.send({ result });
+    });
+    
+    // Better approach: Use worker threads for CPU-intensive tasks
+    const { Worker } = require('worker_threads');
+    
+    app.get('/fibonacci/:n', (req, res) => {
+      const n = parseInt(req.params.n);
+      
+      const worker = new Worker(`
+        const { parentPort, workerData } = require('worker_threads');
+        
+        function calculateFibonacci(n) {
+          if (n <= 1) return n;
+          return calculateFibonacci(n - 1) + calculateFibonacci(n - 2);
+        }
+        
+        parentPort.postMessage(calculateFibonacci(workerData));
+      `, { eval: true, workerData: n });
+      
+      worker.on('message', (result) => {
+        res.send({ result });
+      });
+      
+      worker.on('error', (err) => {
+        res.status(500).send({ error: err.message });
+      });
+    });
+    ```
+    CPU-intensive operations block the event loop, affecting all requests. Use worker threads for CPU-bound tasks.
+  </Accordion>
+  
+  <Accordion title="Memory Leaks" icon="warning">
+    ```javascript
+    // Anti-pattern: Creating memory leaks
+    const cache = {};
+    
+    app.get('/data/:id', (req, res) => {
+      const id = req.params.id;
+      
+      // This cache grows unbounded
+      if (!cache[id]) {
+        cache[id] = fetchData(id);
+      }
+      
+      res.send(cache[id]);
+    });
+    
+    // Better approach: Use a proper caching mechanism with limits
+    const LRU = require('lru-cache');
+    const cache = new LRU({
+      max: 500, // Maximum items in cache
+      maxAge: 1000 * 60 * 60 // Items expire after 1 hour
+    });
+    
+    app.get('/data/:id', (req, res) => {
+      const id = req.params.id;
+      
+      if (!cache.has(id)) {
+        const data = fetchData(id);
+        cache.set(id, data);
+      }
+      
+      res.send(cache.get(id));
+    });
+    ```
+    Unbounded caches and event listeners are common sources of memory leaks. Use proper caching libraries and always remove event listeners when they're no longer needed.
+  </Accordion>
+  
+  <Accordion title="Not Using Environment Variables" icon="warning">
+    ```javascript
+    // Anti-pattern: Hardcoded configuration
+    const dbConfig = {
+      host: 'production-db.example.com',
+      user: 'admin',
+      password: 'supersecretpassword',
+      database: 'myapp'
+    };
+    
+    const apiKey = 'abcd1234efgh5678';
+    
+    // Better approach: Use environment variables
+    require('dotenv').config(); // Load .env file if using dotenv
+    
+    const dbConfig = {
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME
+    };
+    
+    const apiKey = process.env.API_KEY;
+    ```
+    Hardcoded configuration values make deployment difficult and pose security risks. Use environment variables for configuration.
+  </Accordion>
+  
+  <Accordion title="Improper Error Handling in Promises" icon="warning">
+    ```javascript
+    // Anti-pattern: Not handling promise rejections
+    function fetchData() {
+      return fetch('https://api.example.com/data')
+        .then(response => response.json())
+        .then(data => processData(data));
+      // No .catch() to handle errors
+    }
+    
+    // Better approach: Always catch promise errors
+    function fetchData() {
+      return fetch('https://api.example.com/data')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => processData(data))
+        .catch(error => {
+          console.error('Error fetching data:', error);
+          // Handle error appropriately
+          throw error; // Re-throw or return a default value
+        });
+    }
+    ```
+    Unhandled promise rejections can cause application crashes. Always add `.catch()` to promise chains or use try/catch with async/await.
+  </Accordion>
+  
+  <Accordion title="Sync Operations in Async Code" icon="warning">
+    ```javascript
+    // Anti-pattern: Using synchronous operations in async code
+    app.get('/data', (req, res) => {
+      // This blocks the event loop
+      const data = fs.readFileSync('/path/to/data.json');
+      const parsedData = JSON.parse(data);
+      res.json(parsedData);
+    });
+    
+    // Better approach: Use asynchronous operations
+    app.get('/data', async (req, res) => {
+      try {
+        const data = await fs.promises.readFile('/path/to/data.json');
+        const parsedData = JSON.parse(data);
+        res.json(parsedData);
+      } catch (err) {
+        console.error('Error reading file:', err);
+        res.status(500).send('Server error');
+      }
+    });
+    ```
+    Synchronous operations block the event loop and reduce throughput. Always use asynchronous versions of I/O operations.
+  </Accordion>
+  
+  <Accordion title="Not Using a Process Manager" icon="warning">
+    ```javascript
+    // Anti-pattern: Running Node directly
+    // $ node server.js
+    
+    // Better approach: Use a process manager
+    // $ pm2 start server.js --name "my-app" -i max
+    
+    // In package.json
+    {
+      "scripts": {
+        "start": "node server.js",
+        "start:prod": "pm2 start server.js --name 'my-app' -i max",
+        "stop": "pm2 stop my-app",
+        "restart": "pm2 restart my-app"
+      }
+    }
+    ```
+    Running Node.js applications directly in production doesn't handle crashes or utilize multiple cores. Use process managers like PM2 or Docker containers.
+  </Accordion>
+  
+  <Accordion title="Not Validating User Input" icon="warning">
+    ```javascript
+    // Anti-pattern: Not validating user input
+    app.post('/users', (req, res) => {
+      const { name, email, age } = req.body;
+      
+      // Directly using unvalidated input
+      db.createUser({ name, email, age })
+        .then(user => res.status(201).json(user))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    
+    // Better approach: Validate input
+    const { body, validationResult } = require('express-validator');
+    
+    app.post('/users', [
+      body('name').isString().trim().isLength({ min: 2, max: 50 }),
+      body('email').isEmail().normalizeEmail(),
+      body('age').isInt({ min: 0, max: 120 })
+    ], (req, res) => {
+      const errors = validationResult(req);
+      
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+      
+      const { name, email, age } = req.body;
+      
+      db.createUser({ name, email, age })
+        .then(user => res.status(201).json(user))
+        .catch(err => res.status(500).json({ error: err.message }));
+    });
+    ```
+    Not validating user input can lead to security vulnerabilities and data corruption. Always validate and sanitize user input.
+  </Accordion>
+  
+  <Accordion title="Not Using HTTP Security Headers" icon="warning">
+    ```javascript
+    // Anti-pattern: No security headers
+    const express = require('express');
+    const app = express();
+    
+    app.get('/', (req, res) => {
+      res.send('Hello World!');
+    });
+    
+    // Better approach: Use security middleware
+    const express = require('express');
+    const helmet = require('helmet');
+    const app = express();
+    
+    // Add security headers
+    app.use(helmet());
+    
+    app.get('/', (req, res) => {
+      res.send('Hello World!');
+    });
+    ```
+    Not using security headers makes your application vulnerable to various attacks. Use middleware like Helmet to add appropriate security headers.
+  </Accordion>
+  
+  <Accordion title="Not Handling Uncaught Exceptions" icon="warning">
+    ```javascript
+    // Anti-pattern: Not handling uncaught exceptions
+    // No global error handlers
+    
+    // Better approach: Handle uncaught exceptions and unhandled rejections
+    process.on('uncaughtException', (err) => {
+      console.error('Uncaught Exception:', err);
+      // Log to error monitoring service
+      // Gracefully shutdown or restart
+      process.exit(1);
+    });
+    
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+      // Log to error monitoring service
+    });
+    ```
+    Unhandled exceptions can crash your application. Set up global error handlers to log errors and gracefully shut down.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Logging" icon="warning">
+    ```javascript
+    // Anti-pattern: Using console.log for everything
+    function processOrder(order) {
+      console.log('Processing order:', order);
+      // Process order
+      console.log('Order processed successfully');
+    }
+    
+    // Better approach: Use a proper logging library
+    const winston = require('winston');
+    
+    const logger = winston.createLogger({
+      level: process.env.LOG_LEVEL || 'info',
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+      ),
+      transports: [
+        new winston.transports.Console(),
+        new winston.transports.File({ filename: 'error.log', level: 'error' }),
+        new winston.transports.File({ filename: 'combined.log' })
+      ]
+    });
+    
+    function processOrder(order) {
+      logger.info('Processing order', { orderId: order.id });
+      // Process order
+      logger.info('Order processed successfully', { orderId: order.id });
+    }
+    ```
+    Using `console.log` for logging doesn't provide features like log levels, formatting, and output configuration. Use a proper logging library like Winston or Pino.
+  </Accordion>
+</AccordionGroup>

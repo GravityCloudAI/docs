@@ -1,0 +1,584 @@
+---
+title: 'Fastify'
+description: 'Fastify is a web framework for Node.js focused on providing the best developer experience with the least overhead and a powerful plugin architecture. It is one of the fastest web frameworks available for Node.js.'
+---
+
+<AccordionGroup>
+  <Accordion title="Fastify Anti-Patterns Overview" icon="bolt">
+    Fastify, despite its performance and plugin-based architecture, has several common anti-patterns that can lead to performance issues, maintenance problems, and security vulnerabilities. Here are the most important anti-patterns to avoid when developing with Fastify.
+  </Accordion>
+  
+  <Accordion title="Not Using the Schema Validation" icon="warning">
+    ```javascript
+    // Anti-pattern: Not using schema validation
+    fastify.post('/users', async (request, reply) => {
+      const { name, email, age } = request.body;
+      
+      // Manual validation
+      if (!name || typeof name !== 'string') {
+        reply.code(400).send({ error: 'Invalid name' });
+        return;
+      }
+      
+      if (!email || !email.includes('@')) {
+        reply.code(400).send({ error: 'Invalid email' });
+        return;
+      }
+      
+      if (!age || typeof age !== 'number' || age < 0) {
+        reply.code(400).send({ error: 'Invalid age' });
+        return;
+      }
+      
+      // Process the request
+      // ...
+    });
+    
+    // Better approach: Use schema validation
+    const userSchema = {
+      body: {
+        type: 'object',
+        required: ['name', 'email', 'age'],
+        properties: {
+          name: { type: 'string', minLength: 2 },
+          email: { type: 'string', format: 'email' },
+          age: { type: 'integer', minimum: 0 }
+        }
+      }
+    };
+    
+    fastify.post('/users', { schema: userSchema }, async (request, reply) => {
+      // Body is already validated, no need for manual checks
+      const { name, email, age } = request.body;
+      
+      // Process the request
+      // ...
+    });
+    ```
+    Manual validation is error-prone and verbose. Use Fastify's built-in schema validation based on JSON Schema to automatically validate requests and generate documentation.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```javascript
+    // Anti-pattern: Poor error handling
+    fastify.get('/users/:id', async (request, reply) => {
+      const user = await db.users.findById(request.params.id);
+      if (!user) {
+        reply.code(404).send({ error: 'User not found' });
+        return;
+      }
+      return user;
+    });
+    
+    // Better approach: Use custom error classes and error handler
+    class NotFoundError extends Error {
+      constructor(message) {
+        super(message);
+        this.statusCode = 404;
+      }
+    }
+    
+    fastify.setErrorHandler((error, request, reply) => {
+      if (error instanceof NotFoundError) {
+        reply.code(error.statusCode).send({ error: error.message });
+        return;
+      }
+      
+      // Log the error
+      request.log.error(error);
+      
+      // Send a generic error response in production
+      if (process.env.NODE_ENV === 'production') {
+        reply.code(500).send({ error: 'Internal Server Error' });
+        return;
+      }
+      
+      // Send detailed error in development
+      reply.code(500).send({ error: error.message, stack: error.stack });
+    });
+    
+    fastify.get('/users/:id', async (request, reply) => {
+      const user = await db.users.findById(request.params.id);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+      return user;
+    });
+    ```
+    Inconsistent error handling leads to poor user experience and security issues. Use custom error classes and Fastify's error handler to centralize error handling logic.
+  </Accordion>
+  
+  <Accordion title="Not Using Async/Await Properly" icon="warning">
+    ```javascript
+    // Anti-pattern: Mixing callbacks and async/await
+    fastify.get('/users/:id', async (request, reply) => {
+      db.users.findById(request.params.id, (err, user) => {
+        if (err) {
+          reply.code(500).send({ error: err.message });
+          return;
+        }
+        
+        if (!user) {
+          reply.code(404).send({ error: 'User not found' });
+          return;
+        }
+        
+        reply.send(user);
+      });
+    });
+    
+    // Better approach: Consistent async/await
+    fastify.get('/users/:id', async (request, reply) => {
+      try {
+        const user = await db.users.findById(request.params.id);
+        if (!user) {
+          return reply.code(404).send({ error: 'User not found' });
+        }
+        return user; // Fastify automatically handles the response
+      } catch (err) {
+        request.log.error(err);
+        throw err; // Let the error handler deal with it
+      }
+    });
+    ```
+    Mixing callbacks with async/await makes code harder to read and reason about. Be consistent with async/await throughout your route handlers.
+  </Accordion>
+  
+  <Accordion title="Not Using Plugins Properly" icon="warning">
+    ```javascript
+    // Anti-pattern: Global plugin registration without scoping
+    // server.js
+    const fastify = require('fastify')();
+    
+    // Register plugins globally
+    fastify.register(require('fastify-cors'));
+    fastify.register(require('fastify-jwt'), { secret: 'supersecret' });
+    
+    // Routes
+    fastify.register(require('./routes/public'));
+    fastify.register(require('./routes/admin'));
+    fastify.register(require('./routes/user'));
+    
+    // Better approach: Scope plugins to where they're needed
+    // server.js
+    const fastify = require('fastify')();
+    
+    // Register common plugins
+    fastify.register(require('./plugins/common'));
+    
+    // Register route groups with their specific plugins
+    fastify.register(function publicRoutes(instance, opts, done) {
+      // Public routes don't need authentication
+      instance.register(require('./routes/public'));
+      done();
+    }, { prefix: '/api/public' });
+    
+    fastify.register(function protectedRoutes(instance, opts, done) {
+      // Protected routes need JWT authentication
+      instance.register(require('fastify-jwt'), { secret: 'supersecret' });
+      
+      // Add authentication hook
+      instance.addHook('onRequest', async (request, reply) => {
+        try {
+          await request.jwtVerify();
+        } catch (err) {
+          reply.code(401).send({ error: 'Unauthorized' });
+        }
+      });
+      
+      instance.register(require('./routes/admin'), { prefix: '/admin' });
+      instance.register(require('./routes/user'), { prefix: '/user' });
+      
+      done();
+    }, { prefix: '/api' });
+    ```
+    Registering all plugins globally can lead to unnecessary overhead and potential security issues. Use Fastify's encapsulation to scope plugins only to the routes that need them.
+  </Accordion>
+  
+  <Accordion title="Not Using Hooks Properly" icon="warning">
+    ```javascript
+    // Anti-pattern: Duplicating logic in route handlers
+    fastify.get('/users/:id', async (request, reply) => {
+      // Authentication check
+      try {
+        await request.jwtVerify();
+      } catch (err) {
+        reply.code(401).send({ error: 'Unauthorized' });
+        return;
+      }
+      
+      // Log the request
+      request.log.info(`Fetching user ${request.params.id}`);
+      
+      // Actual handler logic
+      const user = await db.users.findById(request.params.id);
+      if (!user) {
+        reply.code(404).send({ error: 'User not found' });
+        return;
+      }
+      return user;
+    });
+    
+    // Better approach: Use hooks for cross-cutting concerns
+    // Authentication hook
+    fastify.register(async (instance) => {
+      instance.addHook('onRequest', async (request, reply) => {
+        try {
+          await request.jwtVerify();
+        } catch (err) {
+          reply.code(401).send({ error: 'Unauthorized' });
+        }
+      });
+      
+      // Logging hook
+      instance.addHook('preHandler', async (request, reply) => {
+        request.log.info(`Processing ${request.method} ${request.url}`);
+      });
+      
+      // Register routes that need these hooks
+      instance.get('/users/:id', async (request, reply) => {
+        // Focus only on the business logic
+        const user = await db.users.findById(request.params.id);
+        if (!user) {
+          reply.code(404).send({ error: 'User not found' });
+          return;
+        }
+        return user;
+      });
+      
+      // More routes...
+    });
+    ```
+    Duplicating cross-cutting concerns in each route handler leads to code duplication and maintenance issues. Use Fastify's hooks to centralize common logic like authentication, logging, and error handling.
+  </Accordion>
+  
+  <Accordion title="Not Using Serialization" icon="warning">
+    ```javascript
+    // Anti-pattern: Manual response transformation
+    fastify.get('/users/:id', async (request, reply) => {
+      const user = await db.users.findById(request.params.id);
+      if (!user) {
+        reply.code(404).send({ error: 'User not found' });
+        return;
+      }
+      
+      // Manual transformation of the response
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        // Omit sensitive fields like password, internal notes, etc.
+      };
+    });
+    
+    // Better approach: Use response schema with serialization
+    const userSchema = {
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            email: { type: 'string' }
+            // No sensitive fields defined here
+          }
+        }
+      }
+    };
+    
+    fastify.get('/users/:id', { schema: userSchema }, async (request, reply) => {
+      const user = await db.users.findById(request.params.id);
+      if (!user) {
+        reply.code(404).send({ error: 'User not found' });
+        return;
+      }
+      
+      // Return the full user object - serialization will filter fields
+      return user;
+    });
+    ```
+    Manual response transformation is error-prone and can lead to inconsistent APIs. Use Fastify's response schemas to automatically serialize responses and filter out sensitive fields.
+  </Accordion>
+  
+  <Accordion title="Not Using the Reply Interface Properly" icon="warning">
+    ```javascript
+    // Anti-pattern: Inconsistent response patterns
+    fastify.get('/users/:id', async (request, reply) => {
+      const user = await db.users.findById(request.params.id);
+      
+      if (!user) {
+        // Using reply.send()
+        reply.code(404).send({ error: 'User not found' });
+        return;
+      }
+      
+      // Directly returning the object
+      return user;
+    });
+    
+    // Better approach: Consistent response pattern
+    // Option 1: Always use return
+    fastify.get('/users/:id', async (request, reply) => {
+      const user = await db.users.findById(request.params.id);
+      
+      if (!user) {
+        return reply.code(404).send({ error: 'User not found' });
+      }
+      
+      return user;
+    });
+    
+    // Option 2: Always use reply.send()
+    fastify.get('/users/:id', async (request, reply) => {
+      const user = await db.users.findById(request.params.id);
+      
+      if (!user) {
+        reply.code(404).send({ error: 'User not found' });
+        return;
+      }
+      
+      reply.send(user);
+    });
+    ```
+    Mixing response patterns makes code harder to read and maintain. Choose one consistent pattern for handling responses throughout your application.
+  </Accordion>
+  
+  <Accordion title="Not Using Content Type Parsing Properly" icon="warning">
+    ```javascript
+    // Anti-pattern: Not configuring content type parsers
+    const fastify = require('fastify')();
+    
+    fastify.post('/upload', async (request, reply) => {
+      // This will fail for multipart/form-data
+      const { file } = request.body;
+      // ...
+    });
+    
+    // Better approach: Configure appropriate parsers
+    const fastify = require('fastify')();
+    const multipart = require('@fastify/multipart');
+    
+    // Register multipart support
+    fastify.register(multipart, {
+      limits: {
+        fileSize: 1024 * 1024 * 10 // 10MB
+      }
+    });
+    
+    // Handle file uploads
+    fastify.post('/upload', async (request, reply) => {
+      const data = await request.file();
+      
+      // Process the file
+      const buffer = await data.toBuffer();
+      // ...
+      
+      return { uploaded: true, filename: data.filename };
+    });
+    
+    // Handle multiple files
+    fastify.post('/upload-many', async (request, reply) => {
+      const files = await request.files();
+      
+      for (const part of files) {
+        // Process each file
+        // ...
+      }
+      
+      return { uploaded: files.length };
+    });
+    ```
+    Not configuring appropriate content type parsers leads to errors when handling different types of requests. Register the appropriate parsers for your API's needs.
+  </Accordion>
+  
+  <Accordion title="Not Using Decorators Properly" icon="warning">
+    ```javascript
+    // Anti-pattern: Using global variables or passing data through function parameters
+    const db = require('./db');
+    
+    fastify.get('/users', async (request, reply) => {
+      return db.users.findAll();
+    });
+    
+    fastify.get('/users/:id', async (request, reply) => {
+      return db.users.findById(request.params.id);
+    });
+    
+    // Better approach: Use decorators to attach shared resources
+    const fastify = require('fastify')();
+    
+    // Database plugin
+    fastify.register(async (instance, opts) => {
+      const db = require('./db');
+      
+      // Make db available to all routes in this context
+      instance.decorate('db', db);
+      
+      // Close database connection when the server closes
+      instance.addHook('onClose', async (instance) => {
+        await db.close();
+      });
+    });
+    
+    // Use the decorator in routes
+    fastify.register(async (instance, opts) => {
+      instance.get('/users', async (request, reply) => {
+        return request.server.db.users.findAll();
+      });
+      
+      instance.get('/users/:id', async (request, reply) => {
+        return request.server.db.users.findById(request.params.id);
+      });
+    });
+    ```
+    Using global variables makes testing difficult and can lead to unexpected behavior. Use Fastify's decorators to attach shared resources to the server, request, or reply objects.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Logging" icon="warning">
+    ```javascript
+    // Anti-pattern: Using console.log
+    fastify.get('/users/:id', async (request, reply) => {
+      console.log(`Getting user ${request.params.id}`);
+      
+      try {
+        const user = await db.users.findById(request.params.id);
+        if (!user) {
+          console.log(`User ${request.params.id} not found`);
+          reply.code(404).send({ error: 'User not found' });
+          return;
+        }
+        console.log(`Found user ${user.id}`);
+        return user;
+      } catch (err) {
+        console.error('Error fetching user:', err);
+        reply.code(500).send({ error: 'Internal Server Error' });
+      }
+    });
+    
+    // Better approach: Use Fastify's logger
+    // Configure Fastify with appropriate logger
+    const fastify = require('fastify')({
+      logger: {
+        level: process.env.LOG_LEVEL || 'info',
+        serializers: {
+          req(request) {
+            return {
+              method: request.method,
+              url: request.url,
+              headers: request.headers,
+              hostname: request.hostname,
+              remoteAddress: request.ip,
+              remotePort: request.socket.remotePort
+            };
+          }
+        }
+      }
+    });
+    
+    fastify.get('/users/:id', async (request, reply) => {
+      request.log.info({ params: request.params }, 'Getting user');
+      
+      try {
+        const user = await db.users.findById(request.params.id);
+        if (!user) {
+          request.log.info({ userId: request.params.id }, 'User not found');
+          reply.code(404).send({ error: 'User not found' });
+          return;
+        }
+        request.log.info({ userId: user.id }, 'User found');
+        return user;
+      } catch (err) {
+        request.log.error(err, 'Error fetching user');
+        reply.code(500).send({ error: 'Internal Server Error' });
+      }
+    });
+    ```
+    Using `console.log` doesn't provide structured logging or log levels. Use Fastify's built-in logger for structured, configurable logging.
+  </Accordion>
+  
+  <Accordion title="Not Using Environment Configuration" icon="warning">
+    ```javascript
+    // Anti-pattern: Hardcoded configuration
+    const fastify = require('fastify')();
+    
+    fastify.register(require('fastify-jwt'), {
+      secret: 'supersecretkey'
+    });
+    
+    fastify.listen(3000, '0.0.0.0', (err) => {
+      if (err) throw err;
+      console.log('Server listening on port 3000');
+    });
+    
+    // Better approach: Use environment variables
+    const fastify = require('fastify')({
+      logger: process.env.NODE_ENV === 'development'
+    });
+    
+    // Load environment variables
+    require('dotenv').config();
+    
+    fastify.register(require('fastify-jwt'), {
+      secret: process.env.JWT_SECRET
+    });
+    
+    const start = async () => {
+      try {
+        await fastify.listen({
+          port: process.env.PORT || 3000,
+          host: process.env.HOST || '0.0.0.0'
+        });
+      } catch (err) {
+        fastify.log.error(err);
+        process.exit(1);
+      }
+    };
+    
+    start();
+    ```
+    Hardcoded configuration makes deployment difficult and poses security risks. Use environment variables for configuration and provide sensible defaults.
+  </Accordion>
+  
+  <Accordion title="Not Using TypeScript" icon="warning">
+    ```javascript
+    // Anti-pattern: Using plain JavaScript without type checking
+    const fastify = require('fastify')();
+    
+    fastify.get('/users/:id', async (request, reply) => {
+      const user = await db.users.findById(request.params.id);
+      return user;
+    });
+    
+    // Better approach: Use TypeScript
+    // user.ts
+    interface User {
+      id: string;
+      name: string;
+      email: string;
+      age: number;
+    }
+    
+    // server.ts
+    import fastify, { FastifyRequest, FastifyReply } from 'fastify';
+    import { User } from './types';
+    
+    const server = fastify();
+    
+    interface GetUserParams {
+      id: string;
+    }
+    
+    server.get<{
+      Params: GetUserParams;
+      Reply: User | { error: string };
+    }>('/users/:id', async (request, reply) => {
+      const user = await db.users.findById(request.params.id);
+      if (!user) {
+        return reply.code(404).send({ error: 'User not found' });
+      }
+      return user;
+    });
+    ```
+    Not using TypeScript can lead to runtime errors and makes refactoring more difficult. Use TypeScript to catch errors at compile time and improve code maintainability.
+  </Accordion>
+</AccordionGroup>

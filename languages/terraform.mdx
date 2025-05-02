@@ -1,0 +1,425 @@
+---
+title: 'Terraform'
+description: 'Terraform is an open-source infrastructure as code software tool created by HashiCorp. It enables users to define and provision data center infrastructure using a declarative configuration language.'
+---
+
+<AccordionGroup>
+  <Accordion title="Terraform Anti-Patterns Overview" icon="terraform">
+    Terraform, despite its powerful infrastructure as code capabilities, has several common anti-patterns that can lead to maintainability issues, security risks, and operational problems. Here are the most important anti-patterns to avoid when writing Terraform code.
+  </Accordion>
+  
+  <Accordion title="Hardcoding Sensitive Values" icon="warning">
+    ```hcl
+    // Anti-pattern: Hardcoding sensitive values
+    resource "aws_db_instance" "database" {
+      allocated_storage    = 10
+      engine               = "mysql"
+      engine_version       = "5.7"
+      instance_class       = "db.t3.micro"
+      name                 = "mydb"
+      username             = "admin"
+      password             = "supersecretpassword" // Hardcoded password
+    }
+    
+    // Better approach: Use variables and sensitive data management
+    variable "db_password" {
+      description = "Password for database"
+      type        = string
+      sensitive   = true
+    }
+    
+    resource "aws_db_instance" "database" {
+      allocated_storage    = 10
+      engine               = "mysql"
+      engine_version       = "5.7"
+      instance_class       = "db.t3.micro"
+      name                 = "mydb"
+      username             = "admin"
+      password             = var.db_password
+    }
+    ```
+    Hardcoding sensitive values like passwords, API keys, and tokens in your Terraform code is a security risk. Use variables marked as sensitive, environment variables, or secret management solutions like HashiCorp Vault.
+  </Accordion>
+  
+  <Accordion title="Not Using Modules" icon="warning">
+    ```hcl
+    // Anti-pattern: Repeating similar resource configurations
+    resource "aws_vpc" "main" {
+      cidr_block = "10.0.0.0/16"
+      tags = {
+        Name = "main-vpc"
+      }
+    }
+    
+    resource "aws_subnet" "subnet1" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = "10.0.1.0/24"
+      tags = {
+        Name = "subnet1"
+      }
+    }
+    
+    resource "aws_subnet" "subnet2" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = "10.0.2.0/24"
+      tags = {
+        Name = "subnet2"
+      }
+    }
+    
+    // Better approach: Use modules
+    module "vpc" {
+      source = "terraform-aws-modules/vpc/aws"
+      version = "3.14.0"
+      
+      name = "main-vpc"
+      cidr = "10.0.0.0/16"
+      
+      azs             = ["us-west-2a", "us-west-2b"]
+      private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+      public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+      
+      tags = {
+        Environment = "dev"
+      }
+    }
+    ```
+    Not using modules leads to code duplication and maintenance challenges. Use modules to encapsulate and reuse infrastructure patterns.
+  </Accordion>
+  
+  <Accordion title="Not Using Remote State" icon="warning">
+    ```hcl
+    // Anti-pattern: Using local state
+    terraform {
+      # No backend configuration, defaults to local state
+    }
+    
+    // Better approach: Use remote state
+    terraform {
+      backend "s3" {
+        bucket         = "terraform-state-bucket"
+        key            = "prod/terraform.tfstate"
+        region         = "us-west-2"
+        encrypt        = true
+        dynamodb_table = "terraform-locks"
+      }
+    }
+    ```
+    Storing state locally prevents collaboration and can lead to state file loss. Use remote state backends like AWS S3, Azure Storage, or Terraform Cloud for team environments.
+  </Accordion>
+  
+  <Accordion title="Not Using State Locking" icon="warning">
+    ```hcl
+    // Anti-pattern: Remote state without locking
+    terraform {
+      backend "s3" {
+        bucket = "terraform-state-bucket"
+        key    = "prod/terraform.tfstate"
+        region = "us-west-2"
+        # No locking mechanism specified
+      }
+    }
+    
+    // Better approach: Enable state locking
+    terraform {
+      backend "s3" {
+        bucket         = "terraform-state-bucket"
+        key            = "prod/terraform.tfstate"
+        region         = "us-west-2"
+        encrypt        = true
+        dynamodb_table = "terraform-locks" # DynamoDB table for locking
+      }
+    }
+    ```
+    Without state locking, multiple users can modify infrastructure simultaneously, leading to conflicts and corruption. Use state locking mechanisms like DynamoDB for AWS or Azure Blob Storage leases.
+  </Accordion>
+  
+  <Accordion title="Not Using Workspaces for Environment Separation" icon="warning">
+    ```hcl
+    // Anti-pattern: Separate directories for environments
+    // dev/main.tf
+    resource "aws_instance" "web" {
+      ami           = "ami-0c55b159cbfafe1f0"
+      instance_type = "t2.micro"
+      tags = {
+        Environment = "dev"
+      }
+    }
+    
+    // prod/main.tf (duplicated code)
+    resource "aws_instance" "web" {
+      ami           = "ami-0c55b159cbfafe1f0"
+      instance_type = "t2.medium"
+      tags = {
+        Environment = "prod"
+      }
+    }
+    
+    // Better approach: Use workspaces with conditional logic
+    variable "instance_type" {
+      type = map(string)
+      default = {
+        default = "t2.micro"
+        prod    = "t2.medium"
+      }
+    }
+    
+    resource "aws_instance" "web" {
+      ami           = "ami-0c55b159cbfafe1f0"
+      instance_type = lookup(var.instance_type, terraform.workspace, var.instance_type["default"])
+      tags = {
+        Environment = terraform.workspace
+      }
+    }
+    ```
+    Using separate directories for environments leads to code duplication. Use Terraform workspaces or separate state files with shared modules for environment separation.
+  </Accordion>
+  
+  <Accordion title="Not Using Data Sources for External Resources" icon="warning">
+    ```hcl
+    // Anti-pattern: Hardcoding external resource IDs
+    resource "aws_security_group_rule" "allow_http" {
+      type              = "ingress"
+      from_port         = 80
+      to_port           = 80
+      protocol          = "tcp"
+      cidr_blocks       = ["0.0.0.0/0"]
+      security_group_id = "sg-12345678" // Hardcoded ID
+    }
+    
+    // Better approach: Use data sources
+    data "aws_security_group" "selected" {
+      filter {
+        name   = "tag:Name"
+        values = ["my-security-group"]
+      }
+    }
+    
+    resource "aws_security_group_rule" "allow_http" {
+      type              = "ingress"
+      from_port         = 80
+      to_port           = 80
+      protocol          = "tcp"
+      cidr_blocks       = ["0.0.0.0/0"]
+      security_group_id = data.aws_security_group.selected.id
+    }
+    ```
+    Hardcoding IDs of resources not managed by Terraform leads to brittle code. Use data sources to reference external resources dynamically.
+  </Accordion>
+  
+  <Accordion title="Not Using Count or For_each for Resource Collections" icon="warning">
+    ```hcl
+    // Anti-pattern: Duplicating similar resources
+    resource "aws_iam_user" "user1" {
+      name = "user1"
+    }
+    
+    resource "aws_iam_user" "user2" {
+      name = "user2"
+    }
+    
+    resource "aws_iam_user" "user3" {
+      name = "user3"
+    }
+    
+    // Better approach: Use count
+    variable "user_names" {
+      type    = list(string)
+      default = ["user1", "user2", "user3"]
+    }
+    
+    resource "aws_iam_user" "users" {
+      count = length(var.user_names)
+      name  = var.user_names[count.index]
+    }
+    
+    // Or even better: Use for_each
+    variable "users" {
+      type = map(object({
+        department = string
+        role       = string
+      }))
+      default = {
+        user1 = { department = "IT", role = "admin" },
+        user2 = { department = "HR", role = "viewer" },
+        user3 = { department = "Finance", role = "viewer" }
+      }
+    }
+    
+    resource "aws_iam_user" "users" {
+      for_each = var.users
+      name     = each.key
+      
+      tags = {
+        Department = each.value.department
+        Role       = each.value.role
+      }
+    }
+    ```
+    Duplicating resource blocks for similar resources leads to maintenance issues. Use `count` or `for_each` to create multiple instances of a resource dynamically.
+  </Accordion>
+  
+  <Accordion title="Not Using Version Constraints" icon="warning">
+    ```hcl
+    // Anti-pattern: No version constraints
+    terraform {
+      required_providers {
+        aws = {
+          source = "hashicorp/aws"
+          # No version constraint
+        }
+      }
+    }
+    
+    // Better approach: Use version constraints
+    terraform {
+      required_providers {
+        aws = {
+          source  = "hashicorp/aws"
+          version = "~> 4.0"
+        }
+      }
+    }
+    ```
+    Not specifying version constraints can lead to unexpected behavior when provider versions change. Always specify version constraints for Terraform and providers.
+  </Accordion>
+  
+  <Accordion title="Not Using Resource Targeting Carefully" icon="warning">
+    ```hcl
+    // Anti-pattern: Carelessly using targeted applies
+    # Running: terraform apply -target=aws_instance.web
+    
+    // Better approach: Use comprehensive applies or modules
+    # Organize resources into logical modules
+    module "web_server" {
+      source = "./modules/web_server"
+      # parameters
+    }
+    
+    module "database" {
+      source = "./modules/database"
+      # parameters
+    }
+    ```
+    Frequently using targeted applies can lead to state inconsistencies. Use targeted applies sparingly and prefer organizing resources into logical modules.
+  </Accordion>
+  
+  <Accordion title="Not Using Output Values" icon="warning">
+    ```hcl
+    // Anti-pattern: Not exposing important resource attributes
+    resource "aws_instance" "web" {
+      ami           = "ami-0c55b159cbfafe1f0"
+      instance_type = "t2.micro"
+    }
+    
+    // Better approach: Use output values
+    resource "aws_instance" "web" {
+      ami           = "ami-0c55b159cbfafe1f0"
+      instance_type = "t2.micro"
+    }
+    
+    output "web_instance_ip" {
+      value       = aws_instance.web.public_ip
+      description = "The public IP address of the web server"
+    }
+    
+    output "web_instance_dns" {
+      value       = aws_instance.web.public_dns
+      description = "The public DNS address of the web server"
+    }
+    ```
+    Not using output values makes it difficult to retrieve important resource attributes. Use outputs to expose important information for use in other configurations or for users.
+  </Accordion>
+  
+  <Accordion title="Not Using Terraform Fmt" icon="warning">
+    ```hcl
+    // Anti-pattern: Inconsistent formatting
+    resource "aws_instance" "web" {ami="ami-0c55b159cbfafe1f0"
+    instance_type="t2.micro"
+      tags={
+        Name="web-server"
+      Environment="prod"}
+    }
+    
+    // Better approach: Use terraform fmt
+    resource "aws_instance" "web" {
+      ami           = "ami-0c55b159cbfafe1f0"
+      instance_type = "t2.micro"
+      tags = {
+        Name        = "web-server"
+        Environment = "prod"
+      }
+    }
+    ```
+    Inconsistent formatting makes code harder to read and review. Use `terraform fmt` to automatically format your code according to the standard style.
+  </Accordion>
+  
+  <Accordion title="Not Using Terraform Validate" icon="warning">
+    ```hcl
+    // Anti-pattern: Not validating before applying
+    # Directly running: terraform apply
+    
+    // Better approach: Validate first
+    # Running: terraform validate
+    # Then: terraform plan
+    # Finally: terraform apply
+    ```
+    Skipping validation can lead to errors during apply. Use `terraform validate` to check for syntax errors and other issues before running `terraform plan` or `terraform apply`.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Resource Naming" icon="warning">
+    ```hcl
+    // Anti-pattern: Vague resource names
+    resource "aws_instance" "instance" {
+      ami           = "ami-0c55b159cbfafe1f0"
+      instance_type = "t2.micro"
+    }
+    
+    resource "aws_security_group" "sg" {
+      name = "security-group"
+    }
+    
+    // Better approach: Descriptive resource names
+    resource "aws_instance" "web_server" {
+      ami           = "ami-0c55b159cbfafe1f0"
+      instance_type = "t2.micro"
+    }
+    
+    resource "aws_security_group" "web_server_sg" {
+      name = "web-server-security-group"
+    }
+    ```
+    Vague resource names make it difficult to understand the purpose of resources. Use descriptive names that indicate the resource's purpose.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```hcl
+    // Anti-pattern: No error handling for data sources
+    data "aws_ami" "latest_amazon_linux" {
+      most_recent = true
+      owners      = ["amazon"]
+      filter {
+        name   = "name"
+        values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+      }
+    }
+    
+    // Better approach: Use count to handle potential errors
+    data "aws_ami" "latest_amazon_linux" {
+      most_recent = true
+      owners      = ["amazon"]
+      filter {
+        name   = "name"
+        values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+      }
+    }
+    
+    resource "aws_instance" "web" {
+      count         = length(data.aws_ami.latest_amazon_linux) > 0 ? 1 : 0
+      ami           = data.aws_ami.latest_amazon_linux.id
+      instance_type = "t2.micro"
+    }
+    ```
+    Not handling potential errors can lead to failed applies. Use conditional logic with `count` or `for_each` to handle potential errors.
+  </Accordion>
+</AccordionGroup>
