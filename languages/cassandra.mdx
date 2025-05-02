@@ -1,0 +1,507 @@
+---
+title: 'Cassandra'
+description: 'Apache Cassandra is a highly-scalable, distributed NoSQL database designed to handle large amounts of data across many commodity servers, providing high availability with no single point of failure.'
+---
+
+<AccordionGroup>
+  <Accordion title="Cassandra Anti-Patterns Overview" icon="database">
+    Cassandra is a powerful distributed database, but using it effectively requires understanding its data model and avoiding common anti-patterns. Here are the most important anti-patterns to avoid when working with Cassandra.
+  </Accordion>
+  
+  <Accordion title="Using a Relational Data Model" icon="warning">
+    ```sql
+    -- Anti-pattern: Designing tables like a relational database
+    CREATE TABLE users (
+      user_id UUID PRIMARY KEY,
+      username TEXT,
+      email TEXT,
+      created_at TIMESTAMP
+    );
+    
+    CREATE TABLE posts (
+      post_id UUID PRIMARY KEY,
+      user_id UUID,  -- Foreign key reference
+      title TEXT,
+      content TEXT,
+      created_at TIMESTAMP
+    );
+    
+    -- To get all posts by a user, we need a secondary index or a full table scan
+    CREATE INDEX ON posts (user_id);
+    
+    -- Better approach: Design for query patterns with denormalization
+    CREATE TABLE users (
+      user_id UUID PRIMARY KEY,
+      username TEXT,
+      email TEXT,
+      created_at TIMESTAMP
+    );
+    
+    CREATE TABLE posts_by_user (
+      user_id UUID,
+      post_id TIMEUUID,
+      title TEXT,
+      content TEXT,
+      created_at TIMESTAMP,
+      PRIMARY KEY (user_id, post_id)
+    ) WITH CLUSTERING ORDER BY (post_id DESC);
+    
+    CREATE TABLE posts_by_id (
+      post_id UUID PRIMARY KEY,
+      user_id UUID,
+      title TEXT,
+      content TEXT,
+      created_at TIMESTAMP
+    );
+    ```
+    ```java
+    // Querying posts by user is now efficient
+    PreparedStatement stmt = session.prepare(
+        "SELECT * FROM posts_by_user WHERE user_id = ? LIMIT 10");
+    ResultSet rs = session.execute(stmt.bind(userId));
+    ```
+    Cassandra is not a relational database and doesn't efficiently support joins or complex queries. Design your data model based on your query patterns, using denormalization and composite keys, rather than trying to normalize data like in a relational database.
+  </Accordion>
+  
+  <Accordion title="Using Secondary Indexes Excessively" icon="warning">
+    ```sql
+    -- Anti-pattern: Overusing secondary indexes
+    CREATE TABLE products (
+      product_id UUID PRIMARY KEY,
+      name TEXT,
+      category TEXT,
+      price DECIMAL,
+      color TEXT,
+      size TEXT,
+      brand TEXT,
+      in_stock BOOLEAN
+    );
+    
+    -- Creating multiple secondary indexes
+    CREATE INDEX ON products (category);
+    CREATE INDEX ON products (color);
+    CREATE INDEX ON products (brand);
+    CREATE INDEX ON products (in_stock);
+    
+    -- Better approach: Create specific tables for common query patterns
+    CREATE TABLE products (
+      product_id UUID PRIMARY KEY,
+      name TEXT,
+      category TEXT,
+      price DECIMAL,
+      color TEXT,
+      size TEXT,
+      brand TEXT,
+      in_stock BOOLEAN
+    );
+    
+    CREATE TABLE products_by_category (
+      category TEXT,
+      product_id UUID,
+      name TEXT,
+      price DECIMAL,
+      color TEXT,
+      size TEXT,
+      brand TEXT,
+      in_stock BOOLEAN,
+      PRIMARY KEY (category, product_id)
+    );
+    
+    CREATE TABLE products_by_brand (
+      brand TEXT,
+      product_id UUID,
+      name TEXT,
+      category TEXT,
+      price DECIMAL,
+      color TEXT,
+      size TEXT,
+      in_stock BOOLEAN,
+      PRIMARY KEY (brand, product_id)
+    );
+    ```
+    ```java
+    // Querying by category is now efficient
+    PreparedStatement stmt = session.prepare(
+        "SELECT * FROM products_by_category WHERE category = ?");
+    ResultSet rs = session.execute(stmt.bind(category));
+    ```
+    Secondary indexes in Cassandra don't perform well for high-cardinality columns or for tables with many rows. Instead of relying on secondary indexes, create specific tables for your query patterns using appropriate partition keys.
+  </Accordion>
+  
+  <Accordion title="Using ALLOW FILTERING" icon="warning">
+    ```sql
+    -- Anti-pattern: Using ALLOW FILTERING
+    SELECT * FROM users 
+    WHERE state = 'CA' AND city = 'San Francisco' 
+    ALLOW FILTERING;
+    
+    -- Better approach: Design tables for specific queries
+    CREATE TABLE users_by_location (
+      state TEXT,
+      city TEXT,
+      user_id UUID,
+      username TEXT,
+      email TEXT,
+      PRIMARY KEY ((state, city), user_id)
+    );
+    
+    -- Now we can query efficiently without ALLOW FILTERING
+    SELECT * FROM users_by_location 
+    WHERE state = 'CA' AND city = 'San Francisco';
+    ```
+    ```java
+    // Efficient query without ALLOW FILTERING
+    PreparedStatement stmt = session.prepare(
+        "SELECT * FROM users_by_location WHERE state = ? AND city = ?");
+    ResultSet rs = session.execute(stmt.bind("CA", "San Francisco"));
+    ```
+    `ALLOW FILTERING` forces Cassandra to scan all data and filter results in memory, which is extremely inefficient for large datasets. Instead, design your data model to support your query patterns without requiring filtering.
+  </Accordion>
+  
+  <Accordion title="Using Wide Rows Without Pagination" icon="warning">
+    ```java
+    // Anti-pattern: Retrieving all data from a wide row
+    Statement stmt = QueryBuilder.select()
+        .all()
+        .from("messages_by_user")
+        .where(QueryBuilder.eq("user_id", userId));
+    
+    ResultSet rs = session.execute(stmt);
+    List<Row> allMessages = rs.all(); // Dangerous for wide rows!
+    
+    // Better approach: Use pagination
+    Statement stmt = QueryBuilder.select()
+        .all()
+        .from("messages_by_user")
+        .where(QueryBuilder.eq("user_id", userId))
+        .setFetchSize(100); // Set page size
+    
+    ResultSet rs = session.execute(stmt);
+    
+    // Process one page at a time
+    for (Row row : rs) {
+        // Process row
+        // The driver will fetch more pages as needed
+    }
+    
+    // For manual pagination with a web API
+    PagingState pagingState = rs.getExecutionInfo().getPagingState();
+    String pagingStateStr = pagingState != null ? 
+        Base64.getEncoder().encodeToString(pagingState.toBytes()) : null;
+    
+    // Return pagingStateStr to client for next page request
+    ```
+    Wide rows in Cassandra can contain millions of columns or clustering keys. Retrieving all data from a wide row can cause memory issues and timeout errors. Always use pagination when querying potentially large datasets.
+  </Accordion>
+  
+  <Accordion title="Using Lightweight Transactions Excessively" icon="warning">
+    ```java
+    // Anti-pattern: Overusing lightweight transactions (LWTs)
+    for (User user : users) {
+        PreparedStatement stmt = session.prepare(
+            "UPDATE users SET last_login = ? WHERE user_id = ? IF last_login < ?");
+        ResultSet rs = session.execute(
+            stmt.bind(currentTime, user.getId(), currentTime));
+    }
+    
+    // Better approach: Use LWTs sparingly and batch when possible
+    // For non-critical updates, avoid LWTs entirely
+    PreparedStatement simpleUpdate = session.prepare(
+        "UPDATE users SET last_login = ? WHERE user_id = ?");
+    
+    BatchStatement batch = new BatchStatement();
+    for (User user : users) {
+        batch.add(simpleUpdate.bind(currentTime, user.getId()));
+    }
+    session.execute(batch);
+    
+    // Only use LWTs when absolutely necessary
+    PreparedStatement lwt = session.prepare(
+        "INSERT INTO user_sessions (user_id, session_id, created_at) 
+         VALUES (?, ?, ?) IF NOT EXISTS");
+    ResultSet rs = session.execute(
+        lwt.bind(userId, sessionId, currentTime));
+    ```
+    Lightweight transactions (using `IF` conditions) in Cassandra are much slower than regular operations because they require a Paxos consensus protocol. Use them only when absolutely necessary for operations that truly require conditional updates.
+  </Accordion>
+  
+  <Accordion title="Using Timeuuid Incorrectly" icon="warning">
+    ```java
+    // Anti-pattern: Using random UUIDs for time-based data
+    UUID randomUuid = UUID.randomUUID();
+    PreparedStatement stmt = session.prepare(
+        "INSERT INTO events (event_id, user_id, event_type, created_at) 
+         VALUES (?, ?, ?, ?)");
+    session.execute(stmt.bind(randomUuid, userId, eventType, currentTime));
+    
+    // Better approach: Use TIMEUUID for time-based ordering
+    UUID timeUuid = UUIDs.timeBased(); // Creates a time-based UUID
+    PreparedStatement stmt = session.prepare(
+        "INSERT INTO events_by_user (user_id, event_id, event_type) 
+         VALUES (?, ?, ?)");
+    session.execute(stmt.bind(userId, timeUuid, eventType));
+    
+    // Querying with time range using TIMEUUID functions
+    UUID startTime = UUIDs.startOf(startTimestamp);
+    UUID endTime = UUIDs.endOf(endTimestamp);
+    
+    PreparedStatement rangeQuery = session.prepare(
+        "SELECT * FROM events_by_user 
+         WHERE user_id = ? AND event_id >= ? AND event_id <= ?");
+    ResultSet rs = session.execute(
+        rangeQuery.bind(userId, startTime, endTime));
+    ```
+    When dealing with time-series data in Cassandra, use `TIMEUUID` type for clustering columns to get automatic time-based ordering. This allows for efficient range queries based on time periods.
+  </Accordion>
+  
+  <Accordion title="Not Using Prepared Statements" icon="warning">
+    ```java
+    // Anti-pattern: Using string concatenation for queries
+    String query = "SELECT * FROM users WHERE user_id = '" + userId + "'";
+    ResultSet rs = session.execute(query);
+    
+    // Better approach: Use prepared statements
+    PreparedStatement stmt = session.prepare(
+        "SELECT * FROM users WHERE user_id = ?");
+    ResultSet rs = session.execute(stmt.bind(userId));
+    ```
+    Not using prepared statements leads to suboptimal performance and potential security issues. Prepared statements are parsed and cached by Cassandra, improving query execution time and protecting against CQL injection.
+  </Accordion>
+  
+  <Accordion title="Using Collection Columns for Large Data Sets" icon="warning">
+    ```sql
+    -- Anti-pattern: Using collections for large datasets
+    CREATE TABLE users (
+      user_id UUID PRIMARY KEY,
+      username TEXT,
+      email TEXT,
+      followers SET<UUID>,  -- Could grow very large
+      liked_posts LIST<UUID>  -- Could grow very large
+    );
+    
+    -- Better approach: Use separate tables for one-to-many relationships
+    CREATE TABLE user_followers (
+      user_id UUID,
+      follower_id UUID,
+      followed_at TIMESTAMP,
+      PRIMARY KEY (user_id, follower_id)
+    );
+    
+    CREATE TABLE user_liked_posts (
+      user_id UUID,
+      post_id UUID,
+      liked_at TIMESTAMP,
+      PRIMARY KEY (user_id, post_id)
+    );
+    ```
+    ```java
+    // Adding a follower relationship
+    PreparedStatement stmt = session.prepare(
+        "INSERT INTO user_followers (user_id, follower_id, followed_at) 
+         VALUES (?, ?, ?)");
+    session.execute(stmt.bind(userId, followerId, currentTime));
+    ```
+    Collections in Cassandra (sets, lists, maps) are stored in a single cell and have a size limit (typically 64KB). Using collections for potentially large datasets can lead to errors and performance issues. Instead, model one-to-many relationships using separate tables with appropriate primary keys.
+  </Accordion>
+  
+  <Accordion title="Not Using Batches Correctly" icon="warning">
+    ```java
+    // Anti-pattern: Using unlogged batches for performance
+    BatchStatement batch = new BatchStatement(BatchStatement.Type.UNLOGGED);
+    for (int i = 0; i < 1000; i++) { // Too many statements in one batch
+        PreparedStatement stmt = session.prepare(
+            "INSERT INTO events (event_id, data) VALUES (?, ?)");
+        batch.add(stmt.bind(UUIDs.timeBased(), "Data " + i));
+    }
+    session.execute(batch);
+    
+    // Better approach: Use batches only for related data and keep them small
+    // For atomic operations across multiple tables
+    BatchStatement atomicBatch = new BatchStatement(BatchStatement.Type.LOGGED);
+    
+    PreparedStatement insertUser = session.prepare(
+        "INSERT INTO users (user_id, username, email) VALUES (?, ?, ?)");
+    PreparedStatement insertUserByEmail = session.prepare(
+        "INSERT INTO users_by_email (email, user_id, username) VALUES (?, ?, ?)");
+    
+    UUID userId = UUIDs.random();
+    atomicBatch.add(insertUser.bind(userId, "johndoe", "john@example.com"));
+    atomicBatch.add(insertUserByEmail.bind("john@example.com", userId, "johndoe"));
+    
+    session.execute(atomicBatch);
+    
+    // For performance, process statements in smaller batches or individually
+    List<Statement> statements = new ArrayList<>();
+    for (int i = 0; i < 1000; i++) {
+        PreparedStatement stmt = session.prepare(
+            "INSERT INTO events (event_id, data) VALUES (?, ?)");
+        statements.add(stmt.bind(UUIDs.timeBased(), "Data " + i));
+    }
+    
+    // Execute in smaller batches
+    for (int i = 0; i < statements.size(); i += 20) {
+        BatchStatement batch = new BatchStatement(BatchStatement.Type.UNLOGGED);
+        for (int j = i; j < Math.min(i + 20, statements.size()); j++) {
+            batch.add(statements.get(j));
+        }
+        session.execute(batch);
+    }
+    ```
+    Batches in Cassandra are not primarily for performance but for ensuring atomicity across multiple operations. Logged batches should only be used for small, related operations that need to be atomic. Unlogged batches should be small and contain operations for the same partition to avoid performance issues.
+  </Accordion>
+  
+  <Accordion title="Not Considering Tombstones" icon="warning">
+    ```java
+    // Anti-pattern: Frequent deletes without considering tombstones
+    // Deleting individual messages frequently
+    PreparedStatement deleteStmt = session.prepare(
+        "DELETE FROM messages WHERE user_id = ? AND message_id = ?");
+    
+    for (UUID messageId : messagesToDelete) {
+        session.execute(deleteStmt.bind(userId, messageId));
+    }
+    
+    // Better approach: Use TTL or design for append-only
+    // Set TTL when inserting data
+    PreparedStatement insertWithTTL = session.prepare(
+        "INSERT INTO messages (user_id, message_id, content) 
+         VALUES (?, ?, ?) USING TTL 2592000"); // 30 days in seconds
+    
+    session.execute(insertWithTTL.bind(userId, messageId, content));
+    
+    // Or use a status flag instead of deleting
+    PreparedStatement markAsDeleted = session.prepare(
+        "UPDATE messages SET is_deleted = true WHERE user_id = ? AND message_id = ?");
+    
+    for (UUID messageId : messagesToDelete) {
+        session.execute(markAsDeleted.bind(userId, messageId));
+    }
+    
+    // Query only non-deleted messages
+    PreparedStatement queryActive = session.prepare(
+        "SELECT * FROM messages 
+         WHERE user_id = ? AND is_deleted = false");
+    ```
+    Deletes in Cassandra create tombstones, which can impact read performance if they accumulate. Instead of frequent deletes, consider using TTL (Time To Live) for data that expires, or design your data model to be append-only with status flags.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Consistency Levels" icon="warning">
+    ```java
+    // Anti-pattern: Using default consistency levels for all operations
+    Statement query = QueryBuilder.select()
+        .all()
+        .from("critical_data")
+        .where(QueryBuilder.eq("id", dataId));
+    
+    ResultSet rs = session.execute(query); // Uses default consistency level
+    
+    // Better approach: Choose appropriate consistency levels based on requirements
+    // For critical reads
+    Statement criticalRead = QueryBuilder.select()
+        .all()
+        .from("critical_data")
+        .where(QueryBuilder.eq("id", dataId));
+    
+    criticalRead.setConsistencyLevel(ConsistencyLevel.QUORUM);
+    ResultSet criticalRs = session.execute(criticalRead);
+    
+    // For critical writes
+    PreparedStatement criticalWrite = session.prepare(
+        "INSERT INTO critical_data (id, value) VALUES (?, ?)");
+    
+    BoundStatement boundStmt = criticalWrite.bind(dataId, value);
+    boundStmt.setConsistencyLevel(ConsistencyLevel.QUORUM);
+    session.execute(boundStmt);
+    
+    // For less critical operations
+    Statement nonCriticalRead = QueryBuilder.select()
+        .all()
+        .from("analytics_data")
+        .where(QueryBuilder.eq("id", dataId));
+    
+    nonCriticalRead.setConsistencyLevel(ConsistencyLevel.ONE);
+    ResultSet nonCriticalRs = session.execute(nonCriticalRead);
+    ```
+    Not choosing appropriate consistency levels can lead to either unnecessary performance overhead or data inconsistency issues. Choose consistency levels based on the importance of the operation and your application's requirements for consistency versus availability.
+  </Accordion>
+  
+  <Accordion title="Not Monitoring and Tuning Cassandra" icon="warning">
+    ```java
+    // Anti-pattern: Not monitoring Cassandra metrics
+    // Just using Cassandra without monitoring
+    
+    // Better approach: Implement comprehensive monitoring
+    // Example using Dropwizard Metrics with Cassandra driver
+    Cluster cluster = Cluster.builder()
+        .addContactPoint("127.0.0.1")
+        .withMetricsEnabled(true) // Enable metrics collection
+        .build();
+    
+    // Register JMX reporter
+    MetricRegistry registry = cluster.getMetrics().getRegistry();
+    JmxReporter reporter = JmxReporter.forRegistry(registry)
+        .build();
+    reporter.start();
+    
+    // Example monitoring code (would be in a separate monitoring service)
+    public void monitorCassandraMetrics() {
+        // Monitor request latencies
+        Histogram readLatencies = registry.histogram("com.datastax.driver.core.Metrics.request-latencies.Read");
+        logger.info("Read latency 99th percentile: {} ms", readLatencies.getSnapshot().get99thPercentile());
+        
+        // Monitor errors
+        Counter errors = registry.counter("com.datastax.driver.core.Metrics.errors");
+        if (errors.getCount() > errorThreshold) {
+            alertSystem.sendAlert("High Cassandra error rate detected");
+        }
+        
+        // Check for connection issues
+        Gauge<Integer> connectedHosts = registry.gauge("com.datastax.driver.core.Metrics.connected-hosts", null);
+        if (connectedHosts.getValue() < minExpectedHosts) {
+            alertSystem.sendAlert("Cassandra connection issues detected");
+        }
+    }
+    ```
+    Not monitoring Cassandra metrics can lead to undetected performance issues and outages. Implement comprehensive monitoring for Cassandra, including latency, throughput, errors, and system metrics, and set up alerts for potential issues.
+  </Accordion>
+  
+  <Accordion title="Not Planning for Data Growth" icon="warning">
+    ```sql
+    -- Anti-pattern: Using a single table for all time-series data
+    CREATE TABLE sensor_data (
+      sensor_id UUID,
+      timestamp TIMESTAMP,
+      value DOUBLE,
+      PRIMARY KEY (sensor_id, timestamp)
+    );
+    
+    -- Better approach: Use time-based partitioning
+    CREATE TABLE sensor_data_by_day (
+      sensor_id UUID,
+      date DATE,
+      timestamp TIMESTAMP,
+      value DOUBLE,
+      PRIMARY KEY ((sensor_id, date), timestamp)
+    );
+    ```
+    ```java
+    // Inserting data with time-based partitioning
+    LocalDate date = LocalDate.now();
+    PreparedStatement stmt = session.prepare(
+        "INSERT INTO sensor_data_by_day (sensor_id, date, timestamp, value) 
+         VALUES (?, ?, ?, ?)");
+    
+    session.execute(stmt.bind(sensorId, date, currentTimestamp, value));
+    
+    // Querying data for a specific day
+    PreparedStatement queryStmt = session.prepare(
+        "SELECT * FROM sensor_data_by_day 
+         WHERE sensor_id = ? AND date = ? 
+         AND timestamp >= ? AND timestamp <= ?");
+    
+    ResultSet rs = session.execute(queryStmt.bind(
+        sensorId, date, startTimestamp, endTimestamp));
+    ```
+    Not planning for data growth can lead to oversized partitions and performance degradation. Use time-based or other logical partitioning strategies to ensure that partitions remain manageable as your data grows.
+  </Accordion>
+</AccordionGroup>

@@ -150,7 +150,14 @@
                   "languages/solidity",
                   "languages/verilog",
                   "languages/vhdl",
-                  "languages/zig"
+                  "languages/zig",
+                  "languages/mongodb",
+                  "languages/clickhouse",
+                  "languages/mysql",
+                  "languages/graphql",
+                  "languages/redis",
+                  "languages/cassandra",
+                  "languages/elasticsearch"
                 ]
               },
               {

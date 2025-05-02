@@ -1,0 +1,462 @@
+---
+title: 'Redis'
+description: 'Redis is an open-source, in-memory data structure store used as a database, cache, message broker, and streaming engine. It supports various data structures such as strings, hashes, lists, sets, and more.'
+---
+
+<AccordionGroup>
+  <Accordion title="Redis Anti-Patterns Overview" icon="database">
+    Redis, despite its performance and versatility, has several common anti-patterns that can lead to memory issues, performance degradation, and operational problems. Here are the most important anti-patterns to avoid when working with Redis.
+  </Accordion>
+  
+  <Accordion title="Using Redis as a Primary Database" icon="warning">
+    ```javascript
+    // Anti-pattern: Using Redis as the only database for all data
+    // Storing all user data in Redis
+    redis.hset('user:1000', 'username', 'john_doe');
+    redis.hset('user:1000', 'email', 'john@example.com');
+    redis.hset('user:1000', 'profile', JSON.stringify(largeProfileObject));
+    redis.hset('user:1000', 'preferences', JSON.stringify(userPreferences));
+    redis.hset('user:1000', 'activity_history', JSON.stringify(extensiveActivityHistory));
+    
+    // Better approach: Use Redis as a cache with a primary database
+    // Store core data in a primary database (e.g., PostgreSQL)
+    const user = await db.query('SELECT * FROM users WHERE id = $1', [1000]);
+    
+    // Cache frequently accessed data in Redis
+    redis.hset('user:1000', 'username', user.username);
+    redis.hset('user:1000', 'email', user.email);
+    redis.expire('user:1000', 3600); // Set expiration time (1 hour)
+    
+    // For large objects, consider separate cache keys with their own TTLs
+    redis.set('user:1000:profile', JSON.stringify(user.profile));
+    redis.expire('user:1000:profile', 7200); // 2 hours
+    ```
+    Using Redis as your only database can lead to data loss, as Redis is primarily an in-memory store. Use Redis as a cache or for specific use cases (like session storage, rate limiting) alongside a persistent primary database.
+  </Accordion>
+  
+  <Accordion title="Not Setting Key Expiration" icon="warning">
+    ```javascript
+    // Anti-pattern: Not setting expiration on keys
+    redis.set('session:user:1000', sessionData);
+    redis.set('cache:product:5', productData);
+    redis.set('temp:import:progress', '75%');
+    
+    // Better approach: Set appropriate TTLs for different types of data
+    // Session data (expire after 24 hours)
+    redis.set('session:user:1000', sessionData);
+    redis.expire('session:user:1000', 86400);
+    
+    // Or in a single command
+    redis.set('session:user:1000', sessionData, 'EX', 86400);
+    
+    // Cache data (expire after 1 hour)
+    redis.set('cache:product:5', productData, 'EX', 3600);
+    
+    // Temporary processing data (expire after 10 minutes)
+    redis.set('temp:import:progress', '75%', 'EX', 600);
+    ```
+    Not setting expiration times on keys can lead to memory exhaustion as Redis accumulates stale data. Set appropriate TTLs (Time To Live) for different types of data based on how long they should be kept.
+  </Accordion>
+  
+  <Accordion title="Using Keys Command in Production" icon="warning">
+    ```javascript
+    // Anti-pattern: Using KEYS command in production
+    redis.keys('user:*', (err, keys) => {
+      keys.forEach(key => {
+        redis.get(key, (err, value) => {
+          // Process each user
+        });
+      });
+    });
+    
+    // Better approach: Use SCAN for iterating over keys
+    async function processAllUsers() {
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await redis.scan(
+          cursor, 
+          'MATCH', 
+          'user:*',
+          'COUNT',
+          100
+        );
+        cursor = nextCursor;
+        
+        // Process batch of keys
+        for (const key of keys) {
+          const value = await redis.get(key);
+          // Process each user
+        }
+      } while (cursor !== '0');
+    }
+    ```
+    The `KEYS` command blocks the Redis server until it completes, which can cause performance issues in production. Use `SCAN` instead, which iterates through keys incrementally without blocking the server.
+  </Accordion>
+  
+  <Accordion title="Storing Large Objects" icon="warning">
+    ```javascript
+    // Anti-pattern: Storing large objects in Redis
+    const largeObject = {
+      // A very large object with many nested properties
+      // Could be several MB in size
+    };
+    
+    redis.set('large:object', JSON.stringify(largeObject));
+    
+    // Better approach: Break down large objects or use a different storage solution
+    // Option 1: Store only the necessary fields
+    redis.hset('object:1000', 'id', largeObject.id);
+    redis.hset('object:1000', 'name', largeObject.name);
+    redis.hset('object:1000', 'summary', largeObject.summary);
+    
+    // Option 2: Store a reference to the object in another database
+    redis.set('object:1000:ref', 'stored_in_s3_bucket_x');
+    
+    // Option 3: If you must store the whole object, consider compression
+    const compressed = await compressData(JSON.stringify(largeObject));
+    redis.set('large:object:compressed', compressed);
+    ```
+    Storing large objects in Redis can lead to increased memory usage and poor performance. Break down large objects into smaller pieces, store only the necessary fields, or use a different storage solution for large data.
+  </Accordion>
+  
+  <Accordion title="Not Using the Right Data Structure" icon="warning">
+    ```javascript
+    // Anti-pattern: Using the wrong data structure
+    // Storing a list of user IDs as a string
+    redis.set('team:members', '1,2,3,4,5');
+    
+    // To add a new member, we need to get, modify, and set again
+    redis.get('team:members', (err, members) => {
+      const memberArray = members.split(',');
+      memberArray.push('6');
+      redis.set('team:members', memberArray.join(','));
+    });
+    
+    // Better approach: Use the appropriate data structure
+    // Using a Set for team members
+    redis.sadd('team:members', '1', '2', '3', '4', '5');
+    
+    // Adding a new member is atomic and efficient
+    redis.sadd('team:members', '6');
+    
+    // Checking if a user is a member is also efficient
+    redis.sismember('team:members', '3', (err, isMember) => {
+      // isMember will be 1 if user 3 is a member, 0 otherwise
+    });
+    ```
+    Using the wrong data structure for your use case can lead to inefficient operations and complex application code. Choose the appropriate Redis data structure (string, list, set, sorted set, hash) based on how you need to access and manipulate the data.
+  </Accordion>
+  
+  <Accordion title="Not Using Pipelining or Transactions" icon="warning">
+    ```javascript
+    // Anti-pattern: Multiple individual commands
+    redis.set('user:1000:name', 'John');
+    redis.set('user:1000:email', 'john@example.com');
+    redis.set('user:1000:age', '30');
+    redis.sadd('users', '1000');
+    
+    // Better approach: Use pipelining
+    const pipeline = redis.pipeline();
+    pipeline.set('user:1000:name', 'John');
+    pipeline.set('user:1000:email', 'john@example.com');
+    pipeline.set('user:1000:age', '30');
+    pipeline.sadd('users', '1000');
+    pipeline.exec((err, results) => {
+      // Handle results
+    });
+    
+    // For operations that need to be atomic, use transactions
+    const multi = redis.multi();
+    multi.set('user:1000:name', 'John');
+    multi.set('user:1000:email', 'john@example.com');
+    multi.set('user:1000:age', '30');
+    multi.sadd('users', '1000');
+    multi.exec((err, results) => {
+      // Handle results
+    });
+    ```
+    Sending individual commands to Redis creates network overhead. Use pipelining to send multiple commands in a single network round trip, and transactions (MULTI/EXEC) when you need operations to be executed atomically.
+  </Accordion>
+  
+  <Accordion title="Not Implementing Proper Error Handling" icon="warning">
+    ```javascript
+    // Anti-pattern: No error handling
+    redis.set('key', 'value');
+    redis.get('key', (err, value) => {
+      // No error handling
+      processValue(value);
+    });
+    
+    // Better approach: Implement proper error handling
+    redis.set('key', 'value', (err) => {
+      if (err) {
+        console.error('Error setting key:', err);
+        // Implement retry logic or fallback mechanism
+        return;
+      }
+      console.log('Key set successfully');
+    });
+    
+    redis.get('key', (err, value) => {
+      if (err) {
+        console.error('Error getting key:', err);
+        // Implement retry logic or fallback mechanism
+        return;
+      }
+      if (value === null) {
+        console.log('Key not found');
+        // Handle missing key scenario
+        return;
+      }
+      processValue(value);
+    });
+    ```
+    Not handling Redis errors can lead to application crashes or incorrect behavior. Implement proper error handling for all Redis operations, including connection errors, command errors, and handling of null values.
+  </Accordion>
+  
+  <Accordion title="Not Monitoring Redis Memory Usage" icon="warning">
+    ```javascript
+    // Anti-pattern: Not monitoring Redis memory usage
+    // Just using Redis without monitoring
+    
+    // Better approach: Regularly monitor memory usage
+    // Set up a scheduled task to check Redis memory usage
+    async function monitorRedisMemory() {
+      const info = await redis.info('memory');
+      const usedMemory = parseInt(info.match(/used_memory:(\d+)/)[1]);
+      const usedMemoryHuman = info.match(/used_memory_human:([\w.]+)/)[1];
+      const maxMemory = parseInt(info.match(/maxmemory:(\d+)/)[1]);
+      const maxMemoryHuman = info.match(/maxmemory_human:([\w.]+)/)[1];
+      
+      const memoryUsagePercent = (usedMemory / maxMemory) * 100;
+      
+      console.log(`Redis memory usage: ${usedMemoryHuman} / ${maxMemoryHuman} (${memoryUsagePercent.toFixed(2)}%)`);
+      
+      // Alert if memory usage is above threshold
+      if (memoryUsagePercent > 80) {
+        sendAlert(`Redis memory usage is high: ${memoryUsagePercent.toFixed(2)}%`);
+      }
+    }
+    
+    // Run every 5 minutes
+    setInterval(monitorRedisMemory, 5 * 60 * 1000);
+    ```
+    Not monitoring Redis memory usage can lead to unexpected out-of-memory errors or performance degradation. Set up monitoring for Redis memory usage and implement alerts for when memory usage exceeds certain thresholds.
+  </Accordion>
+  
+  <Accordion title="Not Configuring Eviction Policies" icon="warning">
+    ```
+    # Anti-pattern: Using default configuration or no eviction policy
+    # redis.conf with default settings (noeviction)
+    # maxmemory 0
+    # maxmemory-policy noeviction
+    
+    # Better approach: Configure appropriate maxmemory and eviction policy
+    # redis.conf with configured memory limit and eviction policy
+    maxmemory 2gb
+    maxmemory-policy allkeys-lru
+    ```
+    Not configuring appropriate eviction policies can lead to Redis running out of memory and crashing. Configure `maxmemory` and an appropriate eviction policy (`allkeys-lru`, `volatile-lru`, etc.) based on your use case.
+  </Accordion>
+  
+  <Accordion title="Using Redis Pub/Sub for Critical Messages" icon="warning">
+    ```javascript
+    // Anti-pattern: Using Redis Pub/Sub for critical messages
+    // Publisher
+    redis.publish('orders', JSON.stringify(newOrder));
+    
+    // Subscriber
+    const subscriber = redis.duplicate();
+    subscriber.subscribe('orders');
+    subscriber.on('message', (channel, message) => {
+      const order = JSON.parse(message);
+      processOrder(order);
+    });
+    
+    // Better approach: Use a message queue with persistence and acknowledgment
+    // Using a dedicated message broker like RabbitMQ, Kafka, or Redis Streams
+    
+    // With Redis Streams (for Redis 5.0+)
+    // Producer
+    redis.xadd('orders', '*', 'order', JSON.stringify(newOrder));
+    
+    // Consumer group (with persistence and acknowledgment)
+    redis.xgroup('CREATE', 'orders', 'order-processors', '$', 'MKSTREAM');
+    
+    // Consumer
+    async function processOrders() {
+      while (true) {
+        try {
+          const results = await redis.xreadgroup(
+            'GROUP', 'order-processors', 'consumer-1',
+            'COUNT', 10,
+            'BLOCK', 2000,
+            'STREAMS', 'orders', '>'
+          );
+          
+          if (results) {
+            for (const [stream, messages] of results) {
+              for (const [id, [_, orderStr]] of messages) {
+                const order = JSON.parse(orderStr);
+                try {
+                  await processOrder(order);
+                  // Acknowledge successful processing
+                  await redis.xack('orders', 'order-processors', id);
+                } catch (err) {
+                  console.error(`Error processing order ${id}:`, err);
+                  // Don't acknowledge, will be redelivered to another consumer
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error reading from stream:', err);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
+    
+    processOrders();
+    ```
+    Redis Pub/Sub doesn't persist messages or provide delivery guarantees, making it unsuitable for critical messages. Use a proper message queue with persistence and acknowledgment for critical messages, such as Redis Streams, RabbitMQ, or Kafka.
+  </Accordion>
+  
+  <Accordion title="Not Using Connection Pooling" icon="warning">
+    ```javascript
+    // Anti-pattern: Creating new connections for each operation
+    function getUserData(userId) {
+      const redis = new Redis();
+      return redis.get(`user:${userId}`)
+        .then(data => {
+          redis.disconnect();
+          return data;
+        })
+        .catch(err => {
+          redis.disconnect();
+          throw err;
+        });
+    }
+    
+    // Better approach: Use connection pooling
+    // Initialize a connection pool once
+    const redisPool = new GenericPool({
+      create: () => new Redis(),
+      destroy: client => client.quit(),
+      max: 10, // Maximum number of connections in the pool
+      min: 2   // Minimum number of connections to keep in the pool
+    });
+    
+    // Use a connection from the pool for each operation
+    async function getUserData(userId) {
+      const redis = await redisPool.acquire();
+      try {
+        return await redis.get(`user:${userId}`);
+      } finally {
+        await redisPool.release(redis);
+      }
+    }
+    ```
+    Creating new Redis connections for each operation is inefficient and can lead to connection limits being reached. Use connection pooling to reuse connections across operations.
+  </Accordion>
+  
+  <Accordion title="Not Using Redis Cluster for High Availability" icon="warning">
+    ```javascript
+    // Anti-pattern: Using a single Redis instance for critical applications
+    const redis = new Redis({
+      host: 'redis-server',
+      port: 6379
+    });
+    
+    // Better approach: Use Redis Cluster or Sentinel for high availability
+    // With Redis Cluster
+    const cluster = new Redis.Cluster([
+      {
+        host: 'redis-node-1',
+        port: 6379
+      },
+      {
+        host: 'redis-node-2',
+        port: 6379
+      },
+      {
+        host: 'redis-node-3',
+        port: 6379
+      }
+    ], {
+      redisOptions: {
+        password: 'your-password'
+      },
+      // Enable read from replicas for read-heavy workloads
+      scaleReads: 'all'
+    });
+    
+    // Or with Redis Sentinel
+    const redis = new Redis({
+      sentinels: [
+        { host: 'sentinel-1', port: 26379 },
+        { host: 'sentinel-2', port: 26379 },
+        { host: 'sentinel-3', port: 26379 }
+      ],
+      name: 'mymaster', // Name of the Sentinel master set
+      password: 'your-password'
+    });
+    ```
+    Using a single Redis instance for critical applications can lead to single points of failure. Use Redis Cluster or Sentinel for high availability and automatic failover.
+  </Accordion>
+  
+  <Accordion title="Not Using Redis for Its Intended Use Cases" icon="warning">
+    ```javascript
+    // Anti-pattern: Using Redis for complex queries and relationships
+    // Trying to model complex relationships in Redis
+    redis.sadd('user:1000:friends', '1001', '1002', '1003');
+    redis.sadd('user:1001:friends', '1000', '1002');
+    
+    // To find friends of friends (complex query)
+    async function getFriendsOfFriends(userId) {
+      const friends = await redis.smembers(`user:${userId}:friends`);
+      const friendsOfFriends = new Set();
+      
+      for (const friendId of friends) {
+        const friendsFriends = await redis.smembers(`user:${friendId}:friends`);
+        for (const fof of friendsFriends) {
+          if (fof !== userId && !friends.includes(fof)) {
+            friendsOfFriends.add(fof);
+          }
+        }
+      }
+      
+      return Array.from(friendsOfFriends);
+    }
+    
+    // Better approach: Use Redis for its strengths and other databases for complex queries
+    // Store relationship data in a graph database or relational database
+    // Use Redis for caching frequently accessed data
+    
+    // Cache the result of complex queries
+    async function getFriendsOfFriends(userId) {
+      // Check if result is cached
+      const cachedResult = await redis.get(`cache:fof:${userId}`);
+      if (cachedResult) {
+        return JSON.parse(cachedResult);
+      }
+      
+      // If not cached, query the primary database
+      const result = await db.query(
+        'SELECT DISTINCT f2.friend_id FROM friends f1 ' +
+        'JOIN friends f2 ON f1.friend_id = f2.user_id ' +
+        'WHERE f1.user_id = ? AND f2.friend_id != ? AND f2.friend_id NOT IN ' +
+        '(SELECT friend_id FROM friends WHERE user_id = ?)',
+        [userId, userId, userId]
+      );
+      
+      const friendsOfFriends = result.map(row => row.friend_id);
+      
+      // Cache the result
+      await redis.set(`cache:fof:${userId}`, JSON.stringify(friendsOfFriends), 'EX', 3600);
+      
+      return friendsOfFriends;
+    }
+    ```
+    Using Redis for complex queries and relationships it wasn't designed for can lead to complex application code and poor performance. Use Redis for its intended use cases (caching, session storage, rate limiting, etc.) and use other databases for complex queries and relationships.
+  </Accordion>
+</AccordionGroup>

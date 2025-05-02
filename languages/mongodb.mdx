@@ -1,0 +1,448 @@
+---
+title: 'MongoDB'
+description: 'MongoDB is a document-oriented NoSQL database used for high volume data storage. Instead of using tables and rows as in traditional relational databases, MongoDB uses collections and documents with a JSON-like structure.'
+---
+
+<AccordionGroup>
+  <Accordion title="MongoDB Anti-Patterns Overview" icon="database">
+    MongoDB, despite its flexibility and scalability, has several common anti-patterns that can lead to performance issues, maintenance problems, and data inconsistency. Here are the most important anti-patterns to avoid when working with MongoDB.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Indexing" icon="warning">
+    ```javascript
+    // Anti-pattern: Querying without indexes
+    db.users.find({ email: "user@example.com" });
+    
+    // This query will perform a full collection scan if there's no index on the email field
+    
+    // Better approach: Create appropriate indexes
+    db.users.createIndex({ email: 1 }, { unique: true });
+    
+    // Now the query will use the index
+    db.users.find({ email: "user@example.com" });
+    ```
+    ```javascript
+    // Anti-pattern: Not analyzing query performance
+    db.orders.find({ status: "processing", createdAt: { $gt: new Date('2023-01-01') } }).sort({ createdAt: -1 });
+    
+    // Better approach: Use explain() to analyze query performance
+    db.orders.find({ status: "processing", createdAt: { $gt: new Date('2023-01-01') } }).sort({ createdAt: -1 }).explain("executionStats");
+    
+    // Create a compound index based on the query pattern
+    db.orders.createIndex({ status: 1, createdAt: -1 });
+    ```
+    Not using proper indexes leads to full collection scans and poor query performance. Create indexes based on your query patterns and use `explain()` to verify that your queries are using indexes efficiently.
+  </Accordion>
+  
+  <Accordion title="Using Deeply Nested Documents" icon="warning">
+    ```javascript
+    // Anti-pattern: Deeply nested documents
+    db.customers.insertOne({
+      name: "John Doe",
+      contact: {
+        email: "john@example.com",
+        phone: {
+          home: "123-456-7890",
+          work: "098-765-4321",
+          cell: {
+            primary: "555-123-4567",
+            secondary: "555-765-4321"
+          }
+        },
+        address: {
+          home: {
+            street: "123 Main St",
+            city: "Anytown",
+            state: "CA",
+            zip: "12345",
+            country: {
+              name: "United States",
+              code: "US"
+            }
+          },
+          work: { /* similarly nested */ }
+        }
+      },
+      // More deeply nested fields
+    });
+    
+    // Better approach: Flatten the structure
+    db.customers.insertOne({
+      name: "John Doe",
+      email: "john@example.com",
+      phoneHome: "123-456-7890",
+      phoneWork: "098-765-4321",
+      phoneCellPrimary: "555-123-4567",
+      phoneCellSecondary: "555-765-4321",
+      homeStreet: "123 Main St",
+      homeCity: "Anytown",
+      homeState: "CA",
+      homeZip: "12345",
+      homeCountry: "United States",
+      homeCountryCode: "US",
+      // Work address fields similarly flattened
+    });
+    
+    // Or use subdocuments with limited nesting
+    db.customers.insertOne({
+      name: "John Doe",
+      email: "john@example.com",
+      phones: {
+        home: "123-456-7890",
+        work: "098-765-4321",
+        cellPrimary: "555-123-4567",
+        cellSecondary: "555-765-4321"
+      },
+      homeAddress: {
+        street: "123 Main St",
+        city: "Anytown",
+        state: "CA",
+        zip: "12345",
+        country: "United States",
+        countryCode: "US"
+      },
+      workAddress: {
+        // Similar structure
+      }
+    });
+    ```
+    Deeply nested documents are difficult to query and update. Limit nesting to 2-3 levels and consider flattening your document structure for better performance and maintainability.
+  </Accordion>
+  
+  <Accordion title="Using Massive Arrays" icon="warning">
+    ```javascript
+    // Anti-pattern: Document with a massive array
+    db.products.insertOne({
+      name: "Popular Product",
+      sku: "PP-123",
+      // Thousands of reviews in a single document
+      reviews: [
+        { user: "user1", rating: 5, comment: "Great product!" },
+        { user: "user2", rating: 4, comment: "Good product." },
+        // ... thousands more reviews
+      ]
+    });
+    
+    // Better approach: Use a separate collection for reviews
+    db.products.insertOne({
+      name: "Popular Product",
+      sku: "PP-123"
+    });
+    
+    db.reviews.insertMany([
+      { productSku: "PP-123", user: "user1", rating: 5, comment: "Great product!" },
+      { productSku: "PP-123", user: "user2", rating: 4, comment: "Good product." },
+      // ... thousands more reviews as separate documents
+    ]);
+    
+    // Create an index on productSku for efficient queries
+    db.reviews.createIndex({ productSku: 1 });
+    
+    // Query for a product's reviews
+    db.reviews.find({ productSku: "PP-123" }).sort({ rating: -1 });
+    ```
+    Massive arrays in documents can lead to performance issues and hit the 16MB document size limit. Use separate collections for one-to-many relationships with high cardinality.
+  </Accordion>
+  
+  <Accordion title="Not Using Aggregation Framework" icon="warning">
+    ```javascript
+    // Anti-pattern: Multiple queries and client-side processing
+    // Step 1: Get all orders for a customer
+    const orders = db.orders.find({ customerId: "12345" }).toArray();
+    
+    // Step 2: Calculate total spent in application code
+    let totalSpent = 0;
+    for (const order of orders) {
+      totalSpent += order.total;
+    }
+    
+    // Step 3: Get customer details
+    const customer = db.customers.findOne({ _id: "12345" });
+    
+    // Step 4: Combine data in application code
+    const result = {
+      customer: customer.name,
+      email: customer.email,
+      totalOrders: orders.length,
+      totalSpent: totalSpent,
+      averageOrderValue: totalSpent / orders.length
+    };
+    
+    // Better approach: Use the aggregation framework
+    const result = db.orders.aggregate([
+      { $match: { customerId: "12345" } },
+      { $group: {
+          _id: "$customerId",
+          totalOrders: { $sum: 1 },
+          totalSpent: { $sum: "$total" },
+          averageOrderValue: { $avg: "$total" }
+        }
+      },
+      { $lookup: {
+          from: "customers",
+          localField: "_id",
+          foreignField: "_id",
+          as: "customerDetails"
+        }
+      },
+      { $unwind: "$customerDetails" },
+      { $project: {
+          _id: 0,
+          customer: "$customerDetails.name",
+          email: "$customerDetails.email",
+          totalOrders: 1,
+          totalSpent: 1,
+          averageOrderValue: 1
+        }
+      }
+    ]).toArray();
+    ```
+    Using multiple queries and processing data in application code is inefficient. Use MongoDB's aggregation framework to process data on the server side, reducing network traffic and improving performance.
+  </Accordion>
+  
+  <Accordion title="Not Using Transactions When Needed" icon="warning">
+    ```javascript
+    // Anti-pattern: No transactions for operations that should be atomic
+    // Transfer funds between accounts
+    db.accounts.updateOne(
+      { _id: sourceAccountId },
+      { $inc: { balance: -amount } }
+    );
+    
+    // If an error occurs here, the system is in an inconsistent state
+    
+    db.accounts.updateOne(
+      { _id: destinationAccountId },
+      { $inc: { balance: amount } }
+    );
+    
+    // Better approach: Use transactions for atomicity
+    const session = client.startSession();
+    session.startTransaction();
+    
+    try {
+      await db.accounts.updateOne(
+        { _id: sourceAccountId, balance: { $gte: amount } },
+        { $inc: { balance: -amount } },
+        { session }
+      );
+      
+      await db.accounts.updateOne(
+        { _id: destinationAccountId },
+        { $inc: { balance: amount } },
+        { session }
+      );
+      
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+    ```
+    Not using transactions for operations that need to be atomic can lead to data inconsistency. Use transactions when you need to ensure that multiple operations succeed or fail as a unit.
+  </Accordion>
+  
+  <Accordion title="Not Using Schema Validation" icon="warning">
+    ```javascript
+    // Anti-pattern: No schema validation
+    db.users.insertOne({
+      name: "John Doe",
+      email: "not-an-email", // Invalid email format
+      age: "thirty" // Should be a number
+    });
+    
+    // Better approach: Use schema validation
+    db.createCollection("users", {
+      validator: {
+        $jsonSchema: {
+          bsonType: "object",
+          required: ["name", "email", "age"],
+          properties: {
+            name: {
+              bsonType: "string",
+              description: "must be a string and is required"
+            },
+            email: {
+              bsonType: "string",
+              pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+              description: "must be a valid email address and is required"
+            },
+            age: {
+              bsonType: "int",
+              minimum: 0,
+              maximum: 120,
+              description: "must be an integer between 0 and 120 and is required"
+            }
+          }
+        }
+      },
+      validationLevel: "strict",
+      validationAction: "error"
+    });
+    ```
+    Not using schema validation can lead to inconsistent data. Use MongoDB's schema validation to enforce data integrity and structure.
+  </Accordion>
+  
+  <Accordion title="Using $where Queries" icon="warning">
+    ```javascript
+    // Anti-pattern: Using $where queries
+    db.orders.find({
+      $where: function() {
+        return this.total > 100 && this.items.length > 5;
+      }
+    });
+    
+    // Better approach: Use standard query operators
+    db.orders.find({
+      total: { $gt: 100 },
+      "items.5": { $exists: true }
+    });
+    ```
+    Using `$where` queries is slow and can be a security risk (potential for injection attacks). Use standard MongoDB query operators instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Connection Pooling" icon="warning">
+    ```javascript
+    // Anti-pattern: Creating new connections for each operation
+    async function getUserById(id) {
+      const client = new MongoClient(uri);
+      try {
+        await client.connect();
+        const db = client.db("mydb");
+        return await db.collection("users").findOne({ _id: id });
+      } finally {
+        await client.close();
+      }
+    }
+    
+    // Better approach: Use connection pooling
+    // Initialize once at application startup
+    const client = new MongoClient(uri, {
+      useUnifiedTopology: true,
+      maxPoolSize: 50
+    });
+    await client.connect();
+    const db = client.db("mydb");
+    
+    // Reuse the connection for operations
+    async function getUserById(id) {
+      return await db.collection("users").findOne({ _id: id });
+    }
+    
+    // Close the connection when the application shuts down
+    process.on("SIGINT", async () => {
+      await client.close();
+      process.exit();
+    });
+    ```
+    Creating new connections for each operation is inefficient. Use connection pooling to reuse connections and improve performance.
+  </Accordion>
+  
+  <Accordion title="Not Handling Write Concerns Properly" icon="warning">
+    ```javascript
+    // Anti-pattern: Using default write concern
+    db.orders.insertOne({
+      customer: "John Doe",
+      total: 99.99,
+      items: [/* ... */]
+    });
+    
+    // Better approach: Specify appropriate write concern
+    db.orders.insertOne(
+      {
+        customer: "John Doe",
+        total: 99.99,
+        items: [/* ... */]
+      },
+      { writeConcern: { w: "majority", wtimeout: 1000 } }
+    );
+    ```
+    Not specifying write concerns can lead to data loss in case of failures. Use appropriate write concerns based on your application's durability requirements.
+  </Accordion>
+  
+  <Accordion title="Not Using Projection in Queries" icon="warning">
+    ```javascript
+    // Anti-pattern: Retrieving entire documents when only a few fields are needed
+    const users = await db.users.find({ age: { $gt: 18 } }).toArray();
+    
+    // Client only uses name and email
+    const result = users.map(user => ({
+      name: user.name,
+      email: user.email
+    }));
+    
+    // Better approach: Use projection to retrieve only needed fields
+    const result = await db.users.find(
+      { age: { $gt: 18 } },
+      { projection: { name: 1, email: 1, _id: 0 } }
+    ).toArray();
+    ```
+    Retrieving entire documents when only a few fields are needed wastes bandwidth and memory. Use projection to retrieve only the fields you need.
+  </Accordion>
+  
+  <Accordion title="Not Using Change Streams for Real-time Updates" icon="warning">
+    ```javascript
+    // Anti-pattern: Polling for changes
+    async function pollForChanges() {
+      const lastCheckTime = new Date(Date.now() - 60000); // Last minute
+      
+      const changes = await db.orders.find({
+        updatedAt: { $gt: lastCheckTime }
+      }).toArray();
+      
+      // Process changes
+      
+      // Poll again after delay
+      setTimeout(pollForChanges, 5000);
+    }
+    
+    // Better approach: Use change streams
+    const changeStream = db.orders.watch();
+    
+    changeStream.on("change", change => {
+      // Process change in real-time
+      console.log("Received change:", change);
+      
+      if (change.operationType === "insert") {
+        // Handle new order
+      } else if (change.operationType === "update") {
+        // Handle order update
+      } else if (change.operationType === "delete") {
+        // Handle order deletion
+      }
+    });
+    
+    // Handle errors
+    changeStream.on("error", error => {
+      console.error("Change stream error:", error);
+      // Reconnect logic
+    });
+    ```
+    Polling for changes is inefficient and can miss updates. Use change streams for real-time notifications of database changes.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Data Types" icon="warning">
+    ```javascript
+    // Anti-pattern: Using strings for IDs, dates, and numeric values
+    db.orders.insertOne({
+      orderId: "12345", // Should be ObjectId or a numeric ID
+      customerId: "67890", // Should be ObjectId or a numeric ID
+      orderDate: "2023-05-15", // Should be a Date object
+      total: "99.99", // Should be a numeric type
+      items: [/* ... */]
+    });
+    
+    // Better approach: Use appropriate data types
+    db.orders.insertOne({
+      _id: new ObjectId(), // MongoDB's ObjectId
+      customerId: new ObjectId("507f1f77bcf86cd799439011"),
+      orderDate: new Date("2023-05-15"),
+      total: 99.99, // Numeric value
+      items: [/* ... */]
+    });
+    ```
+    Using inappropriate data types makes queries and aggregations more complex and less efficient. Use the appropriate BSON data types for your data.
+  </Accordion>
+</AccordionGroup>

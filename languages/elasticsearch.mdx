@@ -1,0 +1,756 @@
+---
+title: 'Elasticsearch'
+description: 'Elasticsearch is a distributed, RESTful search and analytics engine capable of addressing a growing number of use cases. As the heart of the Elastic Stack, it centrally stores your data for lightning fast search, fine‑tuned relevancy, and powerful analytics.'
+---
+
+<AccordionGroup>
+  <Accordion title="Elasticsearch Anti-Patterns Overview" icon="search">
+    Elasticsearch is a powerful search and analytics engine, but using it effectively requires understanding its distributed nature and avoiding common anti-patterns. Here are the most important anti-patterns to avoid when working with Elasticsearch.
+  </Accordion>
+  
+  <Accordion title="Using Dynamic Mapping in Production" icon="warning">
+    ```json
+    // Anti-pattern: Relying on dynamic mapping
+    // Inserting a document without a defined mapping
+    PUT /products/product/1
+    {
+      "name": "Smartphone",
+      "price": 699.99,
+      "description": "Latest smartphone model with advanced features",
+      "stock": 42,
+      "tags": ["electronics", "mobile", "smartphone"],
+      "dimensions": {
+        "height": 15.2,
+        "width": 7.6,
+        "depth": 0.8
+      }
+    }
+    
+    // Better approach: Define explicit mappings
+    PUT /products
+    {
+      "mappings": {
+        "properties": {
+          "name": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+          "price": { "type": "double" },
+          "description": { "type": "text" },
+          "stock": { "type": "integer" },
+          "tags": { "type": "keyword" },
+          "dimensions": {
+            "properties": {
+              "height": { "type": "double" },
+              "width": { "type": "double" },
+              "depth": { "type": "double" }
+            }
+          },
+          "created_at": { "type": "date" },
+          "updated_at": { "type": "date" }
+        }
+      }
+    }
+    ```
+    Relying on dynamic mapping in production can lead to mapping explosions, unexpected field types, and poor performance. Always define explicit mappings for your indices, specifying the appropriate field types and analyzers for your use case.
+  </Accordion>
+  
+  <Accordion title="Using Too Many Fields in a Document" icon="warning">
+    ```json
+    // Anti-pattern: Document with too many fields
+    PUT /users/user/1
+    {
+      "user_id": "12345",
+      "username": "johndoe",
+      "email": "john@example.com",
+      "first_name": "John",
+      "last_name": "Doe",
+      "address_line1": "123 Main St",
+      "address_line2": "Apt 4B",
+      "city": "New York",
+      "state": "NY",
+      "zip": "10001",
+      "country": "USA",
+      "phone": "555-123-4567",
+      "mobile": "555-987-6543",
+      "date_of_birth": "1980-01-15",
+      "gender": "male",
+      "preferences": {
+        "theme": "dark",
+        "notifications": true,
+        "email_frequency": "daily",
+        "language": "en-US"
+      },
+      "social_profiles": {
+        "twitter": "johndoe",
+        "facebook": "johndoe",
+        "linkedin": "johndoe",
+        "instagram": "johndoe"
+      },
+      // ... hundreds more fields
+    }
+    
+    // Better approach: Group related fields and use nested objects judiciously
+    PUT /users/user/1
+    {
+      "user_id": "12345",
+      "username": "johndoe",
+      "email": "john@example.com",
+      "name": {
+        "first": "John",
+        "last": "Doe"
+      },
+      "address": {
+        "line1": "123 Main St",
+        "line2": "Apt 4B",
+        "city": "New York",
+        "state": "NY",
+        "zip": "10001",
+        "country": "USA"
+      },
+      "contact": {
+        "phone": "555-123-4567",
+        "mobile": "555-987-6543"
+      },
+      "profile": {
+        "date_of_birth": "1980-01-15",
+        "gender": "male"
+      },
+      "preferences": {
+        "theme": "dark",
+        "notifications": true,
+        "email_frequency": "daily",
+        "language": "en-US"
+      },
+      "social": {
+        "twitter": "johndoe",
+        "facebook": "johndoe",
+        "linkedin": "johndoe",
+        "instagram": "johndoe"
+      }
+    }
+    ```
+    Having too many fields in a document can lead to mapping explosion and memory issues. Elasticsearch has a default limit of 1000 fields per index. Group related fields into objects and consider whether all fields need to be indexed.
+  </Accordion>
+  
+  <Accordion title="Using Deeply Nested Objects" icon="warning">
+    ```json
+    // Anti-pattern: Deeply nested objects
+    PUT /orders/order/1
+    {
+      "order_id": "ORD-12345",
+      "customer": {
+        "id": "CUST-789",
+        "name": {
+          "first": "John",
+          "last": "Doe"
+        },
+        "contact": {
+          "address": {
+            "home": {
+              "street": {
+                "line1": "123 Main St",
+                "line2": "Apt 4B"
+              },
+              "city": "New York",
+              "state": "NY",
+              "zip": "10001"
+            }
+          },
+          "phone": {
+            "home": "555-123-4567",
+            "work": "555-987-6543"
+          }
+        }
+      },
+      "items": [
+        {
+          "product": {
+            "id": "PROD-001",
+            "name": "Smartphone",
+            "details": {
+              "manufacturer": {
+                "name": "TechCorp",
+                "location": {
+                  "country": "USA",
+                  "city": "San Francisco"
+                }
+              },
+              "specifications": {
+                "dimensions": {
+                  "height": 15.2,
+                  "width": 7.6,
+                  "depth": 0.8
+                }
+              }
+            }
+          },
+          "quantity": 1,
+          "price": 699.99
+        }
+      ]
+    }
+    
+    // Better approach: Flatten the structure where possible
+    PUT /orders/order/1
+    {
+      "order_id": "ORD-12345",
+      "customer_id": "CUST-789",
+      "customer_name": "John Doe",
+      "customer_email": "john@example.com",
+      "shipping_address": "123 Main St, Apt 4B, New York, NY 10001",
+      "contact_phone": "555-123-4567",
+      "items": [
+        {
+          "product_id": "PROD-001",
+          "product_name": "Smartphone",
+          "manufacturer": "TechCorp",
+          "quantity": 1,
+          "price": 699.99
+        }
+      ],
+      "total_amount": 699.99,
+      "order_date": "2023-04-15T14:30:00Z",
+      "status": "shipped"
+    }
+    ```
+    Deeply nested objects in Elasticsearch can lead to complex queries, mapping explosion, and performance issues. Flatten your document structure where possible, and use nested fields only when necessary for maintaining relationships between fields.
+  </Accordion>
+  
+  <Accordion title="Not Using Bulk Operations" icon="warning">
+    ```javascript
+    // Anti-pattern: Individual document indexing
+    for (const product of products) {
+      await client.index({
+        index: 'products',
+        id: product.id,
+        body: product
+      });
+    }
+    
+    // Better approach: Use bulk operations
+    const operations = products.flatMap(product => [
+      { index: { _index: 'products', _id: product.id } },
+      product
+    ]);
+    
+    const bulkResponse = await client.bulk({ body: operations });
+    
+    // Check for errors
+    if (bulkResponse.errors) {
+      const erroredDocuments = [];
+      bulkResponse.items.forEach((action, i) => {
+        const operation = Object.keys(action)[0];
+        if (action[operation].error) {
+          erroredDocuments.push({
+            status: action[operation].status,
+            error: action[operation].error,
+            document: operations[i * 2 + 1]
+          });
+        }
+      });
+      console.error(`${erroredDocuments.length} errors in bulk operation`, erroredDocuments);
+    }
+    ```
+    Indexing documents individually creates unnecessary network overhead and reduces throughput. Use bulk operations when indexing, updating, or deleting multiple documents to significantly improve performance.
+  </Accordion>
+  
+  <Accordion title="Using Wildcard Queries Inefficiently" icon="warning">
+    ```json
+    // Anti-pattern: Leading wildcard queries
+    GET /products/_search
+    {
+      "query": {
+        "wildcard": {
+          "name": "*phone"
+        }
+      }
+    }
+    
+    // Better approach: Use n-grams or edge n-grams for prefix/suffix matching
+    // First, define a custom analyzer with edge n-grams
+    PUT /products
+    {
+      "settings": {
+        "analysis": {
+          "analyzer": {
+            "suffix_analyzer": {
+              "tokenizer": "standard",
+              "filter": ["lowercase", "reverse", "edge_ngram_filter", "reverse"]
+            },
+            "prefix_analyzer": {
+              "tokenizer": "standard",
+              "filter": ["lowercase", "edge_ngram_filter"]
+            }
+          },
+          "filter": {
+            "edge_ngram_filter": {
+              "type": "edge_ngram",
+              "min_gram": 2,
+              "max_gram": 20
+            }
+          }
+        }
+      },
+      "mappings": {
+        "properties": {
+          "name": { 
+            "type": "text",
+            "fields": {
+              "prefix": {
+                "type": "text",
+                "analyzer": "prefix_analyzer",
+                "search_analyzer": "standard"
+              },
+              "suffix": {
+                "type": "text",
+                "analyzer": "suffix_analyzer",
+                "search_analyzer": "standard"
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Now you can search efficiently
+    GET /products/_search
+    {
+      "query": {
+        "match": {
+          "name.suffix": "phone"
+        }
+      }
+    }
+    ```
+    Wildcard queries, especially with leading wildcards (e.g., `*phone`), are very inefficient as they require scanning all values in the index. Use n-grams or edge n-grams for prefix/suffix matching instead.
+  </Accordion>
+  
+  <Accordion title="Not Using Pagination Properly" icon="warning">
+    ```javascript
+    // Anti-pattern: Deep pagination with from/size
+    const response = await client.search({
+      index: 'products',
+      body: {
+        from: 10000,  // Very deep pagination
+        size: 100,
+        query: {
+          match_all: {}
+        }
+      }
+    });
+    
+    // Better approach: Use search_after for deep pagination
+    // First query to get initial results and sort values
+    let response = await client.search({
+      index: 'products',
+      body: {
+        size: 100,
+        sort: [
+          { price: 'asc' },
+          { _id: 'asc' }  // Tie-breaker for stable sorting
+        ],
+        query: {
+          match_all: {}
+        }
+      }
+    });
+    
+    // Get the sort values from the last hit
+    let lastHit = response.hits.hits[response.hits.hits.length - 1];
+    let searchAfter = lastHit.sort;
+    
+    // Subsequent queries use search_after
+    while (response.hits.hits.length > 0) {
+      response = await client.search({
+        index: 'products',
+        body: {
+          size: 100,
+          sort: [
+            { price: 'asc' },
+            { _id: 'asc' }
+          ],
+          search_after: searchAfter,
+          query: {
+            match_all: {}
+          }
+        }
+      });
+      
+      if (response.hits.hits.length > 0) {
+        // Process the results
+        // ...
+        
+        // Update search_after for the next iteration
+        lastHit = response.hits.hits[response.hits.hits.length - 1];
+        searchAfter = lastHit.sort;
+      }
+    }
+    ```
+    Using `from` and `size` for deep pagination (e.g., beyond 10,000 results) can cause performance issues and memory pressure. Use `search_after` for deep pagination, or consider using the Scroll API for processing large result sets.
+  </Accordion>
+  
+  <Accordion title="Using Inappropriate Shard Counts" icon="warning">
+    ```json
+    // Anti-pattern: Using too many shards
+    PUT /products
+    {
+      "settings": {
+        "number_of_shards": 20,  // Too many for a small dataset
+        "number_of_replicas": 1
+      }
+    }
+    
+    // Or too few shards for a large dataset
+    PUT /logs
+    {
+      "settings": {
+        "number_of_shards": 1,  // Too few for a large dataset
+        "number_of_replicas": 1
+      }
+    }
+    
+    // Better approach: Choose appropriate shard counts based on data size
+    // For a small dataset (< 30GB)
+    PUT /products
+    {
+      "settings": {
+        "number_of_shards": 1,
+        "number_of_replicas": 1
+      }
+    }
+    
+    // For a medium dataset (30-100GB)
+    PUT /medium_dataset
+    {
+      "settings": {
+        "number_of_shards": 3,
+        "number_of_replicas": 1
+      }
+    }
+    
+    // For a large dataset (> 100GB)
+    PUT /logs
+    {
+      "settings": {
+        "number_of_shards": 6,
+        "number_of_replicas": 1
+      }
+    }
+    ```
+    Using too many shards can lead to the "small shard problem" with excessive overhead, while too few shards can limit scalability and cause performance issues with large datasets. Choose shard counts based on your data size and expected growth.
+  </Accordion>
+  
+  <Accordion title="Not Using Index Aliases" icon="warning">
+    ```json
+    // Anti-pattern: Directly referencing indices in applications
+    // Application code directly uses index name
+    GET /products_v1/_search
+    {
+      "query": { "match_all": {} }
+    }
+    
+    // Better approach: Use index aliases
+    // Create an index with a version suffix
+    PUT /products_v1
+    {
+      "mappings": {
+        "properties": {
+          "name": { "type": "text" },
+          "price": { "type": "double" }
+        }
+      }
+    }
+    
+    // Create an alias that points to the current version
+    POST /_aliases
+    {
+      "actions": [
+        { "add": { "index": "products_v1", "alias": "products" } }
+      ]
+    }
+    
+    // Application uses the alias instead of the direct index name
+    GET /products/_search
+    {
+      "query": { "match_all": {} }
+    }
+    
+    // When you need to reindex, create a new index version
+    PUT /products_v2
+    {
+      "mappings": {
+        "properties": {
+          "name": { "type": "text" },
+          "price": { "type": "double" },
+          "description": { "type": "text" }  // Added field
+        }
+      }
+    }
+    
+    // Reindex data from v1 to v2
+    POST /_reindex
+    {
+      "source": { "index": "products_v1" },
+      "dest": { "index": "products_v2" }
+    }
+    
+    // Switch the alias to point to the new index (atomic operation)
+    POST /_aliases
+    {
+      "actions": [
+        { "remove": { "index": "products_v1", "alias": "products" } },
+        { "add": { "index": "products_v2", "alias": "products" } }
+      ]
+    }
+    ```
+    Not using index aliases makes it difficult to reindex data or change mappings without downtime. Use aliases to decouple your application from the actual index names, allowing for zero-downtime reindexing and mapping changes.
+  </Accordion>
+  
+  <Accordion title="Not Using Field Data Types Correctly" icon="warning">
+    ```json
+    // Anti-pattern: Using text fields for exact matching or aggregations
+    PUT /users
+    {
+      "mappings": {
+        "properties": {
+          "email": { "type": "text" },  // Wrong type for exact matching
+          "age": { "type": "text" },     // Wrong type for numeric operations
+          "tags": { "type": "text" }     // Wrong type for aggregations
+        }
+      }
+    }
+    
+    // Better approach: Use appropriate field types
+    PUT /users
+    {
+      "mappings": {
+        "properties": {
+          "email": { 
+            "type": "text", 
+            "fields": {
+              "keyword": { "type": "keyword" }  // For exact matching
+            }
+          },
+          "age": { "type": "integer" },  // For numeric operations
+          "tags": { "type": "keyword" },  // For aggregations and exact matching
+          "description": { "type": "text" }  // For full-text search
+        }
+      }
+    }
+    
+    // Now you can do exact matching on email
+    GET /users/_search
+    {
+      "query": {
+        "term": { "email.keyword": "john@example.com" }
+      }
+    }
+    
+    // And numeric range queries on age
+    GET /users/_search
+    {
+      "query": {
+        "range": {
+          "age": {
+            "gte": 25,
+            "lte": 35
+          }
+        }
+      }
+    }
+    
+    // And aggregations on tags
+    GET /users/_search
+    {
+      "aggs": {
+        "popular_tags": {
+          "terms": { "field": "tags" }
+        }
+      }
+    }
+    ```
+    Using incorrect field data types can lead to unexpected search results and performance issues. Use `text` for full-text search, `keyword` for exact matching and aggregations, and appropriate numeric types for numeric fields.
+  </Accordion>
+  
+  <Accordion title="Not Managing Refresh Intervals" icon="warning">
+    ```json
+    // Anti-pattern: Using default refresh interval for all indices
+    // By default, indices refresh every 1 second
+    
+    // Better approach: Adjust refresh intervals based on use case
+    // For write-heavy logging indices
+    PUT /logs/_settings
+    {
+      "refresh_interval": "30s"  // Less frequent refreshes
+    }
+    
+    // For search-heavy product catalog
+    PUT /products/_settings
+    {
+      "refresh_interval": "1s"  // Frequent refreshes for near real-time search
+    }
+    
+    // For bulk indexing operations, temporarily disable refreshes
+    PUT /products/_settings
+    {
+      "refresh_interval": "-1"  // Disable automatic refreshes
+    }
+    
+    // After bulk indexing is complete
+    POST /products/_refresh  // Manual refresh
+    
+    PUT /products/_settings
+    {
+      "refresh_interval": "1s"  // Restore normal refresh interval
+    }
+    ```
+    Not managing refresh intervals appropriately can impact both indexing throughput and search latency. Adjust refresh intervals based on your use case, with longer intervals for write-heavy workloads and shorter intervals for search-heavy workloads.
+  </Accordion>
+  
+  <Accordion title="Not Using Index Lifecycle Management" icon="warning">
+    ```json
+    // Anti-pattern: Manually managing time-based indices
+    // Creating new indices manually
+    PUT /logs-2023-04-15
+    {
+      "mappings": { ... }
+    }
+    
+    // Better approach: Use Index Lifecycle Management (ILM)
+    // Define a lifecycle policy
+    PUT /_ilm/policy/logs_policy
+    {
+      "policy": {
+        "phases": {
+          "hot": {
+            "actions": {
+              "rollover": {
+                "max_size": "50GB",
+                "max_age": "1d"
+              },
+              "set_priority": {
+                "priority": 100
+              }
+            }
+          },
+          "warm": {
+            "min_age": "2d",
+            "actions": {
+              "forcemerge": {
+                "max_num_segments": 1
+              },
+              "shrink": {
+                "number_of_shards": 1
+              },
+              "set_priority": {
+                "priority": 50
+              }
+            }
+          },
+          "cold": {
+            "min_age": "7d",
+            "actions": {
+              "allocate": {
+                "require": {
+                  "data": "cold"
+                }
+              },
+              "set_priority": {
+                "priority": 0
+              }
+            }
+          },
+          "delete": {
+            "min_age": "30d",
+            "actions": {
+              "delete": {}
+            }
+          }
+        }
+      }
+    }
+    
+    // Create an index template with the lifecycle policy
+    PUT /_index_template/logs_template
+    {
+      "index_patterns": ["logs-*"],
+      "template": {
+        "settings": {
+          "number_of_shards": 3,
+          "number_of_replicas": 1,
+          "index.lifecycle.name": "logs_policy",
+          "index.lifecycle.rollover_alias": "logs"
+        },
+        "mappings": {
+          "properties": {
+            "@timestamp": { "type": "date" },
+            "message": { "type": "text" },
+            "level": { "type": "keyword" }
+          }
+        }
+      }
+    }
+    
+    // Create the initial index and alias
+    PUT /logs-000001
+    {
+      "aliases": {
+        "logs": {
+          "is_write_index": true
+        }
+      }
+    }
+    
+    // Now you can index to the alias, and ILM will handle rollovers
+    POST /logs/_doc
+    {
+      "@timestamp": "2023-04-15T12:34:56Z",
+      "message": "This is a log message",
+      "level": "INFO"
+    }
+    ```
+    Manually managing time-based indices is error-prone and time-consuming. Use Index Lifecycle Management (ILM) to automate the management of indices through their lifecycle, from creation to deletion.
+  </Accordion>
+  
+  <Accordion title="Not Monitoring Cluster Health" icon="warning">
+    ```javascript
+    // Anti-pattern: Not monitoring cluster health
+    // Just using Elasticsearch without monitoring
+    
+    // Better approach: Regularly check cluster health
+    // Check cluster health
+    const healthResponse = await client.cluster.health();
+    
+    if (healthResponse.status === 'red') {
+      console.error('Cluster health is RED! Immediate attention required.');
+      sendAlert('Elasticsearch cluster health is RED', healthResponse);
+    } else if (healthResponse.status === 'yellow') {
+      console.warn('Cluster health is YELLOW. Some replicas are not allocated.');
+      if (healthResponse.unassigned_shards > 0) {
+        console.warn(`${healthResponse.unassigned_shards} unassigned shards`);
+      }
+    }
+    
+    // Check for pending tasks
+    const pendingTasksResponse = await client.cluster.pendingTasks();
+    if (pendingTasksResponse.tasks.length > 0) {
+      console.warn(`${pendingTasksResponse.tasks.length} pending tasks in the cluster`);
+    }
+    
+    // Check node stats for high JVM memory pressure
+    const nodeStatsResponse = await client.nodes.stats({
+      metric: ['jvm', 'os', 'fs']
+    });
+    
+    for (const [nodeId, stats] of Object.entries(nodeStatsResponse.nodes)) {
+      const heapUsedPercent = stats.jvm.mem.heap_used_percent;
+      if (heapUsedPercent > 85) {
+        console.warn(`Node ${nodeId} has high heap usage: ${heapUsedPercent}%`);
+        sendAlert(`High heap usage on Elasticsearch node ${nodeId}`, {
+          nodeId,
+          heapUsedPercent
+        });
+      }
+    }
+    ```
+    Not monitoring cluster health can lead to undetected issues and potential data loss. Implement comprehensive monitoring for your Elasticsearch cluster, including cluster health, node stats, and shard allocation.
+  </Accordion>
+</AccordionGroup>

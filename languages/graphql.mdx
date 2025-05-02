@@ -1,0 +1,628 @@
+---
+title: 'GraphQL'
+description: 'GraphQL is a query language for APIs and a runtime for executing those queries with your existing data. It provides a complete and understandable description of the data in your API and gives clients the power to ask for exactly what they need.'
+---
+
+<AccordionGroup>
+  <Accordion title="GraphQL Anti-Patterns Overview" icon="graphql">
+    GraphQL, despite its flexibility and efficiency, has several common anti-patterns that can lead to performance issues, security vulnerabilities, and maintainability problems. Here are the most important anti-patterns to avoid when working with GraphQL.
+  </Accordion>
+  
+  <Accordion title="Not Using Pagination" icon="warning">
+    ```graphql
+    # Anti-pattern: Fetching all items without pagination
+    query GetAllUsers {
+      users {
+        id
+        name
+        email
+        posts {
+          id
+          title
+          content
+          comments {
+            id
+            text
+            author {
+              id
+              name
+            }
+          }
+        }
+      }
+    }
+    
+    # Better approach: Use pagination
+    query GetPaginatedUsers($first: Int!, $after: String) {
+      users(first: $first, after: $after) {
+        edges {
+          node {
+            id
+            name
+            email
+          }
+          cursor
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+    ```
+    ```javascript
+    // Resolver implementation with pagination
+    const resolvers = {
+      Query: {
+        users: async (_, { first = 10, after }) => {
+          const users = await fetchPaginatedUsers(first, after);
+          return {
+            edges: users.map(user => ({
+              node: user,
+              cursor: encodeCursor(user.id)
+            })),
+            pageInfo: {
+              hasNextPage: users.length === first,
+              endCursor: users.length ? encodeCursor(users[users.length - 1].id) : null
+            }
+          };
+        }
+      }
+    };
+    ```
+    Fetching large collections without pagination can lead to performance issues and timeout errors. Implement cursor-based or offset-based pagination for all list queries.
+  </Accordion>
+  
+  <Accordion title="Overfetching in Resolvers" icon="warning">
+    ```javascript
+    // Anti-pattern: Overfetching in resolvers
+    const resolvers = {
+      User: {
+        posts: async (parent) => {
+          // Fetches ALL posts for a user, even if the client only needs a few fields
+          return await Post.find({ userId: parent.id });
+        }
+      }
+    };
+    
+    // Better approach: Use dataloader for batching and caching
+    const postLoader = new DataLoader(async (userIds) => {
+      const posts = await Post.find({ userId: { $in: userIds } });
+      
+      // Group posts by userId
+      const postsByUserId = {};
+      posts.forEach(post => {
+        if (!postsByUserId[post.userId]) {
+          postsByUserId[post.userId] = [];
+        }
+        postsByUserId[post.userId].push(post);
+      });
+      
+      // Return posts in the same order as userIds
+      return userIds.map(userId => postsByUserId[userId] || []);
+    });
+    
+    const resolvers = {
+      User: {
+        posts: async (parent) => {
+          return await postLoader.load(parent.id);
+        }
+      }
+    };
+    ```
+    Overfetching in resolvers can lead to N+1 query problems and poor performance. Use DataLoader to batch and cache database queries.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Authorization" icon="warning">
+    ```javascript
+    // Anti-pattern: No authorization in resolvers
+    const resolvers = {
+      Query: {
+        user: async (_, { id }) => {
+          return await User.findById(id);
+        }
+      },
+      Mutation: {
+        updateUser: async (_, { id, input }) => {
+          const user = await User.findByIdAndUpdate(id, input, { new: true });
+          return user;
+        }
+      }
+    };
+    
+    // Better approach: Implement authorization in resolvers
+    const resolvers = {
+      Query: {
+        user: async (_, { id }, context) => {
+          // Check if user is authenticated
+          if (!context.user) {
+            throw new AuthenticationError('You must be logged in');
+          }
+          
+          // Check if user has permission to view this user
+          if (context.user.id !== id && !context.user.isAdmin) {
+            throw new ForbiddenError('You do not have permission to view this user');
+          }
+          
+          return await User.findById(id);
+        }
+      },
+      Mutation: {
+        updateUser: async (_, { id, input }, context) => {
+          // Check if user is authenticated
+          if (!context.user) {
+            throw new AuthenticationError('You must be logged in');
+          }
+          
+          // Check if user has permission to update this user
+          if (context.user.id !== id && !context.user.isAdmin) {
+            throw new ForbiddenError('You do not have permission to update this user');
+          }
+          
+          const user = await User.findByIdAndUpdate(id, input, { new: true });
+          return user;
+        }
+      }
+    };
+    ```
+    Not implementing proper authorization in resolvers can lead to security vulnerabilities. Implement authorization checks in every resolver that accesses sensitive data.
+  </Accordion>
+  
+  <Accordion title="Not Using Input Validation" icon="warning">
+    ```javascript
+    // Anti-pattern: No input validation
+    const resolvers = {
+      Mutation: {
+        createUser: async (_, { input }) => {
+          // No validation before creating user
+          const user = new User(input);
+          await user.save();
+          return user;
+        }
+      }
+    };
+    
+    // Better approach: Validate inputs
+    const resolvers = {
+      Mutation: {
+        createUser: async (_, { input }) => {
+          // Validate input
+          const { error } = userSchema.validate(input);
+          if (error) {
+            throw new UserInputError('Invalid input', { details: error.details });
+          }
+          
+          // Check if email is already taken
+          const existingUser = await User.findOne({ email: input.email });
+          if (existingUser) {
+            throw new UserInputError('Email already taken');
+          }
+          
+          const user = new User(input);
+          await user.save();
+          return user;
+        }
+      }
+    };
+    ```
+    Not validating user input can lead to data corruption and security vulnerabilities. Implement input validation for all mutations.
+  </Accordion>
+  
+  <Accordion title="Not Using Query Complexity Analysis" icon="warning">
+    ```javascript
+    // Anti-pattern: No query complexity analysis
+    const server = new ApolloServer({
+      typeDefs,
+      resolvers
+    });
+    
+    // Better approach: Implement query complexity analysis
+    const server = new ApolloServer({
+      typeDefs,
+      resolvers,
+      validationRules: [
+        createComplexityLimitRule(1000, {
+          scalarCost: 1,
+          objectCost: 10,
+          listFactor: 10
+        })
+      ]
+    });
+    ```
+    Without query complexity analysis, clients can send expensive queries that overload your server. Implement query complexity analysis to prevent DoS attacks.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Error Handling" icon="warning">
+    ```javascript
+    // Anti-pattern: Poor error handling
+    const resolvers = {
+      Query: {
+        user: async (_, { id }) => {
+          try {
+            return await User.findById(id);
+          } catch (error) {
+            console.error(error);
+            return null; // Silently fails
+          }
+        }
+      }
+    };
+    
+    // Better approach: Proper error handling
+    const resolvers = {
+      Query: {
+        user: async (_, { id }) => {
+          try {
+            const user = await User.findById(id);
+            if (!user) {
+              throw new UserInputError(`User with ID ${id} not found`);
+            }
+            return user;
+          } catch (error) {
+            // Log the error for internal tracking
+            console.error('Error fetching user:', error);
+            
+            // Rethrow Apollo errors
+            if (error instanceof ApolloError) {
+              throw error;
+            }
+            
+            // Convert other errors to appropriate GraphQL errors
+            if (error.name === 'CastError') {
+              throw new UserInputError(`Invalid ID format: ${id}`);
+            }
+            
+            // For unexpected errors, return a generic message in production
+            throw new ApolloError(
+              process.env.NODE_ENV === 'production'
+                ? 'Internal server error'
+                : error.message
+            );
+          }
+        }
+      }
+    };
+    ```
+    Poor error handling can lead to security vulnerabilities and a poor developer experience. Implement proper error handling in all resolvers.
+  </Accordion>
+  
+  <Accordion title="Not Using Field-Level Permissions" icon="warning">
+    ```javascript
+    // Anti-pattern: No field-level permissions
+    const typeDefs = gql`
+      type User {
+        id: ID!
+        name: String!
+        email: String!
+        role: String!
+        salary: Float
+        ssn: String
+      }
+    `;
+    
+    // Better approach: Implement field-level permissions
+    const typeDefs = gql`
+      type User {
+        id: ID!
+        name: String!
+        email: String!
+        role: String!
+        salary: Float @auth(requires: ADMIN)
+        ssn: String @auth(requires: OWNER)
+      }
+    `;
+    
+    // Custom directive implementation
+    const resolvers = {
+      User: {
+        salary: async (parent, args, context) => {
+          if (!context.user || context.user.role !== 'ADMIN') {
+            return null;
+          }
+          return parent.salary;
+        },
+        ssn: async (parent, args, context) => {
+          if (!context.user || (context.user.id !== parent.id && context.user.role !== 'ADMIN')) {
+            return null;
+          }
+          return parent.ssn;
+        }
+      }
+    };
+    ```
+    Not implementing field-level permissions can lead to sensitive data exposure. Use directives or resolver-level checks to implement field-level permissions.
+  </Accordion>
+  
+  <Accordion title="Not Using Fragments for Client Queries" icon="warning">
+    ```graphql
+    # Anti-pattern: Duplicated fields across queries
+    query GetUser {
+      user(id: "123") {
+        id
+        name
+        email
+        profilePicture
+        bio
+      }
+    }
+    
+    query GetUserPosts {
+      user(id: "123") {
+        id
+        name
+        email
+        profilePicture
+        bio
+        posts {
+          id
+          title
+          content
+        }
+      }
+    }
+    
+    # Better approach: Use fragments
+    fragment UserDetails on User {
+      id
+      name
+      email
+      profilePicture
+      bio
+    }
+    
+    query GetUser {
+      user(id: "123") {
+        ...UserDetails
+      }
+    }
+    
+    query GetUserPosts {
+      user(id: "123") {
+        ...UserDetails
+        posts {
+          id
+          title
+          content
+        }
+      }
+    }
+    ```
+    Duplicating field selections across queries leads to maintenance issues. Use fragments to share field selections across queries.
+  </Accordion>
+  
+  <Accordion title="Not Using Proper Caching" icon="warning">
+    ```javascript
+    // Anti-pattern: No caching strategy
+    const server = new ApolloServer({
+      typeDefs,
+      resolvers
+    });
+    
+    // Better approach: Implement caching
+    const server = new ApolloServer({
+      typeDefs,
+      resolvers,
+      cache: new RedisCache({
+        host: 'redis-server',
+        port: 6379
+      }),
+      cacheControl: {
+        defaultMaxAge: 60, // 1 minute
+        calculateHttpHeaders: true
+      }
+    });
+    
+    // Type definitions with cache hints
+    const typeDefs = gql`
+      type User @cacheControl(maxAge: 300) {
+        id: ID!
+        name: String!
+        email: String!
+        posts: [Post!]! @cacheControl(maxAge: 60)
+      }
+      
+      type Post @cacheControl(maxAge: 1800) {
+        id: ID!
+        title: String!
+        content: String!
+      }
+    `;
+    ```
+    Not implementing proper caching can lead to poor performance. Use cache control directives and a caching solution like Redis to improve performance.
+  </Accordion>
+  
+  <Accordion title="Not Using Persisted Queries" icon="warning">
+    ```javascript
+    // Anti-pattern: Not using persisted queries
+    // Client sends full query text with each request
+    const client = new ApolloClient({
+      uri: '/graphql'
+    });
+    
+    // Better approach: Use persisted queries
+    // Server setup
+    const server = new ApolloServer({
+      typeDefs,
+      resolvers,
+      persistedQueries: {
+        cache: new RedisCache({
+          host: 'redis-server',
+          port: 6379
+        })
+      }
+    });
+    
+    // Client setup
+    const client = new ApolloClient({
+      uri: '/graphql',
+      cache: new InMemoryCache(),
+      link: createPersistedQueryLink().concat(httpLink)
+    });
+    ```
+    Sending full query text with each request increases network traffic. Use persisted queries to reduce network traffic and improve security.
+  </Accordion>
+  
+  <Accordion title="Not Using Code Generation" icon="warning">
+    ```javascript
+    // Anti-pattern: Manual type definitions
+    // Client code with manual type definitions
+    interface User {
+      id: string;
+      name: string;
+      email: string;
+    }
+    
+    function fetchUser(id: string): Promise<User> {
+      return client.query({
+        query: gql`
+          query GetUser($id: ID!) {
+            user(id: $id) {
+              id
+              name
+              email
+            }
+          }
+        `,
+        variables: { id }
+      }).then(result => result.data.user);
+    }
+    
+    // Better approach: Use code generation
+    // With GraphQL Code Generator
+    // codegen.yml
+    /*
+    schema: http://localhost:4000/graphql
+    documents: ./src/**/*.graphql
+    generates:
+      ./src/generated/graphql.ts:
+        plugins:
+          - typescript
+          - typescript-operations
+          - typescript-react-apollo
+    */
+    
+    // query.graphql
+    /*
+    query GetUser($id: ID!) {
+      user(id: $id) {
+        id
+        name
+        email
+      }
+    }
+    */
+    
+    // Client code with generated types
+    import { useGetUserQuery } from './generated/graphql';
+    
+    function UserProfile({ id }: { id: string }) {
+      const { data, loading, error } = useGetUserQuery({
+        variables: { id }
+      });
+      
+      if (loading) return <p>Loading...</p>;
+      if (error) return <p>Error: {error.message}</p>;
+      
+      return (
+        <div>
+          <h1>{data.user.name}</h1>
+          <p>{data.user.email}</p>
+        </div>
+      );
+    }
+    ```
+    Manually defining types for GraphQL operations is error-prone. Use code generation tools like GraphQL Code Generator to generate type-safe code from your GraphQL schema and operations.
+  </Accordion>
+  
+  <Accordion title="Not Using Schema Stitching or Federation for Microservices" icon="warning">
+    ```javascript
+    // Anti-pattern: Monolithic GraphQL schema
+    const typeDefs = gql`
+      type User {
+        id: ID!
+        name: String!
+        orders: [Order!]!
+        cart: Cart
+        wishlist: [Product!]!
+        reviews: [Review!]!
+      }
+      
+      type Product {
+        id: ID!
+        name: String!
+        price: Float!
+        inventory: Inventory!
+        reviews: [Review!]!
+      }
+      
+      # Many more types for different domains
+    `;
+    
+    // Better approach: Use schema federation
+    // User service
+    const userTypeDefs = gql`
+      type User @key(fields: "id") {
+        id: ID!
+        name: String!
+      }
+    `;
+    
+    // Order service
+    const orderTypeDefs = gql`
+      type User @key(fields: "id") @extends {
+        id: ID! @external
+        orders: [Order!]!
+      }
+      
+      type Order {
+        id: ID!
+        products: [Product!]!
+        total: Float!
+      }
+      
+      type Product @key(fields: "id") {
+        id: ID!
+        name: String!
+        price: Float!
+      }
+    `;
+    
+    // Product service
+    const productTypeDefs = gql`
+      type Product @key(fields: "id") {
+        id: ID!
+        name: String!
+        price: Float!
+        inventory: Inventory!
+      }
+      
+      type Inventory {
+        quantity: Int!
+        warehouse: String!
+      }
+    `;
+    
+    // Review service
+    const reviewTypeDefs = gql`
+      type User @key(fields: "id") @extends {
+        id: ID! @external
+        reviews: [Review!]!
+      }
+      
+      type Product @key(fields: "id") @extends {
+        id: ID! @external
+        reviews: [Review!]!
+      }
+      
+      type Review {
+        id: ID!
+        text: String!
+        rating: Int!
+        user: User!
+        product: Product!
+      }
+    `;
+    ```
+    A monolithic GraphQL schema becomes hard to maintain as your application grows. Use schema stitching or federation to split your schema across multiple services.
+  </Accordion>
+</AccordionGroup>

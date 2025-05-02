@@ -1,0 +1,470 @@
+---
+title: 'ClickHouse'
+description: 'ClickHouse is an open-source, column-oriented database management system that allows generating analytical data reports in real time. It is designed for online analytical processing (OLAP) and is particularly effective for real-time analytics on large datasets.'
+---
+
+<AccordionGroup>
+  <Accordion title="ClickHouse Anti-Patterns Overview" icon="database">
+    ClickHouse is a powerful columnar database designed for analytical workloads, but using it effectively requires understanding its architecture and avoiding common anti-patterns. Here are the most important anti-patterns to avoid when working with ClickHouse.
+  </Accordion>
+  
+  <Accordion title="Using ClickHouse for OLTP Workloads" icon="warning">
+    ```sql
+    -- Anti-pattern: Using ClickHouse for transactional workloads
+    -- Creating a table for user transactions
+    CREATE TABLE user_transactions
+    (
+        transaction_id UUID,
+        user_id UInt64,
+        amount Decimal(18, 2),
+        status String,
+        created_at DateTime
+    )
+    ENGINE = MergeTree()
+    ORDER BY (user_id, created_at);
+    
+    -- Frequently updating individual records
+    ALTER TABLE user_transactions UPDATE status = 'completed' WHERE transaction_id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    
+    -- Better approach: Use ClickHouse for analytics, not transactions
+    -- Use a transactional database for OLTP workloads
+    -- In PostgreSQL or another OLTP database:
+    CREATE TABLE user_transactions (
+        transaction_id UUID PRIMARY KEY,
+        user_id BIGINT,
+        amount DECIMAL(18, 2),
+        status VARCHAR(50),
+        created_at TIMESTAMP
+    );
+    
+    -- Then periodically sync to ClickHouse for analytics
+    -- In ClickHouse, create a table optimized for analytical queries
+    CREATE TABLE user_transactions_analytics
+    (
+        transaction_id UUID,
+        user_id UInt64,
+        amount Decimal(18, 2),
+        status String,
+        created_at DateTime,
+        date Date DEFAULT toDate(created_at)
+    )
+    ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(date)
+    ORDER BY (user_id, created_at);
+    ```
+    ClickHouse is designed for OLAP (analytical) workloads, not OLTP (transactional) workloads. It excels at processing large volumes of data for analytical queries but performs poorly for frequent single-row updates or deletes. Use a traditional RDBMS like PostgreSQL or MySQL for transactional workloads, and use ClickHouse for analytics.
+  </Accordion>
+  
+  <Accordion title="Not Using Appropriate Primary Keys" icon="warning">
+    ```sql
+    -- Anti-pattern: Poor primary key selection
+    CREATE TABLE website_visits
+    (
+        visit_id UUID,
+        user_id UInt64,
+        url String,
+        referrer String,
+        timestamp DateTime,
+        browser String,
+        device String,
+        country String
+    )
+    ENGINE = MergeTree()
+    ORDER BY visit_id;  -- Poor choice for primary key
+    
+    -- Better approach: Choose primary keys based on query patterns
+    CREATE TABLE website_visits
+    (
+        visit_id UUID,
+        user_id UInt64,
+        url String,
+        referrer String,
+        timestamp DateTime,
+        browser String,
+        device String,
+        country String,
+        date Date DEFAULT toDate(timestamp)
+    )
+    ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(date)
+    ORDER BY (user_id, timestamp);  -- Better for queries filtering by user_id and time ranges
+    ```
+    In ClickHouse, the primary key (defined by the ORDER BY clause) determines data locality and query performance. Choosing a poor primary key, such as a UUID or other high-cardinality field with no relation to common query patterns, can lead to poor performance. Choose primary keys based on your most common query patterns, typically starting with the fields most frequently used in WHERE clauses.
+  </Accordion>
+  
+  <Accordion title="Not Using Partitioning Effectively" icon="warning">
+    ```sql
+    -- Anti-pattern: Not using partitioning or using ineffective partitioning
+    CREATE TABLE logs
+    (
+        log_id UUID,
+        timestamp DateTime,
+        level String,
+        message String,
+        source String
+    )
+    ENGINE = MergeTree()
+    ORDER BY (level, timestamp);
+    
+    -- Or using too granular partitioning
+    CREATE TABLE logs
+    (
+        log_id UUID,
+        timestamp DateTime,
+        level String,
+        message String,
+        source String
+    )
+    ENGINE = MergeTree()
+    PARTITION BY toDate(timestamp)  -- Creates a partition for every day
+    ORDER BY (level, timestamp);
+    
+    -- Better approach: Use appropriate partitioning granularity
+    CREATE TABLE logs
+    (
+        log_id UUID,
+        timestamp DateTime,
+        level String,
+        message String,
+        source String,
+        date Date DEFAULT toDate(timestamp)
+    )
+    ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(date)  -- Monthly partitioning
+    ORDER BY (level, timestamp);
+    ```
+    Partitioning in ClickHouse allows for efficient data management and query performance. Not using partitioning can lead to poor query performance and difficult data management, while overly granular partitioning (e.g., daily partitions for years of data) can lead to too many small parts and filesystem issues. Choose a partitioning scheme that balances query performance with management overhead, typically using monthly or weekly partitions for time-series data.
+  </Accordion>
+  
+  <Accordion title="Using String Instead of Enum" icon="warning">
+    ```sql
+    -- Anti-pattern: Using String for fields with a limited set of values
+    CREATE TABLE user_events
+    (
+        user_id UInt64,
+        event_type String,  -- Only has values like 'login', 'logout', 'purchase', etc.
+        timestamp DateTime
+    )
+    ENGINE = MergeTree()
+    ORDER BY (user_id, timestamp);
+    
+    -- Better approach: Use Enum for fields with a limited set of values
+    CREATE TABLE user_events
+    (
+        user_id UInt64,
+        event_type Enum('login' = 1, 'logout' = 2, 'purchase' = 3, 'view' = 4, 'search' = 5),
+        timestamp DateTime
+    )
+    ENGINE = MergeTree()
+    ORDER BY (user_id, timestamp);
+    ```
+    Using String data types for fields with a limited set of possible values wastes storage space and reduces query performance. Use Enum8 or Enum16 for fields with a small, fixed set of possible values to improve storage efficiency and query performance.
+  </Accordion>
+  
+  <Accordion title="Not Using LowCardinality for Appropriate Columns" icon="warning">
+    ```sql
+    -- Anti-pattern: Not using LowCardinality for appropriate columns
+    CREATE TABLE page_views
+    (
+        page_id UInt32,
+        browser String,       -- Has limited distinct values
+        operating_system String,  -- Has limited distinct values
+        country_code String,  -- Has limited distinct values
+        timestamp DateTime
+    )
+    ENGINE = MergeTree()
+    ORDER BY (page_id, timestamp);
+    
+    -- Better approach: Use LowCardinality for columns with low cardinality
+    CREATE TABLE page_views
+    (
+        page_id UInt32,
+        browser LowCardinality(String),
+        operating_system LowCardinality(String),
+        country_code LowCardinality(String),
+        timestamp DateTime
+    )
+    ENGINE = MergeTree()
+    ORDER BY (page_id, timestamp);
+    ```
+    The LowCardinality data type in ClickHouse is a special encoding that improves performance for columns with a relatively small number of distinct values (typically less than 10,000). Not using LowCardinality for appropriate columns can result in missed performance optimizations. Apply LowCardinality to String columns with a limited number of distinct values, such as categories, status codes, country codes, etc.
+  </Accordion>
+  
+  <Accordion title="Using Inefficient Data Types" icon="warning">
+    ```sql
+    -- Anti-pattern: Using inefficient data types
+    CREATE TABLE sensor_readings
+    (
+        sensor_id String,  -- Could be UInt32
+        value Float64,     -- Could be Float32 if precision allows
+        timestamp Int64,   -- Could be DateTime
+        is_active UInt32   -- Could be UInt8
+    )
+    ENGINE = MergeTree()
+    ORDER BY (sensor_id, timestamp);
+    
+    -- Better approach: Use appropriate data types
+    CREATE TABLE sensor_readings
+    (
+        sensor_id UInt32,
+        value Float32,
+        timestamp DateTime,
+        is_active UInt8
+    )
+    ENGINE = MergeTree()
+    ORDER BY (sensor_id, timestamp);
+    ```
+    Using inefficient data types wastes storage space and reduces query performance. Choose the smallest possible data type that can accommodate your data: use UInt8/16/32 instead of UInt64 when possible, use DateTime instead of String for timestamps, use Float32 instead of Float64 when the precision is sufficient, and use UInt8 (0 or 1) for boolean values.
+  </Accordion>
+  
+  <Accordion title="Not Using Materialized Views for Common Aggregations" icon="warning">
+    ```sql
+    -- Anti-pattern: Repeatedly calculating the same aggregations
+    -- Running this query frequently
+    SELECT
+        toDate(timestamp) AS date,
+        count() AS total_events,
+        uniqExact(user_id) AS unique_users
+    FROM user_events
+    GROUP BY date
+    ORDER BY date;
+    
+    -- Better approach: Use a materialized view for common aggregations
+    -- Create a materialized view that updates automatically
+    CREATE MATERIALIZED VIEW user_events_daily_mv
+    ENGINE = SummingMergeTree()
+    ORDER BY date
+    POPULATE
+    AS
+    SELECT
+        toDate(timestamp) AS date,
+        count() AS total_events,
+        uniqExact(user_id) AS unique_users
+    FROM user_events
+    GROUP BY date;
+    
+    -- Now query the materialized view instead
+    SELECT * FROM user_events_daily_mv ORDER BY date;
+    ```
+    Repeatedly calculating the same aggregations is inefficient and can lead to high CPU usage. Use materialized views to pre-compute and incrementally update common aggregations, significantly improving query performance for frequently accessed aggregated data.
+  </Accordion>
+  
+  <Accordion title="Not Using Projections for Query Optimization" icon="warning">
+    ```sql
+    -- Anti-pattern: Not using projections for different query patterns
+    -- Table optimized for one query pattern
+    CREATE TABLE user_events
+    (
+        user_id UInt64,
+        event_type LowCardinality(String),
+        category LowCardinality(String),
+        timestamp DateTime
+    )
+    ENGINE = MergeTree()
+    ORDER BY (user_id, timestamp);
+    
+    -- But also frequently querying by event_type
+    SELECT count()
+    FROM user_events
+    WHERE event_type = 'purchase'
+    AND timestamp >= '2023-01-01 00:00:00';
+    
+    -- Better approach: Use projections for different query patterns
+    CREATE TABLE user_events
+    (
+        user_id UInt64,
+        event_type LowCardinality(String),
+        category LowCardinality(String),
+        timestamp DateTime
+    )
+    ENGINE = MergeTree()
+    ORDER BY (user_id, timestamp)
+    
+    -- Add a projection for queries by event_type
+    ALTER TABLE user_events ADD PROJECTION event_type_projection
+    (
+        SELECT *
+        ORDER BY (event_type, timestamp)
+    );
+    
+    -- Materialize the projection
+    ALTER TABLE user_events MATERIALIZE PROJECTION event_type_projection;
+    ```
+    ClickHouse tables are optimized for specific query patterns based on their primary key. Not using projections for different query patterns can lead to suboptimal performance for queries that don't align with the table's primary key. Use projections to create additional physical data organizations optimized for different query patterns.
+  </Accordion>
+  
+  <Accordion title="Using GROUP BY Without Combinators" icon="warning">
+    ```sql
+    -- Anti-pattern: Using GROUP BY without combinators for high-cardinality grouping
+    SELECT
+        user_id,
+        count() AS event_count
+    FROM user_events
+    GROUP BY user_id
+    ORDER BY event_count DESC
+    LIMIT 10;
+    
+    -- Better approach: Use GROUP BY with combinators
+    -- For approximate results with better performance
+    SELECT
+        user_id,
+        count() AS event_count
+    FROM user_events
+    GROUP BY user_id WITH TOTALS
+    ORDER BY event_count DESC
+    LIMIT 10;
+    
+    -- Or for even better performance with slight approximation
+    SELECT
+        user_id,
+        count() AS event_count
+    FROM user_events
+    GROUP BY user_id WITH ROLLUP
+    ORDER BY event_count DESC
+    LIMIT 10;
+    ```
+    Using GROUP BY without combinators for high-cardinality grouping can lead to excessive memory usage and slow query performance. Use GROUP BY combinators like WITH ROLLUP, WITH CUBE, or WITH TOTALS to optimize aggregation queries, especially for high-cardinality grouping.
+  </Accordion>
+  
+  <Accordion title="Not Using Distributed Tables Properly" icon="warning">
+    ```sql
+    -- Anti-pattern: Querying individual shards directly
+    -- On shard1
+    SELECT count() FROM events_local;
+    
+    -- On shard2
+    SELECT count() FROM events_local;
+    
+    -- Manually combining results
+    -- Total = shard1_count + shard2_count
+    
+    -- Better approach: Use distributed tables
+    -- Create a local table on each shard
+    CREATE TABLE events_local
+    (
+        event_id UUID,
+        user_id UInt64,
+        timestamp DateTime,
+        event_type String
+    )
+    ENGINE = MergeTree()
+    ORDER BY (user_id, timestamp);
+    
+    -- Create a distributed table that references all shards
+    CREATE TABLE events_distributed AS events_local
+    ENGINE = Distributed(cluster_name, default, events_local, rand());
+    
+    -- Query the distributed table
+    SELECT count() FROM events_distributed;
+    ```
+    Not using distributed tables properly can lead to manual query coordination and result aggregation. Use distributed tables to transparently query data across multiple shards, allowing ClickHouse to handle the distribution and aggregation of queries.
+  </Accordion>
+  
+  <Accordion title="Not Monitoring Query Performance" icon="warning">
+    ```sql
+    -- Anti-pattern: Not monitoring query performance
+    -- Running queries without analyzing their performance
+    
+    -- Better approach: Use system tables to monitor query performance
+    -- Check currently running queries
+    SELECT
+        query_id,
+        user,
+        query,
+        read_rows,
+        read_bytes,
+        total_rows_approx,
+        memory_usage,
+        elapsed
+    FROM system.processes
+    ORDER BY elapsed DESC;
+    
+    -- Analyze query log for slow queries
+    SELECT
+        query_id,
+        query,
+        type,
+        event_time,
+        query_duration_ms,
+        read_rows,
+        read_bytes,
+        memory_usage
+    FROM system.query_log
+    WHERE type = 'QueryFinish'
+    AND query_duration_ms > 1000  -- Queries taking more than 1 second
+    AND event_date = today()
+    ORDER BY query_duration_ms DESC
+    LIMIT 10;
+    ```
+    Not monitoring query performance can lead to undetected performance issues and resource bottlenecks. Use ClickHouse's system tables, such as system.processes, system.query_log, and system.metrics, to monitor query performance, resource usage, and identify optimization opportunities.
+  </Accordion>
+  
+  <Accordion title="Using FINAL Modifier Excessively" icon="warning">
+    ```sql
+    -- Anti-pattern: Using FINAL modifier excessively
+    SELECT *
+    FROM table_with_replacemergetree
+    FINAL
+    WHERE condition;
+    
+    -- Better approach: Use FINAL only when necessary
+    -- For tables with ReplacingMergeTree, CollapsingMergeTree, etc.
+    -- Use FINAL only when you need the latest version of each row
+    
+    -- For queries that don't need deduplication, omit FINAL
+    SELECT *
+    FROM table_with_replacemergetree
+    WHERE condition;
+    
+    -- Only use FINAL when you specifically need deduplication
+    SELECT *
+    FROM table_with_replacemergetree
+    FINAL
+    WHERE condition;
+    
+    -- Consider using a materialized view with AggregatingMergeTree
+    -- for frequently accessed data that needs deduplication
+    CREATE MATERIALIZED VIEW table_deduplicated
+    ENGINE = AggregatingMergeTree()
+    ORDER BY key
+    POPULATE
+    AS
+    SELECT
+        key,
+        argMax(value, version) AS value,
+        argMax(other_field, version) AS other_field
+    FROM table_with_replacemergetree
+    GROUP BY key;
+    ```
+    The FINAL modifier forces ClickHouse to perform deduplication at query time, which can be very expensive for large tables. Use FINAL only when necessary, and consider alternative approaches like materialized views with AggregatingMergeTree for frequently accessed data that needs deduplication.
+  </Accordion>
+  
+  <Accordion title="Not Using Asynchronous Inserts" icon="warning">
+    ```sql
+    -- Anti-pattern: Using synchronous inserts for high-throughput scenarios
+    INSERT INTO events VALUES (1, 'click', '2023-01-01 12:34:56');
+    INSERT INTO events VALUES (2, 'view', '2023-01-01 12:35:00');
+    INSERT INTO events VALUES (3, 'purchase', '2023-01-01 12:36:12');
+    
+    -- Better approach: Use asynchronous inserts for high throughput
+    -- Enable asynchronous inserts in settings
+    SET async_insert = 1;
+    
+    -- Optionally, set the wait for async insert timeout
+    SET wait_for_async_insert = 1;
+    SET async_insert_timeout = 10000; -- 10 seconds
+    
+    -- Now inserts will be processed asynchronously
+    INSERT INTO events VALUES (1, 'click', '2023-01-01 12:34:56');
+    INSERT INTO events VALUES (2, 'view', '2023-01-01 12:35:00');
+    INSERT INTO events VALUES (3, 'purchase', '2023-01-01 12:36:12');
+    
+    -- For even better performance, batch inserts
+    INSERT INTO events VALUES 
+    (1, 'click', '2023-01-01 12:34:56'),
+    (2, 'view', '2023-01-01 12:35:00'),
+    (3, 'purchase', '2023-01-01 12:36:12');
+    ```
+    Synchronous inserts can limit throughput in high-volume ingestion scenarios. Use asynchronous inserts for high-throughput scenarios to improve insert performance, and batch multiple rows into a single INSERT statement for even better performance.
+  </Accordion>
+</AccordionGroup>

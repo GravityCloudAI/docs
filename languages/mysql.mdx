@@ -1,0 +1,574 @@
+---
+title: 'MySQL'
+description: 'MySQL is an open-source relational database management system. It is widely used for web applications and online publishing and is an important component of the LAMP (Linux, Apache, MySQL, PHP/Python/Perl) stack.'
+---
+
+<AccordionGroup>
+  <Accordion title="MySQL Anti-Patterns Overview" icon="database">
+    MySQL is one of the most popular relational database systems, but using it effectively requires understanding its specific behaviors and avoiding common anti-patterns. Here are the most important anti-patterns to avoid when working with MySQL.
+  </Accordion>
+  
+  <Accordion title="Using SELECT *" icon="warning">
+    ```sql
+    -- Anti-pattern: Using SELECT *
+    SELECT * FROM users WHERE status = 'active';
+    
+    -- Better approach: Specify only the columns you need
+    SELECT id, username, email, last_login FROM users WHERE status = 'active';
+    ```
+    ```java
+    // Anti-pattern in application code
+    Statement stmt = connection.createStatement();
+    ResultSet rs = stmt.executeQuery("SELECT * FROM users WHERE status = 'active'");
+    
+    // Better approach
+    Statement stmt = connection.createStatement();
+    ResultSet rs = stmt.executeQuery("SELECT id, username, email, last_login FROM users WHERE status = 'active'");
+    ```
+    Using `SELECT *` retrieves all columns from a table, which can lead to unnecessary I/O, network traffic, and memory usage, especially for tables with many columns or large text/blob fields. Always specify only the columns you actually need in your application.
+  </Accordion>
+  
+  <Accordion title="Not Using Prepared Statements" icon="warning">
+    ```java
+    // Anti-pattern: String concatenation for SQL queries
+    String username = request.getParameter("username");
+    String query = "SELECT * FROM users WHERE username = '" + username + "'";
+    Statement stmt = connection.createStatement();
+    ResultSet rs = stmt.executeQuery(query);
+    
+    // Better approach: Use prepared statements
+    String query = "SELECT * FROM users WHERE username = ?";
+    PreparedStatement pstmt = connection.prepareStatement(query);
+    pstmt.setString(1, username);
+    ResultSet rs = pstmt.executeQuery();
+    ```
+    ```php
+    // Anti-pattern in PHP
+    $username = $_POST['username'];
+    $query = "SELECT * FROM users WHERE username = '$username'";
+    $result = mysqli_query($conn, $query);
+    
+    // Better approach with prepared statements
+    $query = "SELECT * FROM users WHERE username = ?";
+    $stmt = mysqli_prepare($conn, $query);
+    mysqli_stmt_bind_param($stmt, "s", $username);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    ```
+    Not using prepared statements can lead to SQL injection vulnerabilities and reduced performance. Prepared statements protect against SQL injection and allow the database to cache the query execution plan, improving performance for repeated queries.
+  </Accordion>
+  
+  <Accordion title="Not Using Indexes Properly" icon="warning">
+    ```sql
+    -- Anti-pattern: Not indexing columns used in WHERE, JOIN, or ORDER BY clauses
+    CREATE TABLE orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT,
+        status VARCHAR(20),
+        created_at DATETIME
+    );
+    
+    -- Queries that will perform poorly without proper indexes
+    SELECT * FROM orders WHERE user_id = 123;
+    SELECT * FROM orders WHERE status = 'completed' ORDER BY created_at DESC;
+    
+    -- Better approach: Create appropriate indexes
+    CREATE TABLE orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT,
+        status VARCHAR(20),
+        created_at DATETIME,
+        INDEX idx_user_id (user_id),
+        INDEX idx_status_created (status, created_at)
+    );
+    ```
+    ```sql
+    -- Anti-pattern: Creating too many indexes
+    CREATE TABLE products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100),
+        price DECIMAL(10, 2),
+        category VARCHAR(50),
+        brand VARCHAR(50),
+        created_at DATETIME,
+        updated_at DATETIME,
+        INDEX idx_name (name),
+        INDEX idx_price (price),
+        INDEX idx_category (category),
+        INDEX idx_brand (brand),
+        INDEX idx_created (created_at),
+        INDEX idx_updated (updated_at),
+        INDEX idx_cat_brand (category, brand),
+        INDEX idx_brand_cat (brand, category)
+    );
+    
+    -- Better approach: Create targeted indexes based on query patterns
+    CREATE TABLE products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100),
+        price DECIMAL(10, 2),
+        category VARCHAR(50),
+        brand VARCHAR(50),
+        created_at DATETIME,
+        updated_at DATETIME,
+        INDEX idx_category_brand_price (category, brand, price),
+        INDEX idx_name (name)
+    );
+    ```
+    Not using indexes properly can lead to slow queries and poor performance. Create indexes on columns used in WHERE, JOIN, and ORDER BY clauses, but avoid creating too many indexes as they slow down write operations and increase storage requirements. Use EXPLAIN to analyze query execution plans and identify missing indexes.
+  </Accordion>
+  
+  <Accordion title="Using Inefficient JOIN Operations" icon="warning">
+    ```sql
+    -- Anti-pattern: Inefficient JOIN operations
+    -- Using cartesian joins (missing JOIN condition)
+    SELECT * FROM orders, order_items;
+    
+    -- Joining tables without indexes on join columns
+    SELECT * FROM orders o JOIN order_items oi ON o.id = oi.order_id;
+    
+    -- Better approach: Use proper JOIN syntax with indexed columns
+    -- First, ensure proper indexes exist
+    ALTER TABLE order_items ADD INDEX idx_order_id (order_id);
+    
+    -- Then use explicit JOIN syntax
+    SELECT o.id, o.user_id, oi.product_id, oi.quantity
+    FROM orders o
+    JOIN order_items oi ON o.id = oi.order_id
+    WHERE o.status = 'completed';
+    ```
+    ```sql
+    -- Anti-pattern: Using subqueries instead of JOINs when inappropriate
+    SELECT *
+    FROM orders
+    WHERE user_id IN (SELECT id FROM users WHERE country = 'USA');
+    
+    -- Better approach: Use JOINs when appropriate
+    SELECT o.*
+    FROM orders o
+    JOIN users u ON o.user_id = u.id
+    WHERE u.country = 'USA';
+    ```
+    Inefficient JOIN operations can lead to poor query performance, especially for large tables. Use explicit JOIN syntax, ensure join columns are properly indexed, and choose the appropriate join type (INNER, LEFT, RIGHT) based on your requirements. In some cases, JOINs perform better than subqueries, while in others, subqueries are more efficient.
+  </Accordion>
+  
+  <Accordion title="Using Inappropriate Data Types" icon="warning">
+    ```sql
+    -- Anti-pattern: Using inappropriate data types
+    CREATE TABLE products (
+        id VARCHAR(36),  -- UUID stored as VARCHAR
+        name VARCHAR(255),  -- Overkill for most product names
+        description TEXT,  -- Appropriate for long text
+        price VARCHAR(10),  -- Should be DECIMAL for monetary values
+        quantity VARCHAR(5),  -- Should be INT
+        is_active VARCHAR(5),  -- Should be BOOLEAN/TINYINT
+        created_at VARCHAR(20)  -- Should be DATETIME
+    );
+    
+    -- Better approach: Use appropriate data types
+    CREATE TABLE products (
+        id CHAR(36),  -- Fixed-length for UUID
+        name VARCHAR(100),  -- Reasonable length for product names
+        description TEXT,  -- Appropriate for long text
+        price DECIMAL(10, 2),  -- Appropriate for monetary values
+        quantity INT UNSIGNED,  -- Appropriate for quantities
+        is_active TINYINT(1),  -- 1 byte for boolean values
+        created_at DATETIME  -- Appropriate for timestamps
+    );
+    ```
+    Using inappropriate data types can lead to storage inefficiency, data integrity issues, and poor query performance. Choose the most appropriate data type for each column based on the data it will store. Use CHAR for fixed-length strings, VARCHAR for variable-length strings, appropriate numeric types for numbers, and DATE/DATETIME/TIMESTAMP for date and time values.
+  </Accordion>
+  
+  <Accordion title="Not Using Connection Pooling" icon="warning">
+    ```java
+    // Anti-pattern: Creating a new connection for each operation
+    public User getUser(int userId) {
+        Connection conn = null;
+        try {
+            conn = DriverManager.getConnection(DB_URL, USER, PASS);
+            PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE id = ?");
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            // Process result
+            return user;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try { if (conn != null) conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+        }
+        return null;
+    }
+    
+    // Better approach: Use connection pooling
+    // Initialize the connection pool once
+    private static DataSource dataSource;
+    
+    static {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(DB_URL);
+        config.setUsername(USER);
+        config.setPassword(PASS);
+        config.setMaximumPoolSize(10);
+        dataSource = new HikariDataSource(config);
+    }
+    
+    public User getUser(int userId) {
+        try (Connection conn = dataSource.getConnection()) {
+            PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE id = ?");
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            // Process result
+            return user;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    ```
+    ```php
+    // PHP example with connection pooling using PDO
+    // Anti-pattern: Creating a new connection for each request
+    function getUser($userId) {
+        $conn = new PDO('mysql:host=localhost;dbname=mydb', 'username', 'password');
+        $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    
+    // Better approach: Use persistent connections
+    function getUser($userId) {
+        $conn = new PDO('mysql:host=localhost;dbname=mydb', 'username', 'password', [
+            PDO::ATTR_PERSISTENT => true
+        ]);
+        $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    ```
+    Creating a new database connection for each operation is inefficient and can lead to connection overhead, exhaustion of connection limits, and poor performance. Use connection pooling to reuse connections across operations, reducing the overhead of establishing new connections.
+  </Accordion>
+  
+  <Accordion title="Not Handling Transactions Properly" icon="warning">
+    ```java
+    // Anti-pattern: Not using transactions for related operations
+    public void transferMoney(int fromAccount, int toAccount, double amount) {
+        try (Connection conn = dataSource.getConnection()) {
+            // Deduct from source account
+            PreparedStatement pstmt1 = conn.prepareStatement(
+                "UPDATE accounts SET balance = balance - ? WHERE id = ?");
+            pstmt1.setDouble(1, amount);
+            pstmt1.setInt(2, fromAccount);
+            pstmt1.executeUpdate();
+            
+            // What if an error occurs here?
+            
+            // Add to destination account
+            PreparedStatement pstmt2 = conn.prepareStatement(
+                "UPDATE accounts SET balance = balance + ? WHERE id = ?");
+            pstmt2.setDouble(1, amount);
+            pstmt2.setInt(2, toAccount);
+            pstmt2.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    // Better approach: Use transactions
+    public void transferMoney(int fromAccount, int toAccount, double amount) {
+        Connection conn = null;
+        try {
+            conn = dataSource.getConnection();
+            conn.setAutoCommit(false);  // Start transaction
+            
+            // Deduct from source account
+            PreparedStatement pstmt1 = conn.prepareStatement(
+                "UPDATE accounts SET balance = balance - ? WHERE id = ?");
+            pstmt1.setDouble(1, amount);
+            pstmt1.setInt(2, fromAccount);
+            pstmt1.executeUpdate();
+            
+            // Add to destination account
+            PreparedStatement pstmt2 = conn.prepareStatement(
+                "UPDATE accounts SET balance = balance + ? WHERE id = ?");
+            pstmt2.setDouble(1, amount);
+            pstmt2.setInt(2, toAccount);
+            pstmt2.executeUpdate();
+            
+            conn.commit();  // Commit transaction
+        } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();  // Rollback on error
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+    ```
+    Not handling transactions properly can lead to data inconsistency and integrity issues. Use transactions for operations that must be executed as a single unit, ensuring that either all operations succeed or all fail (atomicity). Set appropriate isolation levels based on your concurrency requirements.
+  </Accordion>
+  
+  <Accordion title="Using MySQL as a Queue" icon="warning">
+    ```sql
+    -- Anti-pattern: Using MySQL as a queue
+    CREATE TABLE job_queue (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payload TEXT,
+        status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+    
+    -- Polling for new jobs (inefficient)
+    SELECT id, payload FROM job_queue WHERE status = 'pending' LIMIT 1 FOR UPDATE;
+    UPDATE job_queue SET status = 'processing' WHERE id = ?;
+    
+    -- Better approach: Use a dedicated message queue system
+    -- Use RabbitMQ, Apache Kafka, Redis, or other dedicated queue systems
+    
+    -- If you must use MySQL, optimize with batch processing
+    CREATE TABLE job_queue (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payload TEXT,
+        priority TINYINT DEFAULT 0,
+        status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending',
+        locked_at TIMESTAMP NULL DEFAULT NULL,
+        locked_by VARCHAR(255) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_status_priority_created (status, priority, created_at)
+    );
+    
+    -- Atomic claim of multiple jobs
+    START TRANSACTION;
+    SELECT id, payload 
+    FROM job_queue 
+    WHERE status = 'pending' 
+    AND (locked_at IS NULL OR locked_at < NOW() - INTERVAL 5 MINUTE)
+    ORDER BY priority DESC, created_at 
+    LIMIT 10 FOR UPDATE;
+    
+    UPDATE job_queue 
+    SET status = 'processing', 
+        locked_at = NOW(), 
+        locked_by = 'worker-1' 
+    WHERE id IN (?, ?, ?, ...); -- IDs from the SELECT
+    COMMIT;
+    ```
+    Using MySQL as a job queue can lead to performance issues, contention, and scaling problems. MySQL is not designed for high-throughput queue operations. Use a dedicated message queue system like RabbitMQ, Apache Kafka, or Redis for queue functionality. If you must use MySQL as a queue, optimize with batch processing and proper locking mechanisms.
+  </Accordion>
+  
+  <Accordion title="Not Optimizing Bulk Operations" icon="warning">
+    ```php
+    // Anti-pattern: Executing individual INSERT statements
+    foreach ($users as $user) {
+        $stmt = $conn->prepare("INSERT INTO users (name, email) VALUES (?, ?)");
+        $stmt->execute([$user['name'], $user['email']]);
+    }
+    
+    // Better approach: Use bulk INSERT
+    $sql = "INSERT INTO users (name, email) VALUES ";
+    $values = [];
+    $params = [];
+    
+    foreach ($users as $i => $user) {
+        $values[] = "(?, ?)"; // Add placeholders for each row
+        $params[] = $user['name'];
+        $params[] = $user['email'];
+    }
+    
+    $sql .= implode(", ", $values);
+    $stmt = $conn->prepare($sql);
+    $stmt->execute($params);
+    ```
+    ```java
+    // Java example with JDBC batch operations
+    // Anti-pattern: Individual inserts
+    for (User user : users) {
+        PreparedStatement pstmt = conn.prepareStatement(
+            "INSERT INTO users (name, email) VALUES (?, ?)");
+        pstmt.setString(1, user.getName());
+        pstmt.setString(2, user.getEmail());
+        pstmt.executeUpdate();
+    }
+    
+    // Better approach: Use batch operations
+    PreparedStatement pstmt = conn.prepareStatement(
+        "INSERT INTO users (name, email) VALUES (?, ?)");
+    
+    for (User user : users) {
+        pstmt.setString(1, user.getName());
+        pstmt.setString(2, user.getEmail());
+        pstmt.addBatch();
+    }
+    
+    pstmt.executeBatch();
+    ```
+    Executing individual INSERT, UPDATE, or DELETE statements in a loop is inefficient and can lead to poor performance. Use bulk operations like multi-row INSERT statements, LOAD DATA INFILE for large data imports, or batch operations in your application code to reduce the number of round trips to the database.
+  </Accordion>
+  
+  <Accordion title="Not Using Query Cache Effectively" icon="warning">
+    ```sql
+    -- Anti-pattern: Not considering query cache behavior
+    -- Query that won't benefit from query cache due to non-deterministic function
+    SELECT * FROM products WHERE updated_at > NOW() - INTERVAL 1 DAY;
+    
+    -- Query with low selectivity (returns too many rows)
+    SELECT * FROM large_table WHERE status = 'active';
+    
+    -- Better approach: Design queries to benefit from query cache
+    -- Use deterministic date values
+    SET @yesterday = CURDATE() - INTERVAL 1 DAY;
+    SELECT * FROM products WHERE updated_at > @yesterday;
+    
+    -- Increase selectivity and limit result size
+    SELECT id, name, price FROM large_table WHERE status = 'active' AND category_id = 5 LIMIT 100;
+    ```
+    ```sql
+    -- Note: For MySQL 8.0+, the query cache has been removed
+    -- Use application-level caching instead
+    
+    -- Example with Redis in pseudocode
+    function getProductsByCategory(categoryId) {
+        // Generate cache key
+        cacheKey = "products:category:" + categoryId;
+        
+        // Try to get from cache first
+        cachedResult = redis.get(cacheKey);
+        if (cachedResult) {
+            return deserialize(cachedResult);
+        }
+        
+        // If not in cache, query database
+        result = executeQuery("SELECT * FROM products WHERE category_id = ?", [categoryId]);
+        
+        // Store in cache with expiration
+        redis.set(cacheKey, serialize(result), "EX", 3600); // 1 hour
+        
+        return result;
+    }
+    ```
+    The query cache was removed in MySQL 8.0, but for earlier versions, not using it effectively can lead to missed optimization opportunities. For MySQL 8.0+, use application-level caching with tools like Redis or Memcached. Design queries to be cache-friendly by using deterministic functions, increasing selectivity, and limiting result sizes.
+  </Accordion>
+  
+  <Accordion title="Not Monitoring and Tuning MySQL Configuration" icon="warning">
+    ```sql
+    -- Anti-pattern: Using default MySQL configuration for all workloads
+    
+    -- Better approach: Monitor and tune MySQL configuration
+    -- Check current configuration
+    SHOW VARIABLES LIKE 'innodb_buffer_pool_size';
+    SHOW VARIABLES LIKE 'max_connections';
+    SHOW VARIABLES LIKE 'query_cache_size'; -- For MySQL < 8.0
+    
+    -- Monitor performance
+    SHOW GLOBAL STATUS LIKE 'Threads_connected';
+    SHOW GLOBAL STATUS LIKE 'Slow_queries';
+    SHOW GLOBAL STATUS LIKE 'Innodb_buffer_pool_read_requests';
+    SHOW GLOBAL STATUS LIKE 'Innodb_buffer_pool_reads';
+    
+    -- Example my.cnf optimizations for a typical web application
+    -- innodb_buffer_pool_size = 4G  # 50-80% of available RAM
+    -- innodb_log_file_size = 512M
+    -- innodb_flush_log_at_trx_commit = 2  # Slightly less durability, better performance
+    -- innodb_flush_method = O_DIRECT
+    -- max_connections = 500
+    ```
+    ```bash
+    # Set up slow query logging
+    mysql -u root -p -e "SET GLOBAL slow_query_log = 'ON';"
+    mysql -u root -p -e "SET GLOBAL long_query_time = 1;"
+    mysql -u root -p -e "SET GLOBAL slow_query_log_file = '/var/log/mysql/slow-query.log';"
+    
+    # Analyze slow queries with mysqldumpslow
+    mysqldumpslow -t 10 /var/log/mysql/slow-query.log
+    ```
+    Not monitoring and tuning MySQL configuration can lead to suboptimal performance and resource utilization. Monitor MySQL performance using tools like the Performance Schema, slow query log, and status variables. Tune configuration parameters like buffer sizes, connection limits, and InnoDB settings based on your workload and available resources.
+  </Accordion>
+  
+  <Accordion title="Using Inefficient Schema Design" icon="warning">
+    ```sql
+    -- Anti-pattern: Inefficient schema design
+    -- Using EAV (Entity-Attribute-Value) model inappropriately
+    CREATE TABLE product_attributes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT,
+        attribute_name VARCHAR(100),
+        attribute_value TEXT,
+        INDEX (product_id)
+    );
+    
+    -- Retrieving all attributes for a product requires complex queries
+    SELECT 
+        p.id, p.name, p.price,
+        MAX(CASE WHEN pa.attribute_name = 'color' THEN pa.attribute_value END) AS color,
+        MAX(CASE WHEN pa.attribute_name = 'size' THEN pa.attribute_value END) AS size,
+        MAX(CASE WHEN pa.attribute_name = 'weight' THEN pa.attribute_value END) AS weight
+    FROM products p
+    LEFT JOIN product_attributes pa ON p.id = pa.product_id
+    WHERE p.id = 123
+    GROUP BY p.id;
+    
+    -- Better approach: Use proper normalization with specific tables
+    CREATE TABLE products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100),
+        price DECIMAL(10, 2),
+        description TEXT
+    );
+    
+    CREATE TABLE product_details (
+        product_id INT PRIMARY KEY,
+        color VARCHAR(50),
+        size VARCHAR(20),
+        weight DECIMAL(8, 2),
+        FOREIGN KEY (product_id) REFERENCES products(id)
+    );
+    
+    -- Simple query to retrieve product with details
+    SELECT p.*, pd.color, pd.size, pd.weight
+    FROM products p
+    LEFT JOIN product_details pd ON p.id = pd.product_id
+    WHERE p.id = 123;
+    ```
+    ```sql
+    -- Anti-pattern: Overusing stored procedures for everything
+    DELIMITER //
+    CREATE PROCEDURE get_all_user_data(IN user_id INT)
+    BEGIN
+        SELECT * FROM users WHERE id = user_id;
+        SELECT * FROM orders WHERE user_id = user_id;
+        SELECT * FROM user_preferences WHERE user_id = user_id;
+        SELECT * FROM user_addresses WHERE user_id = user_id;
+        -- And many more tables...
+    END //
+    DELIMITER ;
+    
+    -- Better approach: Use targeted queries or views
+    CREATE VIEW user_summary AS
+    SELECT 
+        u.id, u.username, u.email,
+        COUNT(DISTINCT o.id) AS order_count,
+        MAX(o.created_at) AS last_order_date,
+        ua.city, ua.country
+    FROM users u
+    LEFT JOIN orders o ON u.id = o.user_id
+    LEFT JOIN user_addresses ua ON u.id = ua.user_id AND ua.is_primary = 1
+    GROUP BY u.id, u.username, u.email, ua.city, ua.country;
+    
+    -- Simple query to get user summary
+    SELECT * FROM user_summary WHERE id = 123;
+    ```
+    Inefficient schema design can lead to complex queries, poor performance, and maintenance challenges. Use appropriate normalization to avoid data redundancy, but don't over-normalize if it leads to excessive JOINs. Choose the right data model for your use case, and consider denormalization for read-heavy workloads when appropriate.
+  </Accordion>
+</AccordionGroup>
