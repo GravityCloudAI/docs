@@ -4,7 +4,7 @@ description: 'Launch, manage and scale your Kubernetes workloads with Gravity St
 ---
 
 ## Gravity Kubernetes Dashboard
-Gravity Cloud provides a clean, actionable and detailed overview of your current and new services.
+Matter AI provides a clean, actionable and detailed overview of your current and new services.
 
 <img
     className="block"
@@ -21,13 +21,13 @@ Gravity Cloud provides a clean, actionable and detailed overview of your current
 
 ### Setup
 1. Integrate AWS EKS just by connecting your AWS account: https://docs.gravitycloud.ai/quickstart-aws
-2. Gravity Cloud will automatically detect your EKS cluster and start scraping it. This scraping is done by external agent so your k8s cluster does not incurr any additional resources.
-3. To enable workloads data, you need to give permissions to Gravity Cloud to access your cluster. You can do this by running the following command:
+2. Matter AI will automatically detect your EKS cluster and start scraping it. This scraping is done by external agent so your k8s cluster does not incurr any additional resources.
+3. To enable workloads data, you need to give permissions to Matter AI to access your cluster. You can do this by running the following command:
 ```
 eksctl create iamidentitymapping --cluster CLUSTER_NAME --region=AWS_REGION --arn arn:aws:iam::AWS_ACCOUNT_ID:role/GravityCloudRole --username gravitycloud --group system:masters --no-duplicate-arns
 ```
 
 ### Local Developement App
-You can also download the Gravity Cloud app to run local clusters and cloud clusters with more real-time data. You can download the Linux, Mac, or Windows the app from https://gravitycloud.ai/download.
+You can also download the Matter AI app to run local clusters and cloud clusters with more real-time data. You can download the Linux, Mac, or Windows the app from https://gravitycloud.ai/download.
 
 > Quick read: https://gravitycloud.ai/blog/open-lens-vs-gravity-cloud

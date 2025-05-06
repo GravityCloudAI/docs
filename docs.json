@@ -254,7 +254,8 @@
                   "enterprise/self-hosted-docker-compose",
                   "enterprise/self-hosted-helm-chart"
                 ]
-              }
+              },
+              "enterprise/rbac"
             ]
           }
         ]

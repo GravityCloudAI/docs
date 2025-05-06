@@ -1,0 +1,47 @@
+---
+icon: lock
+title: 'RBAC'
+description: 'Role Based Access Control'
+---
+
+# Role Based Access Control (RBAC)
+
+Matter AI implements a comprehensive Role Based Access Control (RBAC) system to manage user permissions within the platform. This system defines different user roles, each with specific permissions that determine what actions users can perform.
+
+## Available Roles
+
+Matter AI offers the following roles with increasing levels of access:
+
+- **Viewer**: Limited access with only analytics viewing capabilities
+- **Member**: Standard access with viewing permissions for most resources
+- **Manager**: Extended access with editing capabilities for settings, rulesets, and memories
+- **Admin**: Full access with editing permissions for all resources
+
+## Permissions Table
+
+The following table outlines the specific permissions granted to each role:
+
+| Resource Category | Viewer | Member | Manager | Admin |
+|-------------------|:------:|:------:|:-------:|:-----:|
+| Analytics         | View   | View   | View    | Edit  |
+| Logs              | -      | View   | View    | Edit  |
+| PRs               | -      | View   | View    | Edit  |
+| Settings          | -      | View   | Edit    | Edit  |
+| Memories          | -      | View   | Edit    | Edit  |
+| Ruleset           | -      | View   | Edit    | Edit  |
+
+## Permission Types
+
+Matter AI implements two primary permission types:
+
+- **View**: Allows users to view and read resources but not modify them
+- **Edit**: Allows users to both view and modify resources
+
+## Permission Inheritance
+
+Roles generally inherit permissions from lower-level roles, with some exceptions:
+
+- Manager role inherits all Member permissions and adds editing capabilities
+- Admin role has full editing permissions across all resource categories
+
+This RBAC implementation ensures that users have appropriate access based on their responsibilities within your organization.
