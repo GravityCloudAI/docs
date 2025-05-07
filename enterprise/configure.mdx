@@ -20,6 +20,9 @@ Below are the configuration values needed:
 - Private Key (base64 encoded)
 - Webhook Secret
 
+<Warning>Remember to Base64 encode the `private-key.pem`, you can run `base64 -i private-key.pem` and enter the output in the Private Key input box under github app config</Warning>
+
+
 <Frame>
 <img src="/images/enterprise/github-app-config.png" alt="GitHub App Configuration" />
 </Frame>
@@ -32,13 +35,6 @@ Virtual keys are your AI API keys stored securely in Matter AI. You can create a
 <img src="/images/enterprise/virtual-keys.png" alt="Virtual Keys" />
 </Frame>
 
-## Custom Prompts
-
-You can update default prompts in the Matter AI dashboard as per your own needs for multiple use-cases.
-
-<Frame>
-<img src="/images/enterprise/custom-prompts.png" alt="Custom Prompts" />
-</Frame>
 
 ## RuleSets
 Rulesets are your custom organization-specific AI rules for languages, security and repositories stored securely in Matter AI. You can create and manage them in the Matter AI dashboard.
