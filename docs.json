@@ -78,7 +78,8 @@
               "product/rulesets",
               "product/memories",
               "product/analytics",
-              "product/command-list"
+              "product/command-list",
+              "product/configurations"
             ]
           },
           {
