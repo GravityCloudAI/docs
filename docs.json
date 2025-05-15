@@ -16,7 +16,7 @@
       "og:image": "https://res.cloudinary.com/dor5uewzz/image/upload/v1745344726/og-img_szgudr.webp",
       "og:title": "Matter AI | Code Reviewer Documentation",
       "og:description": "Matter AI is an intelligent pull request assistant designed to streamline code reviews, enhance collaboration, and improve code quality using AI. It automatically generates detailed PR summaries, detects performance, security, and bug-related issues in code, and helps reviewers understand complex changes faster with AI-powered explanations. By integrating seamlessly into your workflow, Matter AI reduces review time, prevents costly errors, and ensures a smoother development process—so your team can focus on building, not battling PR bottlenecks.",
-      "og:url": "https://docs.matterai.dev",
+      "og:url": "https://docs.matterai.so",
       "twitter:title": "Matter AI | Code Reviewer Documentation",
       "twitter:description": "Matter AI is an intelligent pull request assistant designed to streamline code reviews, enhance collaboration, and improve code quality using AI. It automatically generates detailed PR summaries, detects performance, security, and bug-related issues in code, and helps reviewers understand complex changes faster with AI-powered explanations. By integrating seamlessly into your workflow, Matter AI reduces review time, prevents costly errors, and ensures a smoother development process—so your team can focus on building, not battling PR bottlenecks.",
       "twitter:image": "https://res.cloudinary.com/dor5uewzz/image/upload/v1745344726/og-img_szgudr.webp",
@@ -28,8 +28,8 @@
   },
   "integrations": {
     "plausible": {
-      "domain": "docs.matterai.dev",
-      "server": "plausible.gravitycloud.ai"
+      "domain": "docs.matterai.so",
+      "server": "plausible.matterai.so"
     }
   },
   "styling": {
@@ -266,7 +266,7 @@
       "anchors": [
         {
           "anchor": "Blog",
-          "href": "https://matterai.dev/blog",
+          "href": "https://matterai.so/blog",
           "icon": "newspaper"
         },
         {
@@ -292,7 +292,7 @@
     "links": [
       {
         "label": "Contact",
-        "href": "https://matterai.dev/contact"
+        "href": "https://matterai.so/contact"
       },
       {
         "label": "Github",
@@ -307,7 +307,7 @@
   },
   "footer": {
     "socials": {
-      "website": "https://matterai.dev",
+      "website": "https://matterai.so",
       "x": "https://x.com/matteraidev",
       "github": "https://github.com/gravitycloudai",
       "linkedin": "https://www.linkedin.com/company/matter-ai-dev"
