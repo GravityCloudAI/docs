@@ -45,15 +45,7 @@
           {
             "group": "Introduction",
             "pages": [
-              "introduction",
-              {
-                "group": "Use Cases",
-                "icon": "lightbulb",
-                "pages": [
-                  "use-cases/ai-code-review-agent",
-                  "use-cases/ai-summary-generation"
-                ]
-              }
+              "introduction"
             ]
           },
           {
