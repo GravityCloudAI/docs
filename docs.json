@@ -262,6 +262,11 @@
           "icon": "newspaper"
         },
         {
+          "anchor": "Discord",
+          "href": "https://discord.gg/fJU5DvanU3",
+          "icon": "discord"
+        },
+        {
           "anchor": "Github",
           "href": "https://github.com/gravitycloudai/matter-ai",
           "icon": "github"
