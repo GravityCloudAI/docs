@@ -65,7 +65,7 @@ services:
     container_name: matter-frontend
     restart: always
     ports:
-      - "3000:3000"
+      - "80:3000"
     volumes:
       - ./config/nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
@@ -176,7 +176,8 @@ docker compose up -d
 
 ## Step 4: Visit the UI and create a new account
 
-Access the Matter AI web interface at `http://your-domain.com` (or `http://localhost:3000` if not using a reverse proxy)
+- Access the MatterAI web interface at `http://your-domain.com`
+- Access the MatterAI backend at `http://your-domain.com/api`
 
 ## Maintenance and Updates
 
