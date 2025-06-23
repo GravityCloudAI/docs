@@ -27,13 +27,99 @@ Below are the configuration values needed:
 <img src="/images/enterprise/github-app-config.png" alt="GitHub App Configuration" />
 </Frame>
 
-## Virtual Keys
+## AI Provider Keys
 
-Virtual keys are your AI API keys stored securely in Matter AI. You can create and manage them in the Matter AI dashboard.
+### Setup
+
+AI Provider keys are your AI API keys stored securely in Matter AI. You can create and manage them in the Matter AI dashboard.
 
 <Frame>
-<img src="/images/enterprise/virtual-keys.png" alt="Virtual Keys" />
+<img src="/images/enterprise/ai-provider-keys.png" alt="AI Provider Keys" />
 </Frame>
+
+### Anthropic
+
+To setup Anthropic, simply add your API key in the Matter AI dashboard. You can get your API key from [Anthropic Console](https://console.anthropic.com/settings/keys)
+
+### OpenAI
+
+To setup OpenAI, simply add your API key in the Matter AI dashboard. You can get your API key from [OpenAI Console](https://platform.openai.com/api-keys)
+
+### Gemini
+
+To setup Gemini, simply add your API key in the Matter AI dashboard. You can get your API key from [Gemini Console](https://aistudio.google.com/app/apikey)
+
+### Vertex AI
+
+To setup Vertex AI, you need to create a service account in Google Cloud Console and required details as below.
+
+- Project ID
+- Project Location (eg; us-central1)
+- Service Account JSON
+
+#### Creating Service Account for Vertex AI
+
+<Steps>
+
+<Step title="Create a new Service Account">
+Visit GCP Console for Service Accounts and create a new Service Account: [https://console.cloud.google.com/iam-admin/serviceaccounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
+<Frame>
+<img
+  className="block"
+  src="/images/enterprise/vertex-ai-1.png"
+  alt="Create a new Service Account"
+/>
+</Frame>
+</Step>
+<Step title="Configure the Service Account">
+Configure the Service Account with required name and role.
+- Name: `matterai`
+- Role: `Vertex AI Colab Service Agent`
+
+<Frame>
+<img
+  className="block"
+  src="/images/enterprise/vertex-ai-2.png"
+  alt="Configure Service Account"
+/>
+</Frame>
+
+<Frame>
+<img
+  className="block"
+  src="/images/enterprise/vertex-ai-3.png"
+  alt="Configure Service Account"
+/>
+</Frame>
+</Step>
+
+<Step title="Create a Key">
+Create a key for the service account and download the JSON file.
+
+<Frame>
+<img
+  className="block"
+  src="/images/enterprise/vertex-ai-4.png"
+  alt="Create a Key"
+/>
+</Frame>
+</Step>
+
+<Step title="Add the details in Matter AI dashboard">
+Add the details in Matter AI dashboard.
+- Project ID
+- Project Location (eg; us-central1)
+- Service Account JSON
+
+<Frame>
+<img
+  className="block"
+  src="/images/enterprise/vertex-ai-5.png"
+  alt="Add the details in Matter AI dashboard"
+/>
+</Frame>
+</Step>
+</Steps>
 
 
 ## RuleSets
