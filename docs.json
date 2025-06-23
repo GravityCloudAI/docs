@@ -37,10 +37,9 @@
   },
   "favicon": "/favicon.png",
   "navigation": {
-    "anchors": [
+    "tabs": [
       {
-        "anchor": "Documentation",
-        "icon": "book-open",
+        "tab": "Documentation",
         "groups": [
           {
             "group": "Introduction",
@@ -249,6 +248,24 @@
                 ]
               },
               "enterprise/rbac"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "groups": [
+          {
+            "group": "Monthly Summary",
+            "pages": [
+              {
+                "group": "2025",
+                "pages": [
+                  "changelog/2025/june",
+                  "changelog/2025/may",
+                  "changelog/2025/april"
+                ]
+              }
             ]
           }
         ]
