@@ -4,6 +4,10 @@ title: 'Similarity Search'
 description: 'Similarity Search is an automated part of the code review process that finds the patterns, implementations and definations to verify the code implemented is correct'
 ---
 
+<Note>
+Similarity Search is only available on PRO plan.
+</Note>
+
 ## Overview
 
 Similarity Search is an automatic review step that compares every new or modified function call **in your pull request** with existing definitions across the repository.  
@@ -29,9 +33,9 @@ We use [ast-grep](https://github.com/ast-grep/ast-grep) for syntax-aware matchin
 
 ## Why you’ll love it
 
-• **Catch bugs early** – Prevent invalid API usage before it reaches CI.
-• **Shorter reviews** – Focus human reviewers on architectural decisions, not boilerplate mistakes.
-• **Faster onboarding** – New engineers quickly learn correct library usage by example.
+- **Catch bugs early** – Prevent invalid API usage before it reaches CI.
+- **Shorter reviews** – Focus human reviewers on architectural decisions, not boilerplate mistakes.
+- **Faster onboarding** – New engineers quickly learn correct library usage by example.
 
 ## Enable / disable
 
@@ -49,5 +53,4 @@ Similarity Search is **on by default** for all repositories. You can use the set
 - Rust
 
 ## Limitations & future work
-
-• Only analyses intra-repository symbols today, cross-repo support is on the roadmap using Semantic Search.
+- Only analyses intra-repository symbols today, cross-repo support is on the roadmap using Semantic Search.
