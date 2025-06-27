@@ -1,0 +1,53 @@
+---
+icon: magnifying-glass
+title: 'Similarity Search'
+description: 'Similarity Search is an automated part of the code review process that finds the patterns, implementations and definations to verify the code implemented is correct'
+---
+
+## Overview
+
+Similarity Search is an automatic review step that compares every new or modified function call **in your pull request** with existing definitions across the repository.  
+It then checks whether the way the engineer is *using* that function matches the original implementation’s contract (required parameters, return value, side-effects, etc.).
+
+When a mismatch is detected, the reviewer leaves an inline suggestion that pin-points:
+
+1. The **issue** – what is being mis-used and why.
+2. The **fix** – the minimal code change required to align the call-site with the definition.
+3. The potential **impact** if the mismatch is shipped.
+
+> **Example**
+> The screenshot below shows `isValidUrl` being invoked with two parameters even though its definition only accepts one.
+> Similarity Search detected the mismatch and suggested the one-line fix.
+
+<Frame>
+<img src="/images/features/similarity-search.png" alt="Similarity Search" />
+</Frame>
+
+## How it works
+
+We use [ast-grep](https://github.com/ast-grep/ast-grep) for syntax-aware matching between new or modified call-sites and existing symbol definitions across the repository.
+
+## Why you’ll love it
+
+• **Catch bugs early** – Prevent invalid API usage before it reaches CI.
+• **Shorter reviews** – Focus human reviewers on architectural decisions, not boilerplate mistakes.
+• **Faster onboarding** – New engineers quickly learn correct library usage by example.
+
+## Enable / disable
+
+Similarity Search is **on by default** for all repositories. You can use the setting `Enable Similarity Search` option in the Matter AI configurations to enable or disable it.
+
+## Supported languages
+
+- JavaScript / TypeScript
+- Python
+- Go
+- Java
+- Kotlin
+- Python
+- C# / C++
+- Rust
+
+## Limitations & future work
+
+• Only analyses intra-repository symbols today, cross-repo support is on the roadmap using Semantic Search.

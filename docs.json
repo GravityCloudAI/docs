@@ -61,16 +61,17 @@
             ]
           },
           {
-            "group": "Product",
+            "group": "Features",
             "pages": [
-              "product/security-analysis",
-              "product/code-quality",
-              "product/agentic-chat",
-              "product/rulesets",
-              "product/memories",
-              "product/analytics",
-              "product/command-list",
-              "product/configurations"
+              "features/security-analysis",
+              "features/code-quality",
+              "features/similarity-search",
+              "features/agentic-chat",
+              "features/rulesets",
+              "features/memories",
+              "features/analytics",
+              "features/command-list",
+              "features/configurations"
             ]
           },
           {
