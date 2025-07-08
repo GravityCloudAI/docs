@@ -1,0 +1,88 @@
+---
+title: 'Matter AI MCP Server'
+icon: "code"
+description: 'AI-powered code reviews and development workflow directly in your IDE'
+---
+
+<Note>
+Matter AI MCP Server is currently in beta and subject to change.
+</Note>
+
+## Overview
+
+Matter AI MCP Server revolutionizes code reviews by bringing AI-powered analysis directly into your development workflow. By leveraging the Model Context Protocol (MCP), it provides seamless integration with modern IDEs to enhance code quality and developer productivity.
+
+<Frame>
+<img src="/images/matter-ai-mcp-1.png" alt="Matter AI MCP Server" />
+</Frame>
+
+## Key Features
+
+### 🔍 Comprehensive Code Reviews
+- Review individual files or full git diffs with a single command
+- Identify potential bugs, security vulnerabilities, and performance issues
+- Get suggestions for code improvements and best practices
+
+### 🧠 Implementation Planning
+- Generate detailed implementation plans for AI agents
+- Break down complex features into manageable tasks
+- Align implementation with architectural best practices
+
+### 🚀 Pull Request Generation
+- Create pull requests with auto-generated titles and descriptions
+- Highlight key changes and their impact
+- Save time on PR documentation
+
+<Frame>
+<img src="/images/matter-ai-mcp-2.png" alt="Matter AI MCP Server" />
+</Frame>
+
+## Getting Started
+
+### 1. Create your Matter AI Account
+Visit [Matter AI](https://app.matterai.dev) to create your account.
+
+### 2. IDE Setup
+
+#### For Cursor IDE:
+1. Click on "Add to Cursor" button in the Get Started section
+<Frame>
+<img src="/images/matter-ai-mcp-3.png" alt="Matter AI MCP Server" />
+</Frame>
+
+#### For Any MCP-Compatible IDE:
+1. Obtain your Matter AI API key from [Matter AI Settings](https://app.matterai.dev/settings)
+2. Configure your MCP configuration file with the following settings:
+
+```json
+{
+  "mcpServers": {
+    "matter-ai": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.matterai.so/sse",
+        "--header",
+        "X-AUTH-TOKEN:YOUR_MATTER_AI_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+### 3. Start Using in AI Agent Chats
+Use natural language to request code reviews, implementation plans, and generate pull requests directly in your IDE.
+
+## Why Choose Matter AI MCP Server?
+
+- **Seamless Integration**: Works directly in your existing development environment
+- **Context-Aware**: Understands your codebase and provides relevant suggestions
+- **Time-Saving**: Automates routine code review tasks
+- **Consistent Quality**: Provides consistent, objective code reviews every time
+
+> "Our team is hooked to this amazing AI-driven code review agent. This is something I would have loved to build myself, if MatterAI hadn't done it already." — CTO, Rumi
+
+## Learn More
+
+For more information and updates, visit [Matter AI](https://www.matterai.so).

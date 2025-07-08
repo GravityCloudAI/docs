@@ -52,10 +52,10 @@
             "pages": [
               {
                 "group": "QuickStart",
-                "icon": "stars",
+                "icon": "rocket",
                 "pages": [
                   "quickstart-ai-code-review-agent",
-                  "quickstart-ai-code-review-cli"
+                  "quickstart-ai-code-review-mcp-server"
                 ]
               }
             ]
