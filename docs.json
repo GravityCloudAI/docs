@@ -67,6 +67,7 @@
               "features/code-quality",
               "features/similarity-search",
               "features/agentic-chat",
+              "features/auto-resolve",
               "features/rulesets",
               "features/memories",
               "features/analytics",
