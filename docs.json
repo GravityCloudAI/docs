@@ -56,6 +56,7 @@
                 "pages": [
                   "quickstart-ai-code-review-agent",
                   "quickstart-ai-code-review-gitlab",
+                  "quickstart-ai-code-review-atlassian-bitbucket",
                   "quickstart-ai-code-review-mcp-server"
                 ]
               }
