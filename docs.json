@@ -321,7 +321,7 @@
     "primary": {
       "type": "button",
       "label": "Sign in",
-      "href": "https://app.matterai.dev"
+      "href": "https://app.matterai.so"
     }
   },
   "footer": {
