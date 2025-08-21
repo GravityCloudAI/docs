@@ -1,0 +1,198 @@
+---
+title: "Cortex Changelog"
+description: "Product updates and announcements"
+---
+
+<Update label="August 20, 2025">
+## Cursor Rules Support
+MatterAI now supports using your existing Cursor rules to automatically generate AI code reviews. This allows you to leverage your existing rules and policies to ensure that AI-generated reviews align with your team's coding standards and practices.
+</Update>
+
+<Update label="August 15, 2025">
+## Bugfix - AI Summary generation
+Minor bugfix on AI Summary generation JSON formatting that in somecases caused undefined to show
+</Update>
+
+<Update label="August 10, 2025">
+## Review Engine v6
+The latest version of our AI code review engine is now available, featuring:
+- **Improved Accuracy**: Enhanced understanding of code context and structure.
+- **Faster Processing**: Optimized algorithms for quicker review generation.
+- **Better Language Support**: Expanded support for more programming languages and frameworks.
+- **Enhanced Security Checks**: More robust detection of security vulnerabilities and code smells.
+</Update>
+
+<Update label="July 2025">
+## Integrations
+
+### Gitlab Setup is GA
+MatterAI seamlessly integrates with GitLab to enhance your development workflow!
+<Frame>
+  <img src="/images/connectors/gitlab/gitlab-merge-request-summary.png" alt="Setting up MatterAI service account" />
+</Frame>
+<Card
+title="Gitlab Integration"
+icon="gitlab"
+href="/quickstart-ai-code-review-gitlab"
+>
+Get Started with Gitlab AI Code Reviews
+</Card>
+
+
+## Atlassian Bitbucket Setup is GA
+MatterAI seamlessly integrates with Atlassian Bitbucket to enhance your development workflow!
+<Frame>
+  <img src="/images/connectors/bitbucket/matterai-bitbucket-summary.png" alt="Setting up MatterAI service account" />
+</Frame>
+<Card
+title="Bitbucket Integration"
+icon="bitbucket"
+href="/quickstart-ai-code-review-atlassian-bitbucket"
+>
+Get Started with Bitbucket AI Code Reviews
+</Card>
+
+## New Features
+
+### Similarity Search 🔍
+Similarity Search automatically reviews new or modified function calls in pull requests, comparing them to existing repository definitions. It verifies alignment with the function's contract (parameters, return value, side-effects). If a mismatch is found, it provides an inline suggestion detailing:
+The issue: What's misused and why.
+The fix: Minimal code changes needed.
+The impact: Risks if the mismatch is deployed.
+<Card
+icon="magnifying-glass"
+title="Similarity Search"
+href="/features/similarity-search"
+>
+Learn More about Similarity Search
+</Card>
+
+### Auto Resolve Comments ✅
+MatterAI automatically marks resolved issues in new commits with a ✅ Resolved comment, including a resolution reason.
+Benefits:
+Saves engineers time by eliminating manual comments and issue resolution.
+Validates fixes in new commits, exclusive to MatterAI-generated AI code reviews.
+<Card
+icon="message-check"
+title="Auto Resolve Comments"
+href="/features/auto-resolve"
+>
+Learn More about Auto Resolve Comments
+</Card>
+
+
+### Slack Alerts 🔔
+Get alerts on Slack channel when any PR is merged below your configured Code Quality threshold or with an unresolved security vulnerability!
+<Card
+icon="slack"
+title="Slack Alerts"
+href="/connectors/slack"
+>
+Configure Slack Alerts
+</Card>
+
+## Improvements
+- Stronger code reviews with our updated review engine
+- Updates to on-prem enterprise with better scaling and lite-reviews for cost savings
+- Bug fixes in summary generations and mermaid diagrams
+- Tanka poem in Summary: Similar to Haiku but expressing deeper emotions or nature themes.
+
+These upgrades mean faster, sharper, and more efficient reviews, try it out and let us know what you think!
+</Update>
+
+<Update label="June 2025">
+### New Features & Improvements
+
+- ✅ **Similarity Search (GA)**: Now generally available with AST grep functionality (no AI required).
+- 🔍 **Enhanced Code Reviews**: Deeper analysis, better accuracy, and improved string literals handling.
+- 📝 **Code Suggestion Formatting**: Fixed edge-case issues.
+- 🤖 **Vertex API Support**: Added Service Account authentication.
+- ✨ **Gemini Models**: Updated to latest stable versions.
+
+### Fixes & Tweaks
+
+- 🔧 **GitHub New-Line Character Parsing**: Fixed edge cases.
+- 📊 **Updated PR Review & Summary Formats**: Improved presentation and clarity.
+- 📈 **Added LLM Cost/Usage Tracking Metrics**: Better visibility into AI consumption.
+- 🐛 **Command Pattern Recognition**: Bug fixes for improved command detection.
+
+### Enterprise AI Integration
+
+- **Vertex AI Support**: Native integration with Google's Vertex AI platform for enhanced model capabilities.
+- **Multi-Model Orchestration**: Intelligent routing between different AI providers based on task requirements.
+
+### Enterprise Security Enhancements
+
+- **Role-Based Access Control**: Granular permission management for teams of all sizes.
+
+### LLM Cost Metrics
+
+- **Token Usage**: Tools to monitor and optimize token consumption.
+- **Model Performance**: Side-by-side comparison of different LLM providers.
+
+### Review Engine Improvements
+
+- **End Line Character Fixes**: Intelligent handling of line ending inconsistencies in GitHub.
+- **Committable Code Generation**: Enhanced code suggestions that are ready to commit without manual fixes.
+- **Reduced Verbosity**: More concise code and text outputs without sacrificing clarity.
+
+### Code Analysis Upgrades
+
+- **Cross-Repository Analysis**: Identify patterns and issues across multiple repositories.
+- **Legacy Code Support**: Improved analysis for older codebases and deprecated languages.
+
+### Developer Workflow Integration
+
+- **Keyboard Shortcut Customization**: Personalize your Matter AI interaction experience.
+</Update>
+
+<Update label="May 2025">
+### AI Summaries v2
+
+- **Advanced Detail Summary**: Comprehensive PR summaries with deeper context understanding
+- **Structured Information**: Automatically splits summaries into logical sections for better readability
+- **Security Visualization**: Tables for package vulnerabilities, CVEs, and detailed explanations
+
+### AI Code Review Engine V2
+
+- **Precise Code Suggestions**: Deterministic commit positioning ensures feedback exactly where you need it
+- **Duplicate Prevention**: Smarter review intelligence avoids re-analyzing unchanged code sections
+- **Cost Optimization**: Auto-model swapping selects the best AI for each use-case, balancing performance and efficiency
+
+### Command Improvements
+
+- **/matter review**: Reviews only new commits for faster and more efficient reviews
+- **/matter review-full**: Triggers a comprehensive re-review of the entire codebase when needed
+
+### Agentic Chat
+
+- **Code-Aware Conversations**: Parses PR diffs, file context, and repo structure for relevant answers
+- **Technical Explanations**: Explains implementation decisions with precise technical details
+- **Impact Analysis**: Identifies potential side effects and integration points of code changes
+
+---
+
+<Note>
+For detailed release notes and API changes, please refer to our [GitHub repository](https://github.com/GravityCloudAI/matter-ai).
+</Note>
+</Update>
+
+<Update label="April 2025">
+### AI Memories
+
+- **Learning & Adaptation**: Observes developer interactions to capture team preferences and coding styles
+- **Pattern Recognition**: Identifies recurring patterns in code reviews and discussions for better context
+- **Contextual Understanding**: Builds deeper understanding of your codebase and project architecture
+
+### Continuous Improvement
+
+- **Adaptive Reviews**: Refines review approach based on team interactions and preferences
+- **Team Alignment**: Becomes increasingly aligned with team-specific needs and standards
+
+### Knowledge Retention
+
+- **Codebase Familiarity**: Develops understanding of project-specific patterns and conventions
+
+---
+
+</Update>
