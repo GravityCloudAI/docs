@@ -11,9 +11,8 @@ Rulesets is available only on the PRO plan.
 ## MATTER.md
 Similar to Cursor Rules, you can define rules in a `MATTER.md` file in the root of your repository. This file will be automatically detected and applied by Matter AI during code reviews.
 
-`MATTER.md` file can contain two sections:
+`MATTER.md` file must contain:
 
-- `# CODE_GEN_RULES` section: Define rules for code generation
 - `# CODE_REVIEW_RULES` section: Define rules for code reviews
 
 ### Best practices
@@ -23,22 +22,42 @@ Similar to Cursor Rules, you can define rules in a `MATTER.md` file in the root 
 - Provide concrete examples or referenced files
 - Avoid vague guidance. Write rules like clear internal docs
 
+> You can find more detailed examples in the Git repository here: https://github.com/GravityCloudAI/matter-rules-examples
+
 ### Example
 
 ```markdown MATTER.md lines icon="markdown"
-# CODE_GEN_RULES
-1. Package Management
-   - ONLY use uv, NEVER pip
-   - Installation: `uv add package`
-   - Running tools: `uv run tool`
-   - Upgrading: `uv add --dev package --upgrade-package package`
-   - FORBIDDEN: `uv pip install`, `@latest` syntax
-
 # CODE_REVIEW_RULES
-1. Code Format
-   - Always add documentation for new and updated code
-   - Always define variables in snake_case
-   - All APIs should support correct error messages in response
+
+## 1. Code Format & Style
+   - Use camelCase for variables and functions
+   - Use PascalCase for constructors and classes
+   - Use const for immutable values, let for variables
+   - Prefer arrow functions for callbacks and short functions
+
+## 2. Modern JavaScript Patterns
+   - Use destructuring for object/array extraction
+   - Prefer template literals over string concatenation
+   - Use optional chaining (?.) for safe property access
+   - Use nullish coalescing (??) for default values
+
+## 3. Async Operations
+   - Prefer async/await over .then() chains
+   - Always handle promise rejections with try/catch
+   - Use Promise.all() for parallel async operations
+   - Avoid mixing async/await with .then()
+
+## 4. Error Handling
+   - Validate function parameters at entry
+   - Use meaningful error messages
+   - Handle edge cases (null, undefined, empty arrays)
+   - Log errors with sufficient context
+
+## 5. Performance & Memory
+   - Avoid creating functions inside render loops
+   - Use array methods (map, filter, reduce) appropriately
+   - Clean up event listeners and timers
+   - Minimize DOM manipulation in loops
 ```
 
 ## Cursor Rules and Claude.md
