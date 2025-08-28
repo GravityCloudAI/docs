@@ -8,6 +8,39 @@ description: 'Rulesets are powerful configuration tools that allow teams to prec
 Rulesets is available only on the PRO plan.
 </Note>
 
+## MATTER.md
+Similar to Cursor Rules, you can define rules in a `MATTER.md` file in the root of your repository. This file will be automatically detected and applied by Matter AI during code reviews.
+
+`MATTER.md` file can contain two sections:
+
+- `# CODE_GEN_RULES` section: Define rules for code generation
+- `# CODE_REVIEW_RULES` section: Define rules for code reviews
+
+### Best practices
+- Good rules are focused, actionable, and scoped.
+- Keep rules under 500 lines
+- Split large rules into multiple, composable rules
+- Provide concrete examples or referenced files
+- Avoid vague guidance. Write rules like clear internal docs
+
+### Example
+
+```markdown MATTER.md lines icon="markdown"
+# CODE_GEN_RULES
+1. Package Management
+   - ONLY use uv, NEVER pip
+   - Installation: `uv add package`
+   - Running tools: `uv run tool`
+   - Upgrading: `uv add --dev package --upgrade-package package`
+   - FORBIDDEN: `uv pip install`, `@latest` syntax
+
+# CODE_REVIEW_RULES
+1. Code Format
+   - Always add documentation for new and updated code
+   - Always define variables in snake_case
+   - All APIs should support correct error messages in response
+```
+
 ## Cursor Rules and Claude.md
 If you have exisitng Cursor Rules or Claude.md files in your repositories, Matter AI can automatically detect and apply these rules during code reviews. This ensures that your established coding standards and practices are consistently enforced without any additional configuration. Check [Configurations](/features/configurations) to enable this feature.
 
