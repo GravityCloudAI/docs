@@ -11,6 +11,13 @@
   "fonts": {
     "family": "Geist"
   },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt"
+    ]
+  },
   "seo": {
     "metatags": {
       "og:image": "https://res.cloudinary.com/dxvbskvxm/image/upload/v1756191766/og-image-matter_s5m5l6.webp",
