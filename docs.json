@@ -76,7 +76,8 @@
                     "group": "Integrations",
                     "icon": "wrench",
                     "pages": [
-                      "/axon/integrations/cline-ide"
+                      "/axon/integrations/cline",
+                      "/axon/integrations/continue"
                     ]
                   }
                 ]
