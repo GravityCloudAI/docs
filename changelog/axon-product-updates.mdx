@@ -1,9 +1,63 @@
 ---
-title: "Cortex Changelog"
-description: "Product updates and announcements"
+title: "Axon Changelog"
+description: "Product updates and announcements for MatterAI Axon LLM"
 ---
 
+<Update label="August 25th, 2025">
+## Improved Response Speed
+MatterAI Axon now supports improved response speed to provide a high level overview of the reasoning process. This allows you to balance between accuracy and performance.
+</Update>
+
+<Update label="August 20th, 2025">
+## Web Search & Web Fetch Tool Calling
+MatterAI Axon now supports web search and web fetch tool calling to provide a high level overview of the reasoning process. This allows you to balance between accuracy and performance.
+
+- `web_search` - LLM will use web search to find relevant information
+- `web_fetch` - LLM will scrape the provided URL to find relevant information
+
+<Note>
+Tool Calling is always available and enabled by default.
+</Note>
+</Update>
+
+<Update label="August 10th, 2025">
+## Reasoning Summary in Response
+MatterAI Axon now supports reasoning summary in response to provide a high level overview of the reasoning process. This allows you to balance between accuracy and performance.
+
+- `auto` - AI will decide whether to provide a summary or not
+- `none` - AI will never provide a summary
+
+```json
+{
+  "reasoning": {
+    "summary": "auto"
+  }
+}
+```
+<Note>
+Reasoning summary is always enclosed in a `<reasoning_start>` REASONING `<reasoning_end>` tag.
+</Note>
+</Update>
+
+<Update label="August 5, 2025">
+## Reasoning Effort Options
+MatterAI Axon now supports reasoning effort options to control the level of reasoning and analysis performed by the AI model. This allows you to balance between accuracy and performance.
+
+- `None` - No reasoning, fastest
+- `Low` - Fastest, least accurate
+- `Medium` - Good balance
+- `High` - Most accurate, slowest
+
+```json
+{
+  "reasoning": {
+    "effort": "low | medium | high | none"
+  }
+}
+```
+</Update>
+
 <Update label="August 1, 2025">
-# Alpha Release
-MatterAI Axon aplha release
+## Private Beta Release
+MatterAI Axon private beta release
 </Update>

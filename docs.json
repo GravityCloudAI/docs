@@ -296,7 +296,8 @@
           {
             "group": "Product Updates",
             "pages": [
-              "changelog/cortex-product-updates"
+              "changelog/cortex-product-updates",
+              "changelog/axon-product-updates"
             ]
           }
         ]
