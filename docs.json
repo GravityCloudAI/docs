@@ -320,6 +320,11 @@
           "anchor": "Github",
           "href": "https://github.com/gravitycloudai/matter-ai",
           "icon": "github"
+        },
+        {
+          "anchor": "Status Page",
+          "href": "https://status.matterai.so",
+          "icon": "monitor-waveform"
         }
       ]
     }
