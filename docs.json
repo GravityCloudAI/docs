@@ -89,6 +89,7 @@
             "pages": [
               "features/security-analysis",
               "features/code-quality",
+              "features/codebase-learnings",
               "features/similarity-search",
               "features/agentic-chat",
               "features/auto-resolve",
