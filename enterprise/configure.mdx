@@ -1,15 +1,15 @@
 ---
 title: 'Enterprise Configurations'
-description: 'Configure Matter AI for your enterprise deployment features as per your organization'
+description: 'Configure MatterAI for your enterprise deployment features as per your organization'
 ---
 
 <Note>
-These instructions are for self-hosted enterprise Matter AI deployments.
+These instructions are for self-hosted enterprise MatterAI deployments.
 </Note>
 
 ## Github App Configuration
 
-Once you have created your own GitHub App, you need to configure it for Matter AI.
+Once you have created your own GitHub App, you need to configure it for MatterAI.
 
 Below are the configuration values needed:
 
@@ -29,23 +29,23 @@ Below are the configuration values needed:
 
 ## Review Configurations
 
-Customize how Matter AI handles code reviews with the following settings:
+Customize how MatterAI handles code reviews with the following settings:
 
 <Frame>
 <img src="/images/enterprise/review-configurations.png" alt="Review Configurations" />
 </Frame>
 
 ### **Enable PR Review Comments** 
-When enabled, Matter AI will post detailed review comments on pull requests, highlighting potential issues and suggestions directly in the code diff.
+When enabled, MatterAI will post detailed review comments on pull requests, highlighting potential issues and suggestions directly in the code diff.
 
 #### Enable PR Review on Commits
-When enabled, Matter AI will automatically review new commits pushed to pull requests, providing feedback on the latest changes.
+When enabled, MatterAI will automatically review new commits pushed to pull requests, providing feedback on the latest changes.
 
 #### Enable Language Rulesets in Review
-When enabled, Matter AI will apply language-specific rules and best practices during code reviews, ensuring code quality and consistency.
+When enabled, MatterAI will apply language-specific rules and best practices during code reviews, ensuring code quality and consistency.
 
 #### Enable Similarity Search
-When enabled, Matter AI will search for similar code patterns across your codebase to identify potential duplications or reusable components.
+When enabled, MatterAI will search for similar code patterns across your codebase to identify potential duplications or reusable components.
 
 #### Enable Lite Review
 When enabled, performs a faster, less resource-intensive review that focuses on critical issues only.
@@ -62,7 +62,7 @@ When enabled, includes code quality improvement recommendations in the review su
 When enabled, generates and includes sequence diagrams in the review summary to help visualize complex interactions in the code.
 
 ## Disabled Repositories
-Mark repositories that Matter AI should not review automatically. Manual reviews can be triggered for these repositories using `/matter` [commands](/features/command-list).
+Mark repositories that MatterAI should not review automatically. Manual reviews can be triggered for these repositories using `/matter` [commands](/features/command-list).
 
 <Frame>
 <img src="/images/enterprise/disabled-repositories.png" alt="Disabled Repositories" />
@@ -72,7 +72,7 @@ Mark repositories that Matter AI should not review automatically. Manual reviews
 
 ### Setup
 
-AI Provider keys are your AI API keys stored securely in Matter AI. You can create and manage them in the Matter AI dashboard.
+AI Provider keys are your AI API keys stored securely in MatterAI. You can create and manage them in the MatterAI dashboard.
 
 <Frame>
 <img src="/images/enterprise/ai-provider-keys.png" alt="AI Provider Keys" />
@@ -80,15 +80,15 @@ AI Provider keys are your AI API keys stored securely in Matter AI. You can crea
 
 ### Anthropic
 
-To setup Anthropic, simply add your API key in the Matter AI dashboard. You can get your API key from [Anthropic Console](https://console.anthropic.com/settings/keys)
+To setup Anthropic, simply add your API key in the MatterAI dashboard. You can get your API key from [Anthropic Console](https://console.anthropic.com/settings/keys)
 
 ### OpenAI
 
-To setup OpenAI, simply add your API key in the Matter AI dashboard. You can get your API key from [OpenAI Console](https://platform.openai.com/api-keys)
+To setup OpenAI, simply add your API key in the MatterAI dashboard. You can get your API key from [OpenAI Console](https://platform.openai.com/api-keys)
 
 ### Gemini
 
-To setup Gemini, simply add your API key in the Matter AI dashboard. You can get your API key from [Gemini Console](https://aistudio.google.com/app/apikey)
+To setup Gemini, simply add your API key in the MatterAI dashboard. You can get your API key from [Gemini Console](https://aistudio.google.com/app/apikey)
 
 ### Vertex AI
 
@@ -146,8 +146,8 @@ Create a key for the service account and download the JSON file.
 </Frame>
 </Step>
 
-<Step title="Add the details in Matter AI dashboard">
-Add the details in Matter AI dashboard.
+<Step title="Add the details in MatterAI dashboard">
+Add the details in MatterAI dashboard.
 - Project ID
 - Project Location (eg; us-central1)
 - Service Account JSON
@@ -156,7 +156,7 @@ Add the details in Matter AI dashboard.
 <img
   className="block"
   src="/images/enterprise/vertex-ai-5.png"
-  alt="Add the details in Matter AI dashboard"
+  alt="Add the details in MatterAI dashboard"
 />
 </Frame>
 </Step>
@@ -164,17 +164,17 @@ Add the details in Matter AI dashboard.
 
 
 ## RuleSets
-Rulesets are your custom organization-specific AI rules for languages, security and repositories stored securely in Matter AI. You can create and manage them in the Matter AI dashboard.
+Rulesets are your custom organization-specific AI rules for languages, security and repositories stored securely in MatterAI. You can create and manage them in the MatterAI dashboard.
 
 ### Language Rules
-Create or edit existing language rules in the Matter AI dashboard as per how AI should should review your codebase with specific instructions.
+Create or edit existing language rules in the MatterAI dashboard as per how AI should should review your codebase with specific instructions.
 
 <Frame>
 <img src="/images/enterprise/language-rules.png" alt="Language Rules" />
 </Frame>
 
 ### Security Rules
-Create or edit existing security rules in the Matter AI dashboard as per how AI should should review your codebase with specific instructions.
+Create or edit existing security rules in the MatterAI dashboard as per how AI should should review your codebase with specific instructions.
 
 <Frame>
 <img src="/images/enterprise/security-rules.png" alt="Security Rules" />

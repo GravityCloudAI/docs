@@ -1,13 +1,13 @@
 ---
 icon: dharmachakra
 title: 'Kubernetes Deployment'
-description: 'Deploy Matter AI on Kubernetes using Helm charts'
+description: 'Deploy MatterAI on Kubernetes using Helm charts'
 ---
 
 ## Infrastructure Diagram
 
 <Frame>
-<img src="/images/enterprise/self-hosted-kubernetes-infrastructure-diagram.png" alt="Infrastructure Diagram for Matter AI on Kubernetes" />
+<img src="/images/enterprise/self-hosted-kubernetes-infrastructure-diagram.png" alt="Infrastructure Diagram for MatterAI on Kubernetes" />
 </Frame>
 
 ## Prerequisites
@@ -197,13 +197,13 @@ helm upgrade --install matter-ai-enterprise gravity/matter-ai-enterprise -f matt
 
 ## Step 4: Visit the UI and create a new account
 
-Access the Matter AI web interface at `http://your-domain.com` (or `http://localhost:3000` if not using a reverse proxy)
+Access the MatterAI web interface at `http://your-domain.com` (or `http://localhost:3000` if not using a reverse proxy)
 
 ## Maintenance and Updates
 
-### Updating Matter AI
+### Updating MatterAI
 
-To update to the latest version of Matter AI:
+To update to the latest version of MatterAI:
 
 ```bash
 # Pull the latest chart
@@ -215,7 +215,7 @@ helm upgrade matter-ai-enterprise gravity/matter-ai-enterprise -f matter-enterpr
 
 ## Next steps
 <CardGroup cols={1}>
-  <Card title="Configure Matter AI" icon="gears" href="/enterprise/configure">
-    Configure Matter AI for your enterprise deployment
+  <Card title="Configure MatterAI" icon="gears" href="/enterprise/configure">
+    Configure MatterAI for your enterprise deployment
   </Card>
 </CardGroup>

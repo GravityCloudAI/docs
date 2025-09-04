@@ -1,9 +1,9 @@
 ---
 title: 'Create Your Own GitHub App'
-description: 'Set up a custom GitHub App to deploy Matter AI in your own environment'
+description: 'Set up a custom GitHub App to deploy MatterAI in your own environment'
 ---
 
-This guide walks you through the process of creating and configuring your own GitHub App for Matter AI, giving you complete control over permissions and data access.
+This guide walks you through the process of creating and configuring your own GitHub App for MatterAI, giving you complete control over permissions and data access.
 
 ## Prerequisites
 
@@ -14,19 +14,19 @@ This guide walks you through the process of creating and configuring your own Gi
 1. Navigate to your GitHub organization settings (or personal settings)
 2. Select **Developer settings** > **GitHub Apps** > **New GitHub App**
 3. Configure the basic app settings:
-   - **GitHub App name**: Choose a descriptive name (e.g., "YourCompany Matter AI")
+   - **GitHub App name**: Choose a descriptive name (e.g., "YourCompany MatterAI")
    - **Homepage URL**: Your company website or internal documentation URL
    - **Callback URL**: `https://matter-backend.example.com/api/v1/auth/github/callback`. Replace your domain later.
    - **Webhook URL**: `https://matter-backend.example.com/github/webhook`. Replace your domain later.
    - **Webhook secret**: Generate a secure random string to validate webhook payloads
 
 <Note>
-Keep your webhook secret secure. You'll need to provide this to your Matter AI instance during configuration.
+Keep your webhook secret secure. You'll need to provide this to your MatterAI instance during configuration.
 </Note>
 
 ## Step 2: Set Required Permissions
 
-Matter AI requires specific permissions to function properly. Configure the following permission settings:
+MatterAI requires specific permissions to function properly. Configure the following permission settings:
 
 ### Repository **Permissions**
 
@@ -97,18 +97,18 @@ The private key is generated only once and cannot be recovered if lost. Store it
 1. Navigate to your GitHub App's settings page
 2. Click on **Install App** in the sidebar
 3. Choose the organization or account where you want to install the app
-4. Select the repositories you want Matter AI to have access to
+4. Select the repositories you want MatterAI to have access to
    - You can choose specific repositories or grant access to all repositories
 
 ## Next Steps
 
-Now that you've created your GitHub App, you can proceed to deploy Matter AI using one of our self-hosting options:
+Now that you've created your GitHub App, you can proceed to deploy MatterAI using one of our self-hosting options:
 
 <CardGroup cols={2}>
   <Card title="Docker Compose Deployment" icon="docker" href="/enterprise/self-hosted-docker-compose">
-    Deploy Matter AI using Docker Compose
+    Deploy MatterAI using Docker Compose
   </Card>
   <Card title="Kubernetes Deployment" icon="dharmachakra" href="/enterprise/self-hosted-helm-chart">
-    Deploy Matter AI on Kubernetes using Helm charts
+    Deploy MatterAI on Kubernetes using Helm charts
   </Card>
 </CardGroup>

@@ -1,15 +1,15 @@
 ---
 icon: docker
 title: 'Docker Compose'
-description: 'Deploy Matter AI in your own infrastructure using Docker Compose'
+description: 'Deploy MatterAI in your own infrastructure using Docker Compose'
 ---
 
-This guide walks you through deploying Matter AI in your own infrastructure using Docker Compose, which is ideal for smaller deployments or testing environments.
+This guide walks you through deploying MatterAI in your own infrastructure using Docker Compose, which is ideal for smaller deployments or testing environments.
 
 ## Prerequisites
 
 <Note>
-You need to have private registery docker credentials. Contact Matter AI team at support@matterai.so
+You need to have private registery docker credentials. Contact MatterAI team at support@matterai.so
 </Note>
 
 - A server with Docker and Docker Compose installed
@@ -169,7 +169,7 @@ server {
 }
 ```
 
-## Step 3: Deploy Matter AI
+## Step 3: Deploy MatterAI
 ```bash
 docker compose up -d
 ```
@@ -181,9 +181,9 @@ docker compose up -d
 
 ## Maintenance and Updates
 
-### Updating Matter AI
+### Updating MatterAI
 
-To update to the latest version of Matter AI:
+To update to the latest version of MatterAI:
 
 ```bash
 # Pull the latest images
@@ -224,7 +224,7 @@ cat your_backup_file.sql | docker-compose exec -T postgres psql -U ${POSTGRES_US
 
 ## Next steps
 <CardGroup cols={1}>
-  <Card title="Configure Matter AI" icon="gears" href="/enterprise/configure">
-    Configure Matter AI for your enterprise deployment
+  <Card title="Configure MatterAI" icon="gears" href="/enterprise/configure">
+    Configure MatterAI for your enterprise deployment
   </Card>
 </CardGroup>

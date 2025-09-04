@@ -1,7 +1,7 @@
 ---
 icon: messages-question
 title: 'Agentic Chat'
-description: 'Agentic Chat is a powerful feature that allows engineers to chat with their pull requests using Matter AI.'
+description: 'Agentic Chat is a powerful feature that allows engineers to chat with their pull requests using MatterAI.'
 ---
 
 <Note>
@@ -14,7 +14,7 @@ Agentic Chat is available on all plans.
 
 ## Overview
 
-Matter AI is an intelligent assistant embedded directly in your code review workflow that enables developers to interact with PRs through natural language. The agent lives inside your GitHub PR interface, eliminating context switching while providing deep insights into code changes. It parses PR context, understands code structure, and delivers targeted answers to technical questions without requiring you to leave your development environment.
+MatterAI is an intelligent assistant embedded directly in your code review workflow that enables developers to interact with PRs through natural language. The agent lives inside your GitHub PR interface, eliminating context switching while providing deep insights into code changes. It parses PR context, understands code structure, and delivers targeted answers to technical questions without requiring you to leave your development environment.
 
 ## Features
 
@@ -68,7 +68,7 @@ Matter AI is an intelligent assistant embedded directly in your code review work
 ```md
 User: `/matter can you explain the changes made in postDeployStep?`
 
-Matter AI: The changes in postDeployStep remove the branch-specific deployment filtering logic:
+MatterAI: The changes in postDeployStep remove the branch-specific deployment filtering logic:
 
 Before:
 - Post-deployment would conditionally run based on branch name patterns
@@ -88,7 +88,7 @@ Technical impact: Deployment decisions now rely entirely on PR creation rather t
 ```md
 User: `/matter How does the wildcard pattern matching work in the old code?`
 
-Matter AI: Technical implementation of wildcard pattern matching in the old code:
+MatterAI: Technical implementation of wildcard pattern matching in the old code:
 
 1. Entry point: `some()` method checks if any branch in `postDeployStep.branches` ends with `.*`
 2. Pattern extraction:
@@ -110,7 +110,7 @@ This implements a simplified glob-like pattern matching focused specifically on 
 ```md
 User: `/matter Why would we want to remove branch filtering for post-deployment steps?`
 
-Matter AI: Technical rationale for removing branch filtering:
+MatterAI: Technical rationale for removing branch filtering:
 
 1. **Deployment Philosophy Shift**:
    - From: Implicit deployment based on branch naming conventions
@@ -137,7 +137,7 @@ Matter AI: Technical rationale for removing branch filtering:
 ```md
 User: `/matter What are potential issues with this change?`
 
-Matter AI: Technical risks and considerations:
+MatterAI: Technical risks and considerations:
 
 1. **CI Resource Consumption**:
    - All branches now trigger post-deployment steps
@@ -168,7 +168,7 @@ Matter AI: Technical risks and considerations:
 ```md
 User: `/matter What are best practices for PR-based deployments?`
 
-Matter AI: [Using web search tool...]
+MatterAI: [Using web search tool...]
 
 Based on current industry standards, here are PR-based deployment best practices:
 
