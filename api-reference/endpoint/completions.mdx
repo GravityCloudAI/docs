@@ -40,7 +40,7 @@ Keep your API key secure and never expose it in client-side code. Get your API k
   Whether to stream the response as it's generated.
 </ParamField>
 
-<ParamField body="max_tokens" type="integer" default="2000">
+<ParamField body="max_tokens" type="integer" default="8192">
   The maximum number of tokens to generate in the completion.
 </ParamField>
 
@@ -48,8 +48,14 @@ Keep your API key secure and never expose it in client-side code. Get your API k
   Configuration for reasoning capabilities.
   
   <Expandable title="Reasoning Object">
-    <ParamField body="effort" type="string" default="none">
+    <ParamField body="effort" type="string" default="high">
       The level of reasoning effort. Options: `"none"`, `"low"`, `"medium"`, `"high"`.
+    </ParamField>
+  </Expandable>
+
+    <Expandable title="Reasoning Object">
+    <ParamField body="summary" type="string" default="none">
+      The level of reasoning effort. Options: `"none"`, `"auto"`.
     </ParamField>
   </Expandable>
 </ParamField>
