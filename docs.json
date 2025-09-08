@@ -68,18 +68,11 @@
                 ]
               },
               {
-                "group": "Axon Code Gen",
-                "icon": "laptop-code",
+                "group": "Axon LLM Models",
+                "icon": "gem",
                 "pages": [
-                  "axon-ai-code-gen",
-                  {
-                    "group": "Integrations",
-                    "icon": "wrench",
-                    "pages": [
-                      "/axon/integrations/cline",
-                      "/axon/integrations/continue"
-                    ]
-                  }
+                  "axon-code",
+                  "axon-base"
                 ]
               }
             ]
