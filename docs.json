@@ -292,6 +292,25 @@
         ]
       },
       {
+        "tab": "Coding Tools",
+        "pages": [
+          {
+            "group": "CLI",
+            "pages": [
+              "coding-tools/cli/codex",
+              "coding-tools/cli/claude-code"
+            ]
+          },
+          {
+            "group": "Editors",
+            "pages": [
+              "coding-tools/editors/cline",
+              "coding-tools/editors/continue"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Changelog",
         "groups": [
           {

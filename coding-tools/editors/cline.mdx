@@ -1,0 +1,51 @@
+---
+title: "Cline"
+description: "Configure Cline IDE to work with Axon AI code generation"
+---
+
+<Tip>
+Axon Coding Plan is currently in beta with free 10M tokens a week, collectively for all Axon Models
+</Tip>
+
+Cline is a VS Code extension that provides AI-powered coding assistance. You can configure it to use Axon's AI capabilities for enhanced code generation and analysis.
+
+## Obtain MatterAI API Key
+Get your API Key from MatterAI console: [https://app.matterai.so/settings](https://app.matterai.so/settings)
+
+## Configuration
+
+To integrate Cline with Axon, configure the following settings in Cline's API Configuration:
+
+<Frame>
+<img
+  className="block"
+  src="/images/axon/axon-cline-setup.png"
+  alt="Axon Cline Setup"
+/>
+</Frame>
+
+### API Provider Settings
+- **API Provider**: OpenAI Compatible
+- **Base URL**: `https://api.matterai.so/v1`
+- **Model ID**: `axon-code`
+
+### Authentication
+- **OpenAI Compatible API Key**: Your Axon API key
+- The key is stored locally and only used for API requests
+
+### Model Configuration
+- **Context Window Size**: 200,000 tokens
+- **Max Output Tokens**: 32,768
+- **Input Price**: $2.00/1M tokens
+- **Output Price**: $5.00/1M tokens
+- **Temperature**: 0.1
+
+### Features
+- ✅ Supports complex prompts optimized for Claude models
+- ❌ Does not support images
+- ❌ Does not support browser use
+- ❌ Does not support prompt caching
+
+## Usage Notes
+
+The configuration provides a large context window (200,000 tokens) which is ideal for working with large codebases and maintaining context across extended coding sessions.

@@ -1,0 +1,34 @@
+---
+title: "Claude Code"
+description: "Configure Claude Code CLI to work with Axon models"
+---
+
+<Tip>
+Axon Coding Plan is currently in beta with free 10M tokens a week, collectively for all Axon Models
+</Tip>
+
+## Obtain MatterAI API Key
+Get your API Key from MatterAI console: [https://app.matterai.so/settings](https://app.matterai.so/settings)
+
+## Configuration
+
+To integrate Axon models with Claude Code CLI, configure your environment as following:
+
+1. Export Custom Base URL in your environment
+```
+export ANTHROPIC_BASE_URL=https://api.matterai.so
+```
+
+2. Export Custom Auth Token in your environment
+```
+export ANTHROPIC_AUTH_TOKEN=<your_matterai_api_key>
+```
+
+<Note>
+These exports are for the current shell, to always use it, please set in `~/.bashrc` OR `~/.zshrc` file
+</Note>
+
+4. Start using Claude Code
+```
+claude -p "What is the capital of France"
+```
