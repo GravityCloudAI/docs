@@ -298,6 +298,7 @@
             "group": "Editors",
             "pages": [
               "coding-tools/editors/cline",
+              "coding-tools/editors/cursor",
               "coding-tools/editors/continue"
             ]
           }

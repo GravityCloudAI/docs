@@ -1,6 +1,6 @@
 ---
-title: "Cline"
-description: "Configure Cline IDE to work with Axon AI code generation"
+title: "Cursor"
+description: "Configure Cursor IDE to work with Axon AI code generation"
 ---
 
 <Tip>
@@ -19,23 +19,24 @@ To integrate Cline with Axon, configure the following settings in Cline's API Co
 <Frame>
 <img
   className="block"
-  src="/images/axon/axon-cline-setup.png"
-  alt="Axon Cline Setup"
+  src="/images/axon/axon-cursor-setup.png"
+  alt="Axon Cursor Setup"
 />
 </Frame>
 
 ### API Provider Settings
 - **API Provider**: OpenAI Compatible
 - **Base URL**: `https://api.matterai.so/v1`
-- **Model ID**: `axon-code`
+- **Model ID**: `gpt-4o`
+
+<Note>
+Cursor routes LLM calls via thier internal system and only OpenAI model name are valid, using `gpt-4o` is equal to `axon-code`.
+</Note>
 
 ### Authentication
 - **OpenAI Compatible API Key**: Your Axon API key
 - The key is stored locally and only used for API requests
 
-### Model Configuration
-- **Context Window Size**: 200,000 tokens
-- **Max Output Tokens**: 32,768
-- **Input Price**: $2.00/1M tokens
-- **Output Price**: $5.00/1M tokens
-- **Temperature**: 0.1
+## Usage Notes
+
+The configuration provides a large context window (200,000 tokens) which is ideal for working with large codebases and maintaining context across extended coding sessions.
