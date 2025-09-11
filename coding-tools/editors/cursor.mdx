@@ -1,5 +1,5 @@
 ---
-title: "Cursor"
+title: "Cursor Editor"
 description: "Configure Cursor IDE to work with Axon AI code generation"
 ---
 
@@ -7,14 +7,12 @@ description: "Configure Cursor IDE to work with Axon AI code generation"
 Axon Coding Plan is currently in beta with free 10M tokens a week, collectively for all Axon Models
 </Tip>
 
-Cline is a VS Code extension that provides AI-powered coding assistance. You can configure it to use Axon's AI capabilities for enhanced code generation and analysis.
-
 ## Obtain MatterAI API Key
 Get your API Key from MatterAI console: [https://app.matterai.so/settings](https://app.matterai.so/settings)
 
 ## Configuration
 
-To integrate Cline with Axon, configure the following settings in Cline's API Configuration:
+To integrate Cursir with Axon, configure the following settings in Cursors Model's Configuration:
 
 <Frame>
 <img
@@ -30,13 +28,25 @@ To integrate Cline with Axon, configure the following settings in Cline's API Co
 - **Model ID**: `gpt-4o`
 
 <Note>
-Cursor routes LLM calls via thier internal system and only OpenAI model name are valid, using `gpt-4o` is equal to `axon-code`.
+Cursor routes LLM calls via thier internal backend and only OpenAI model name are valid, using `gpt-4o` is equal to `axon-code`. Do not use any other model name, it will result into 401 error from Cursor.
 </Note>
 
 ### Authentication
 - **OpenAI Compatible API Key**: Your Axon API key
 - The key is stored locally and only used for API requests
 
-## Usage Notes
+### Model Configuration
+- **Context Window Size**: 200,000 tokens
+- **Model Name**: `axon-code`
+- **Max Output Tokens**: 32,768
+- **Input Price**: $1.50/1M tokens
+- **Output Price**: $7.50/1M tokens
+- **Temperature**: 0.1
 
-The configuration provides a large context window (200,000 tokens) which is ideal for working with large codebases and maintaining context across extended coding sessions.
+### Cursor Support
+| Feature | Supported |
+|---------|-----------|
+| Code Generation | ✅ |
+| Tool Calling | ✅ |
+| Reasoning | ✅ |
+| Reasoning Summaries | ❌ |

@@ -1,0 +1,99 @@
+---
+title: "Zed Editor"
+description: "Configure Zed IDE to work with Axon AI code generation"
+---
+
+<Tip>
+Axon Coding Plan is currently in beta with free 10M tokens a week, collectively for all Axon Models
+</Tip>
+
+Zed is a next-generation code editor designed for high-performance collaboration with humans and AI. Official installation website: [https://zed.dev](https://zed.dev)
+
+## Obtain MatterAI API Key
+Get your API Key from MatterAI console: [https://app.matterai.so/settings](https://app.matterai.so/settings)
+
+## Configuration
+
+To integrate Zed with Axon, configure the following settings in Zed's Provider Selection and `~/.config/zed/settings.json` file:
+
+- Setup `MatterAI` Provider in `~/.config/zed/settings.json`:
+
+<Frame>
+<img
+  className="block"
+  src="/images/axon/zed-axon-setup.png"
+  alt="Axon Zed Setup"
+/>
+</Frame>
+
+```json ~/.config/zed/settings.json lines icon="json"
+// Zed settings
+//
+// For information on how to configure Zed, see the Zed
+// documentation: https://zed.dev/docs/configuring-zed
+//
+// To see all of Zed's default settings without changing your
+// custom settings, run `zed: open default settings` from the
+// command palette (cmd-shift-p / ctrl-shift-p)
+{
+  "agent": {
+    "default_model": {
+      "provider": "MatterAI",
+      "model": "axon-code"
+    }
+  },
+  "language_models": {
+    "openai_compatible": {
+      "MatterAI": {
+        "api_url": "https://api.matterai.so/v1",
+        "available_models": [
+          {
+            "name": "axon-code",
+            "display_name": "axon-code",
+            "max_tokens": 200000,
+            "max_output_tokens": 32000,
+            "max_completion_tokens": 32000
+          }
+        ]
+      }
+    }
+  },
+  "telemetry": {
+    // as is
+  },
+  "theme": {
+    // as is
+  }
+  //.
+  //.
+  //.
+  // rest of your Zed configs
+}
+```
+
+- Start Coding!
+
+<Frame>
+<img
+  className="block"
+  src="/images/axon/zed-axon-chat.png"
+  alt="Axon Zed Chat"
+/>
+</Frame>
+
+### API Provider Settings
+- **API Provider**: OpenAI Compatible
+- **Base URL**: `https://api.matterai.so/v1`
+- **Model ID**: `gpt-4o`
+
+### Authentication
+- **OpenAI Compatible API Key**: Your Axon API key
+- The key is stored locally and only used for API requests
+
+### Model Configuration
+- **Context Window Size**: 200,000 tokens
+- **Model Name**: `axon-code`
+- **Max Output Tokens**: 32,768
+- **Input Price**: $1.50/1M tokens
+- **Output Price**: $7.50/1M tokens
+- **Temperature**: 0.1

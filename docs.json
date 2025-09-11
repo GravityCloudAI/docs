@@ -12,11 +12,7 @@
     "family": "Geist"
   },
   "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt"
-    ]
+    "options": ["copy", "view", "chatgpt"]
   },
   "seo": {
     "metatags": {
@@ -50,9 +46,7 @@
         "groups": [
           {
             "group": "Introduction",
-            "pages": [
-              "introduction"
-            ]
+            "pages": ["introduction"]
           },
           {
             "group": "Getting Started",
@@ -70,10 +64,7 @@
               {
                 "group": "Axon LLM Models",
                 "icon": "gem",
-                "pages": [
-                  "axon-code",
-                  "axon-base"
-                ]
+                "pages": ["axon-code", "axon-base"]
               }
             ]
           },
@@ -240,17 +231,11 @@
               },
               {
                 "group": "Team Messengers",
-                "pages": [
-                  "connectors/slack",
-                  "connectors/ms-teams"
-                ]
+                "pages": ["connectors/slack", "connectors/ms-teams"]
               },
               {
                 "group": "Ticketing",
-                "pages": [
-                  "connectors/Linear",
-                  "connectors/Jira"
-                ]
+                "pages": ["connectors/Linear", "connectors/Jira"]
               }
             ]
           },
@@ -278,9 +263,7 @@
         "pages": [
           {
             "group": "Inference",
-            "pages": [
-              "api-reference/endpoint/completions"
-            ]
+            "pages": ["api-reference/endpoint/completions"]
           }
         ]
       },
@@ -288,19 +271,17 @@
         "tab": "Coding Tools",
         "pages": [
           {
-            "group": "CLI",
-            "pages": [
-              "coding-tools/cli/codex",
-              "coding-tools/cli/claude-code"
-            ]
-          },
-          {
             "group": "Editors",
             "pages": [
               "coding-tools/editors/cline",
               "coding-tools/editors/cursor",
+              "coding-tools/editors/zed",
               "coding-tools/editors/continue"
             ]
+          },
+          {
+            "group": "CLI",
+            "pages": ["coding-tools/cli/codex", "coding-tools/cli/claude-code"]
           }
         ]
       },
