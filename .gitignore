@@ -1,0 +1,22 @@
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/build/
+/dist/
+/out/
+*.log
+*.tmp
+
+# Dependencies
+node_modules/
+venv/
+env/
+
+# IDE & editors
+.idea/
+.vscode/
+*.swp
+*.swo
