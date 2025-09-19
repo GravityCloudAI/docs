@@ -72,93 +72,128 @@ Our State-of-the-Art State Machine Engine uses temporal memories to remember you
 <Frame>
   <img src="/images/axon/axon-state-machine.png" className="block" />
 </Frame>
+## Integration
 
-### Integration
+### Get API Key
 
-- **Platforms**: Seamless integration with enterprise platforms
-- **System Mapping**: Comprehensive workflow analysis
-- **Storage**: Secure multitenant architecture
-- **Workflows**: Custom process adaptation
-
-### Security & Performance
-
-- **Security Analysis**: Proactive threat identification
-- **Edge Cases**: Comprehensive scenario coverage
-
-### LLM Reasoning
-
-- **Optimal Solutions**: Infers best approaches for complex problems
-- **Context Integration**: Leverages organizational context for informed decisions
-- **Best Practices**: Adheres to industry standards and guidelines
-
-### Organization Tuning
-
-- **Custom Training**: Model fine-tuning for specific needs
-- **Pattern Learning**: Adapts to organizational preferences
-- **Consistency**: Ensures uniform output style
-
-### Runtime Adaptation
-
-- **Improvement**: Continuous capability enhancement
-- **Feedback**: Incorporates user input for refinement
-- **Optimization**: Enhances overall model efficiency
-
-## Quality & Security
-
-Enterprise-grade quality and security measures.
-
-### Security Testing
-
-- **Proactive Detection**: Built-in threat identification
-- **Real-time Security**: Continuous assessment and monitoring
-- **Vulnerability Prevention**: Mitigates security issues effectively
-
-### Compliance
-
-- **Standards**: Adherence to industry guidelines
-- **Threat Modeling**: Security-conscious design
-- **Best Practices**: Automatic security implementation
-
-### Performance
-
-- **CPU**: Efficient cycle usage
-- **Memory**: Leak prevention, optimization
-- **Resources**: Optimal utilization patterns
-
-### Quality Checks
-
-- **Review**: Automated quality assessment
-- **Benchmarking**: Continuous evaluation and improvement
-- **Scalability**: Designed for growth and high demand
-
-## Data Privacy
-
-Privacy-first architecture with security measures.
-
-### Data Handling
-
-- **Storage**: Organizational data isolation
-- **No Sharing**: Zero cross-org data usage
-- **Processing**: Isolated environment operations
-
-### Organizational Context
-
-- **Reasoning**: Organization-specific context
-- **Compliance**: Company standard adherence
-- **Learning**: Organization-specific training
-
-### Security Infrastructure
-
-- **Architecture**: Secure data isolation
-- **Encryption**: End-to-end protection
-- **Access**: Granular permissions, auditing
-
-## Getting Started
-<CardGroup cols={1}>
+<CardGroup cols={2}>
   <Card
-  title="/v1/chat/completions"
-  icon="gem"
-  href="/api-reference/endpoint/completions">
-  Integrate Axon LLM
+  title="Get API Key"
+  icon="key"
+  href="/management/api-keys">
+  Generate a new API key
   </Card>
 </CardGroup>
+
+### API Integration Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://api.matterai.so/v1/chat/completions \
+  --header 'Content-Type: application/json' \
+  --header 'Authorization: Bearer MATTER_API_KEY' \
+  --data '{
+  "model": "axon-base",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "What is Rust?"
+    }
+  ],
+  "stream": false,
+  "max_tokens": 1000,
+  "reasoning": {
+    "effort": "high",
+    "summary": "none"
+  },
+  "response_format": {
+    "type": "text"
+  },
+  "temperature": 0,
+  "top_p": 1
+}'
+```
+
+```javascript OpenAI NodeJS SDK
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: 'MATTER_API_KEY',
+  baseURL: 'https://api.matterai.so/v1',
+});
+
+async function main() {
+  const response = await openai.chat.completions.create({
+    model: 'axon-base',
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a helpful assistant.'
+      },
+      {
+        role: 'user',
+        content: 'What is Rust?'
+      }
+    ],
+    stream: false,
+    max_tokens: 1000,
+    reasoning: {
+      effort: 'high',
+      summary: 'none'
+    },
+    response_format: {
+      type: 'text'
+    },
+    temperature: 0,
+    top_p: 1
+  });
+
+  console.log(response.choices[0].message.content);
+}
+
+main();
+```
+
+```python OpenAI Python SDK
+from openai import OpenAI
+
+client = OpenAI(
+  api_key='MATTER_API_KEY',
+  base_url='https://api.matterai.so/v1'
+)
+
+response = client.chat.completions.create(
+  model='axon-base',
+  messages=[
+    {
+      'role': 'system',
+      'content': 'You are a helpful assistant.'
+    },
+    {
+      'role': 'user',
+      'content': 'What is Rust?'
+    }
+  ],
+  stream=False,
+  max_tokens=1000,
+  reasoning={
+    'effort': 'high',
+    'summary': 'none'
+  },
+  response_format={
+    'type': 'text'
+  },
+  temperature=0,
+  top_p=1
+)
+
+print(response.choices[0].message.content)
+```
+
+</CodeGroup>

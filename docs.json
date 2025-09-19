@@ -64,7 +64,7 @@
               {
                 "group": "Axon LLM Models",
                 "icon": "gem",
-                "pages": ["axon-code", "axon-base"]
+                "pages": ["axon-code", "axon-base", "axon-base-research"]
               }
             ]
           },
@@ -254,6 +254,12 @@
                 ]
               },
               "enterprise/rbac"
+            ]
+          },
+          {
+            "group": "Management",
+            "pages": [
+              "management/api-keys"
             ]
           }
         ]

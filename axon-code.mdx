@@ -73,103 +73,181 @@ Our State-of-the-Art State Machine Engine uses temporal memories to remember you
   <img src="/images/axon/axon-state-machine.png" className="block" />
 </Frame>
 
-### Integration
+## Integration
 
-- **Platforms**: Jira, GitHub, GitLab integration
-- **System Mapping**: Workflow analysis
-- **Storage**: Secure multitenant architecture
-- **Workflows**: Custom process adaptation
+### Get API Key
 
-### Code Analysis
+<CardGroup cols={2}>
+  <Card
+  title="Get API Key"
+  icon="key"
+  href="/management/api-keys">
+  Generate a new API key
+  </Card>
+</CardGroup>
 
-- **Pattern Recognition**: Learns organizational coding patterns
-- **Anti-Pattern Detection**: Prevents coding mistakes
-- **Legacy Analysis**: Maintains codebase consistency
+### API Integration Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://api.matterai.so/v1/chat/completions \
+  --header 'Content-Type: application/json' \
+  --header 'Authorization: Bearer MATTER_API_KEY' \
+  --data '{
+  "model": "axon-code",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "What is Rust?"
+    }
+  ],
+  "stream": false,
+  "max_tokens": 1000,
+  "reasoning": {
+    "effort": "high",
+    "summary": "none"
+  },
+  "response_format": {
+    "type": "text"
+  },
+  "temperature": 0,
+  "top_p": 1
+}'
+```
+
+```javascript OpenAI NodeJS SDK
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: 'MATTER_API_KEY',
+  baseURL: 'https://api.matterai.so/v1',
+});
+
+async function main() {
+  const response = await openai.chat.completions.create({
+    model: 'axon-code',
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a helpful assistant.'
+      },
+      {
+        role: 'user',
+        content: 'What is Rust?'
+      }
+    ],
+    stream: false,
+    max_tokens: 1000,
+    reasoning: {
+      effort: 'high',
+      summary: 'none'
+    },
+    response_format: {
+      type: 'text'
+    },
+    temperature: 0,
+    top_p: 1
+  });
+
+  console.log(response.choices[0].message.content);
+}
+
+main();
+```
+
+```python OpenAI Python SDK
+from openai import OpenAI
+
+client = OpenAI(
+  api_key='MATTER_API_KEY',
+  base_url='https://api.matterai.so/v1'
+)
+
+response = client.chat.completions.create(
+  model='axon-code',
+  messages=[
+    {
+      'role': 'system',
+      'content': 'You are a helpful assistant.'
+    },
+    {
+      'role': 'user',
+      'content': 'What is Rust?'
+    }
+  ],
+  stream=False,
+  max_tokens=1000,
+  reasoning={
+    'effort': 'high',
+    'summary': 'none'
+  },
+  response_format={
+    'type': 'text'
+  },
+  temperature=0,
+  top_p=1
+)
+
+print(response.choices[0].message.content)
+```
+
+</CodeGroup>
+
+## Axon Intelligence
+
+### Code Quality
+
+<CardGroup cols={2}>
+  <Card
+  title="Pattern Recognition"
+  icon="head-side-gear">
+  Axon Code recognizes organizational coding patterns across the codebase to generate code that is consistent with the organization's standards.
+  </Card>
+  <Card
+  title="Anti-Pattern Detection"
+  icon="circle-xmark">
+  Axon Code understands and removes as much as possible anti-patterns in it's generated code, powered by out deep reasoner, it can pre-detect where anti-patterns can occur.
+  </Card>
+</CardGroup>
 
 ### Security & Performance
 
-- **Security Analysis**: Vulnerability identification
-- **Edge Cases**: Comprehensive scenario coverage
-- **Performance**: Code optimization assessment
+<CardGroup cols={2}>
+  <Card
+  title="SAST"
+  icon="shield-halved">
+  Axon Code is well versed with Static Application Security Testing (SAST) to pre-determine potential security vulnerabilities, there by generating code that is secure.
+  </Card>
+  <Card
+  title="Performance Optimization"
+  icon="bolt">
+  Axon Code generates sleek, performant and optimized code that is always fast to run for your CPU cycles and RAM usage.
+  </Card>
+</CardGroup>
 
-## Code Generation
+### Code Maintainability
 
-Multi-stage process for quality code and organizational alignment.
-
-### LLM Reasoning
-
-- **Pattern Selection**: Optimal code patterns
-- **Context Integration**: Organizational context
-- **Best Practices**: Standards compliance
-
-### Organization Tuning
-
-- **Custom Training**: Model fine-tuning
-- **Pattern Learning**: Coding preference adaptation
-- **Style Consistency**: Uniform coding style
-
-### Runtime Adaptation
-
-- **Improvement**: Runtime capability enhancement
-- **Feedback**: Developer input processing
-- **Optimization**: Code quality improvements
-
-## Quality & Security
-
-Enterprise-grade code quality and security measures.
-
-### Security Testing
-
-- **SAST**: Built-in vulnerability detection
-- **Real-time Security**: Continuous assessment
-- **Vulnerability Prevention**: Security issue mitigation
-
-### OWASP Compliance
-
-- **Standards**: OWASP guideline adherence
-- **Threat Modeling**: Security-conscious generation
-- **Best Practices**: Automatic security implementation
-
-### Performance
-
-- **CPU**: Efficient cycle usage
-- **Memory**: Leak prevention, optimization
-- **Resources**: Optimal utilization patterns
-
-### Quality Checks
-
-- **Review**: Automated quality assessment
-- **Benchmarking**: Continuous evaluation
-- **Scalability**: Growth readiness analysis
+<CardGroup cols={2}>
+    <Card
+  title="Only Write Code That Matters"
+  icon="square-code">
+  Axon Code only writes code that matters, there by reducing the amount of code you need to generate to get the job done.
+  </Card>
+  <Card
+  title="Documentation Generation"
+  icon="file-check">
+  Axon Code generates detailed documentation for your code, ensuring that your code is easy to understand and maintain.
+  </Card>
+</CardGroup>
 
 ## Data Privacy
 
-Privacy-first architecture with security measures.
-
-### Data Handling
-
-- **Storage**: Organizational data isolation
-- **No Sharing**: Zero cross-org data usage
-- **Processing**: Isolated environment operations
-
-### Organizational Context
-
-- **Reasoning**: Organization-specific context
-- **Compliance**: Company standard adherence
-- **Learning**: Organization-specific training
-
-### Security Infrastructure
-
-- **Architecture**: Secure data isolation
-- **Encryption**: End-to-end protection
-- **Access**: Granular permissions, auditing
-
-## Getting Started
-<CardGroup cols={1}>
-  <Card
-  title="/v1/chat/completions"
-  icon="gem"
-  href="/api-reference/endpoint/completions">
-  Integrate Axon LLM
-  </Card>
-</CardGroup>
+<Note>
+MatterAI never trains on your codebase, all data is temporary and deleted automatically.
+</Note>
