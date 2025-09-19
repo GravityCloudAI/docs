@@ -1,12 +1,34 @@
-# Mintlify Starter Kit
+<div align="center">
+  <a href="https://matterai.so">
+    <img
+      src="https://matterai.so/favicon.png"
+      alt="Matter AI Logo"
+      height="64"
+    />
+  </a>
+  <br />
+  <p>
+    <h3>
+      <b>
+        MatterAI
+      </b>
+    </h3>
+  </p>
+  <p>
+    <b>
+      AI Super Intelligence for Engineering
+    </b>
+  </p>
+  <p>
 
-Click on `Use this template` to copy the Mintlify starter kit. The starter kit contains examples including
+![Matter Og Image](https://res.cloudinary.com/dxvbskvxm/image/upload/v1756191766/og-image-matter_s5m5l6.webp)
 
-- Guide pages
-- Navigation
-- Customizations
-- API Reference pages
-- Use of popular components
+  </p>
+</div>
+
+# MatterAI Documentation
+
+This documentation is using on Mintlify.
 
 ### Development
 
@@ -24,9 +46,10 @@ mintlify dev
 
 ### Publishing Changes
 
-Install our Github App to auto propagate changes from your repo to your deployment. Changes will be deployed to production automatically after pushing to the default branch. Find the link to install on your dashboard. 
+1. Create a Pull Request withe the changes
+2. Once the PR is approved and merged, Mintlify will auto-deploy the new changes
 
 #### Troubleshooting
 
 - Mintlify dev isn't running - Run `mintlify install` it'll re-install dependencies.
-- Page loads as a 404 - Make sure you are running in a folder with `mint.json`
+- Page loads as a 404 - Make sure you are running in a folder with `docs.json`
