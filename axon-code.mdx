@@ -1,20 +1,13 @@
 ---
-title: 'Axon Code'
+title: "Axon Code"
 icon: "laptop-code"
-description: 'Super Intelligent model for coding with deep reasoning'
+description: "Super Intelligent model for coding with deep reasoning"
 tag: "NEW"
 og:title: "Axon Code Model By MatterAI | MatterAI Documentation"
 og:description: "Axon Code Model By MatterAI is a super intelligent model for coding with deep reasoning"
 og:image: "https://res.cloudinary.com/dxvbskvxm/image/upload/v1758260554/axon-code_babbba.png"
 og:url: "https://docs.matterai.so/axon-code"
 ---
-Axon offers secure, production-ready AI models for both code generation and general-purpose tasks, leveraging pattern validation and organizational learning on GCP infrastructure.
-
-<Tip>
-Axon models are currently in beta with free 5M tokens, collectively for all Axon Models
-</Tip>
-
-# Models
 
 ## Axon Code
 
@@ -22,18 +15,18 @@ Axon models are currently in beta with free 5M tokens, collectively for all Axon
   <img src="/images/axon/axon-code.png" className="block" />
 </Frame>
 
-| Specification | Value |
-|---------------|-------|
-| ModelID | `axon-code` |
-| Description | `Code-gen LLM Model with deep-reasoning` |
-| Region | `US` |
-| Context Window Size | `256K tokens` |
-| Max Output Tokens | `32,768` |
-| Input Price (`<256K`) | `$1.50/1M tokens` |
-| Output Price (`<256K`) | `$7.50/1M tokens` |
-| Input Modalities | `Text`, `Image` |
-| Output Modalities | `Text` |
-| Capabilities | `Function Calling`, `Tool Calling`, `Reasoning` |
+| Specification          | Value                                           |
+| ---------------------- | ----------------------------------------------- |
+| ModelID                | `axon-code`                                     |
+| Description            | `Code-gen LLM Model with deep-reasoning`        |
+| Region                 | `US`                                            |
+| Context Window Size    | `256K tokens`                                   |
+| Max Output Tokens      | `32,768`                                        |
+| Input Price (`<256K`)  | `$1.50/1M tokens`                               |
+| Output Price (`<256K`) | `$7.50/1M tokens`                               |
+| Input Modalities       | `Text`, `Image`                                 |
+| Output Modalities      | `Text`                                          |
+| Capabilities           | `Function Calling`, `Tool Calling`, `Reasoning` |
 
 ### Key Features
 
@@ -44,47 +37,6 @@ Axon models are currently in beta with free 5M tokens, collectively for all Axon
 - **Platform Integration**: Jira, GitHub, GitLab connectivity
 - **Deep Reasoner**: Deep Reasoner Engine with search and web fetch tool calling
 - **State Machine**: Manages complex workflows and transitions
-
-## Deep Reasoner
-Our State-of-the-Art Deep Reasoner Engine generates a detailed reasoning process for your requests, detects what needs to be done and how to do it, ensuring all the context is considered and the best possible solution is provided.
-
-- **Multi-sources causal graph traversal** for inferencing across heterogeneous data sources, enabling root-cause analysis and counterfactual reasoning.
-- **Dynamic symbolic grounding** via contextual ontologies to map abstract concepts into actionable knowledge representations in real time.
-- **Probabilistic logic synthesis** with uncertainty quantification to evaluate solution optimality under incomplete or ambiguous input conditions.
-- **Hierarchical attention over structured memory** to maintain long-range dependencies during complex, multi-step problem decomposition.
-- **Meta-cognitive feedback loops** that refine internal heuristics based on outcome validation, improving future reasoning trajectories.
-- **Real-time web search integration** with federated query optimization across multiple search providers for comprehensive knowledge retrieval.
-- **Adaptive web content parsing** using semantic-aware scrapers that extract structured data from dynamic web sources while respecting rate limits and ToS.
-
-<Frame>
-  <img src="/images/axon/axon-deep-reasoner.png" className="block" />
-</Frame>
-
-## State Machine
-Our State-of-the-Art State Machine Engine uses temporal memories to remember your continued flow of usage on what has accomplished and what needs to be completed next.
-
-- **Hierarchical semi-Markov decision processes** (HSMDPs) for modeling variable-duration states and adaptive task sequencing.
-- **Distributed state persistence with vector-clock reconciliation** to ensure consistency across asynchronous, concurrent user sessions.
-- **Reinforcement learning-driven transition policies** that optimize long-term user goal completion over immediate action rewards.
-- **Temporal difference learning over latent state embeddings** to predict and pre-fetch likely next states for zero-latency transitions.
-- **Context-sensitive state compression** using learned subroutines to reduce combinatorial state explosion while preserving semantic fidelity.
-
-<Frame>
-  <img src="/images/axon/axon-state-machine.png" className="block" />
-</Frame>
-
-## Integration
-
-### Get API Key
-
-<CardGroup cols={2}>
-  <Card
-  title="Get API Key"
-  icon="key"
-  href="/management/api-keys">
-  Generate a new API key
-  </Card>
-</CardGroup>
 
 ### API & SDK Integration
 
@@ -122,37 +74,37 @@ curl --request POST \
 ```
 
 ```javascript OpenAI NodeJS SDK
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: 'MATTER_API_KEY',
-  baseURL: 'https://api.matterai.so/v1',
+  apiKey: "MATTER_API_KEY",
+  baseURL: "https://api.matterai.so/v1",
 });
 
 async function main() {
   const response = await openai.chat.completions.create({
-    model: 'axon-code',
+    model: "axon-code",
     messages: [
       {
-        role: 'system',
-        content: 'You are a helpful assistant.'
+        role: "system",
+        content: "You are a helpful assistant.",
       },
       {
-        role: 'user',
-        content: 'What is Rust?'
-      }
+        role: "user",
+        content: "What is Rust?",
+      },
     ],
     stream: false,
     max_tokens: 1000,
     reasoning: {
-      effort: 'high',
-      summary: 'none'
+      effort: "high",
+      summary: "none",
     },
     response_format: {
-      type: 'text'
+      type: "text",
     },
     temperature: 0,
-    top_p: 1
+    top_p: 1,
   });
 
   console.log(response.choices[0].message.content);
@@ -203,16 +155,18 @@ print(response.choices[0].message.content)
 
 <CardGroup cols={2}>
   <Card
-  title="Cursor IDE"
-  icon="arrow-pointer"
-  href="/coding-tools/editors/cursor">
-  Integrate Axon Code with Cursor
+    title="Cursor IDE"
+    icon="arrow-pointer"
+    href="/coding-tools/editors/cursor"
+  >
+    Integrate Axon Code with Cursor
   </Card>
   <Card
-  title="Cline VS Code"
-  icon="message-bot"
-  href="/coding-tools/editors/cline">
-  Integrate Axon Code with Cline
+    title="Cline VS Code"
+    icon="message-bot"
+    href="/coding-tools/editors/cline"
+  >
+    Integrate Axon Code with Cline
   </Card>
 </CardGroup>
 
@@ -221,50 +175,52 @@ print(response.choices[0].message.content)
 ## Code Quality
 
 <CardGroup cols={2}>
-  <Card
-  title="Pattern Recognition"
-  icon="head-side-gear">
-  Axon Code recognizes organizational coding patterns across the codebase to generate code that is consistent with the organization's standards.
+  <Card title="Pattern Recognition" icon="head-side-gear">
+    Axon Code recognizes organizational coding patterns across the codebase to
+    generate code that is consistent with the organization's standards.
   </Card>
-  <Card
-  title="Anti-Pattern Detection"
-  icon="circle-xmark">
-  Axon Code understands and removes as much as possible anti-patterns in it's generated code, powered by out deep reasoner, it can pre-detect where anti-patterns can occur.
+  <Card title="Anti-Pattern Detection" icon="circle-xmark">
+    Axon Code understands and removes as much as possible anti-patterns in it's
+    generated code, powered by out deep reasoner, it can pre-detect where
+    anti-patterns can occur.
   </Card>
 </CardGroup>
 
 ## Security & Performance
 
 <CardGroup cols={2}>
-  <Card
-  title="SAST"
-  icon="shield-halved">
-  Axon Code is well versed with Static Application Security Testing (SAST) to pre-determine potential security vulnerabilities, there by generating code that is secure.
+  <Card title="SAST" icon="shield-halved">
+    Axon Code is well versed with Static Application Security Testing (SAST) to
+    pre-determine potential security vulnerabilities, there by generating code
+    that is secure.
   </Card>
-  <Card
-  title="Performance Optimization"
-  icon="bolt">
-  Axon Code generates sleek, performant and optimized code that is always fast to run for your CPU cycles and RAM usage.
+  <Card title="Performance Optimization" icon="bolt">
+    Axon Code generates sleek, performant and optimized code that is always fast
+    to run for your CPU cycles and RAM usage.
   </Card>
 </CardGroup>
 
 ## Code Maintainability
 
 <CardGroup cols={2}>
-    <Card
-  title="Only Write Code That Matters"
-  icon="square-code">
-  Axon Code only writes code that matters, there by reducing the amount of code you need to generate to get the job done.
+  <Card title="Only Write Code That Matters" icon="square-code">
+    Axon Code only writes code that matters, there by reducing the amount of
+    code you need to generate to get the job done.
   </Card>
-  <Card
-  title="Documentation Generation"
-  icon="file-check">
-  Axon Code generates detailed documentation for your code, ensuring that your code is easy to understand and maintain.
+  <Card title="Documentation Generation" icon="file-check">
+    Axon Code generates detailed documentation for your code, ensuring that your
+    code is easy to understand and maintain.
   </Card>
 </CardGroup>
 
-# Data Privacy
+## Model Family
 
-<Note>
-MatterAI never trains on your codebase, all data is temporary and deleted automatically.
-</Note>
+<CardGroup cols={1}>
+  <Card
+    href="/axon-models"
+    title="Axon Models Overview"
+    img="https://res.cloudinary.com/dxvbskvxm/image/upload/v1758381085/axon-family_ykqtva.png"
+  >
+    Learn about the core technologies and general integration of Axon models.
+  </Card>
+</CardGroup>

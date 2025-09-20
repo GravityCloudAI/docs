@@ -64,7 +64,7 @@
               {
                 "group": "Axon LLM Models",
                 "icon": "gem",
-                "pages": ["axon-code", "axon-base", "axon-base-research"]
+                "pages": ["axon-models", "axon-code", "axon-base", "axon-base-research"]
               }
             ]
           },
