@@ -9,37 +9,45 @@ og:url: "https://docs.matterai.so/coding-tools/editors/cline"
 ---
 
 <Tip>
-Axon models are currently in beta with free 5M tokens, collectively for all Axon Models
+  Axon models are currently in beta with free 5M tokens, collectively for all
+  Axon Models
 </Tip>
-
 
 Cline is a VS Code extension that provides AI-powered coding assistance. You can configure it to use Axon's AI capabilities for enhanced code generation and analysis. To install Cline, follow official documentation here: [https://docs.cline.bot/getting-started/installing-cline](https://docs.cline.bot/getting-started/installing-cline)
 
-## Obtain MatterAI API Key
-Get your API Key from MatterAI console: [https://app.matterai.so/settings](https://app.matterai.so/settings)
+### Get API Key
+
+<CardGroup cols={2}>
+  <Card title="Get API Key" icon="key" href="/management/api-keys">
+    Generate a new API key
+  </Card>
+</CardGroup>
 
 ## Configuration
 
 To integrate Cline with Axon, configure the following settings in Cline's API Configuration:
 
 <Frame>
-<img
-  className="block"
-  src="/images/axon/axon-cline-setup.png"
-  alt="Axon Cline Setup"
-/>
+  <img
+    className="block"
+    src="/images/axon/axon-cline-setup.png"
+    alt="Axon Cline Setup"
+  />
 </Frame>
 
 ### API Provider Settings
+
 - **API Provider**: OpenAI Compatible
 - **Base URL**: `https://api.matterai.so/v1`
 - **Model ID**: `axon-code`
 
 ### Authentication
+
 - **OpenAI Compatible API Key**: Your Axon API key
 - The key is stored locally and only used for API requests
 
 ### Model Configuration
+
 - **Context Window Size**: 200,000 tokens
 - **Model Name**: `axon-code`
 - **Max Output Tokens**: 32,768

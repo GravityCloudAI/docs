@@ -69,6 +69,12 @@
             ]
           },
           {
+            "group": "Axon APIs",
+            "pages": [
+              "axon-ai/rate-limits"
+            ]
+          },
+          {
             "group": "Cortex Features",
             "pages": [
               "features/security-analysis",

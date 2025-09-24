@@ -4,11 +4,17 @@ description: "Configure Codex CLI to work with Axon models"
 ---
 
 <Tip>
-Axon models are currently in beta with free 5M tokens, collectively for all Axon Models
+  Axon models are currently in beta with free 5M tokens, collectively for all
+  Axon Models
 </Tip>
 
-## Obtain MatterAI API Key
-Get your API Key from MatterAI console: [https://app.matterai.so/settings](https://app.matterai.so/settings)
+### Get API Key
+
+<CardGroup cols={2}>
+  <Card title="Get API Key" icon="key" href="/management/api-keys">
+    Generate a new API key
+  </Card>
+</CardGroup>
 
 ## Configuration
 
@@ -17,6 +23,7 @@ To integrate Axon models with Codex CLI, configure your `~/.codex/config.toml` f
 1. `vi ~/.codex/config.toml`
 
 2. Add MatterAI as provider and `axon-code` model config:
+
 ```toml ~/.codex/config.toml lines icon="toml"
 model = "axon-code"
 model_provider = "matterai"
@@ -35,14 +42,18 @@ wire_api = "chat"
 ```
 
 3. Export `MATTERAI_API_KEY` in your environment
+
 ```
 export MATTERAI_API_KEY=<your_matterai_api_key>
 ```
+
 <Note>
-This export is for the current shell, to always use it, please set in `~/.bashrc` OR `~/.zshrc` file
+  This export is for the current shell, to always use it, please set in
+  `~/.bashrc` OR `~/.zshrc` file
 </Note>
 
 4. Start using Codex
+
 ```
 codex "explain this readme to me"
 ```

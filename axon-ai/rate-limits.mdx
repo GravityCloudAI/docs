@@ -1,0 +1,36 @@
+---
+title: Rate Limits
+description: Understand Axon AI's rate limiting policies and tier-based quotas
+---
+
+Axon AI enforces rate limits to ensure fair usage and maintain system stability. These limits are applied per API key and are measured across a one-minute window.
+
+## Rate Limit Tiers
+
+Different service tiers offer varying rate limits to accommodate different usage patterns and requirements. Below are the rate limits for each tier:
+
+| Tier    | Requests per Minute | Input Tokens per Minute | Output Tokens per Minute | Credits to Purchase | Max Monthly Spend |
+| ------- | ------------------- | ----------------------- | ------------------------ | ------------------- | ----------------- |
+| Default | 20                  | 30,000                  | 8,000                    | $5                  | $100              |
+| Tier 2  | 200                 | 300,000                 | 80,000                   | $40                 | $500              |
+| Tier 3  | 400                 | 600,000                 | 160,000                  | $200                | $1,000            |
+
+### Default Tier
+
+The default tier provides basic rate limits suitable for most development and testing scenarios. This tier is unlocked with `$5` credits and has a maximum monthly spend of `$100`.
+
+### Tier 2
+
+Tier 2 offers 10x the default limits, ideal for production applications with moderate usage. This tier is unlocked with `$40` credits and has a maximum monthly spend of `$500`.
+
+### Tier 3
+
+Tier 3 provides the highest limits at 20x the default, designed for high-volume production workloads. This tier is unlocked with `$200` credits and has a maximum monthly spend of `$1,000`.
+
+## Understanding Rate Limits
+
+- **Requests per Minute**: The maximum number of API calls allowed per minute
+- **Input Tokens per Minute**: The maximum number of tokens that can be sent as input per minute
+- **Output Tokens per Minute**: The maximum number of tokens that can be generated as output per minute
+
+**When a rate limit is exceeded, the API will return a 429 (Too Many Requests) status code.** Your application should implement appropriate retry logic with exponential backoff to handle rate limit errors gracefully.
