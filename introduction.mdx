@@ -1,37 +1,89 @@
 ---
 title: What is MatterAI?
 icon: "stars"
-description: 'MatterAI is AI Super Intelligence for Engineering revolutionizing coding and reviews with AI that amplifies brilliance and accelerates innovation with Axon (LLM model for code gen) and Cortex (AI Code Review tool)'
+description: "MatterAI is AI Super Intelligence for Engineering revolutionizing coding and reviews with AI that amplifies brilliance and accelerates innovation with Axon (LLM model for code gen) and Cortex (AI Code Review tool)"
 ---
 
-<iframe width="100%" height="400px" src="https://www.youtube.com/embed/2MjNv7eZucM" title="MatterAI Overview" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+## Introducing Axon Model Family
 
-## What is Axon?
-Agentic LLM Model for Code Generation with reasoning
+Axon, powered by MatterAI, delivers state-of-the-art (SOTA) AI models optimized for general-purpose tasks, code generation, and deep research. Built on advanced Deep Reasoning and State Machines, Axon ensures secure, efficient performance with temporary data handling—no training on your inputs.
 
 <Frame>
-  <img src="/images/axon/axon-code.png" className="block" />
+  <img
+    src="https://res.cloudinary.com/dxvbskvxm/image/upload/v1758381085/axon-family_ykqtva.png"
+    className="block"
+  />
 </Frame>
 
-### 🤖 Intelligent Code Generation
-Automated, context-aware code generation that understand your codebase and generates bug-free, secure and performant code.
+### What Sets Axon Apart
 
-<Tip>
-Axon models are currently in beta with free 5M tokens, collectively for all Axon Models
-</Tip>
+- **Deep Reasoning**: Generates detailed, context-aware processes for optimal solutions, with features like multi-source causal graphs, probabilistic logic, and real-time web integration.
+- **State Machines**: Tracks usage flow via temporal memories, using hierarchical decision processes and reinforcement learning for seamless, adaptive task progression.
+- **Zero Training**: No training on your inputs and data.
 
-## What is Cortex?
+### Model Family
+
+<CardGroup cols={3}>
+  <Card
+  img="https://res.cloudinary.com/dxvbskvxm/image/upload/v1758261129/axon-base_auegfz.png"
+    title="Axon Base"
+    icon="brain-circuit"
+    href="/axon-base">
+    General Purpose Model
+  </Card>
+  <Card
+  img="https://res.cloudinary.com/dxvbskvxm/image/upload/v1758260554/axon-code_babbba.png"
+    title="Axon Code"
+    icon="laptop-code"
+    href="/axon-code">
+    Code Generation Model
+  </Card>
+  <Card
+  img="https://res.cloudinary.com/dxvbskvxm/image/upload/v1758381085/axon-research_gkewhe.png"
+    title="Axon Research"
+    icon="flask"
+    href="/axon-research">
+    Deep Research Model
+  </Card>
+
+</CardGroup>
+
+## Get Started with Axon
+
+<CardGroup cols={3}>
+  <Card title="Get API Key" icon="key" href="/management/api-keys">
+    Get started with Axon API
+  </Card>
+  <Card
+    title="API Reference"
+    icon="globe"
+    href="/api-reference/endpoint/completions"
+  >
+    Get started with Axon API
+  </Card>
+  <Card
+    title="Coding Tools"
+    icon="laptop-code"
+    href="/coding-tools/editors/cline"
+  >
+    Get started with Axon Coding Tools
+  </Card>
+</CardGroup>
+
+## AI Code Reviews
+
 Cortex is AI Code Review platform for your PRs on Github, GitLab and Bitbucket
 
 <Frame>
-<img
-  className="block"
-  src="/images/docs-intro-1.png"
-  alt="Intelligent Code Reviews"
-/>
+  <img
+    className="block"
+    src="/images/docs-intro-1.png"
+    alt="Intelligent Code Reviews"
+  />
 </Frame>
 
 ### 🤖 Intelligent Code Reviews
+
 Automated, context-aware code reviews that understand your codebase and provide actionable feedback.
 
 - **Automated PR Summaries**
@@ -40,6 +92,7 @@ Automated, context-aware code reviews that understand your codebase and provide 
 - **Code Quality Analysis**
 
 ### 🔍 Advanced Code Understanding
+
 Deep semantic understanding of your codebase for better suggestions and analysis.
 
 - **Semantic Search**
@@ -49,14 +102,15 @@ Deep semantic understanding of your codebase for better suggestions and analysis
 - **Chat with AI**
 
 <Frame>
-<img
-  className="block"
-  src="/images/docs-intro-2.png"
-  alt="Advanced Code Understanding"
-/>
+  <img
+    className="block"
+    src="/images/docs-intro-2.png"
+    alt="Advanced Code Understanding"
+  />
 </Frame>
 
 ### 🛡️ Security & Compliance
+
 Proactive security scanning and compliance checks to keep your code secure.
 
 - **Vulnerability Scanning**
@@ -65,6 +119,7 @@ Proactive security scanning and compliance checks to keep your code secure.
 - **Policy Enforcement**
 
 ### 📊 Team Analytics
+
 Comprehensive insights into your team's development process and code quality.
 
 - **Code Health Metrics**
@@ -75,11 +130,13 @@ Comprehensive insights into your team's development process and code quality.
 ## Why Choose MatterAI?
 
 ### For Developers
+
 - **Save Time** with automated code reviews and documentation
 - **Write Better Code** with intelligent suggestions
 - **Learn Faster** with contextual code explanations
 
 ### For Engineering Leaders
+
 - **Improve Code Quality** across your organization
 - **Reduce Technical Debt** with proactive insights
 - **Scale Your Team** without sacrificing code quality
@@ -94,7 +151,7 @@ Comprehensive insights into your team's development process and code quality.
   >
     Get up and running with MatterAI in minutes
   </Card>
-    <Card
+  <Card
     title="Integrate with your IDE"
     icon="rocket"
     href="/quickstart-ai-code-review-mcp-server"
@@ -108,11 +165,7 @@ Comprehensive insights into your team's development process and code quality.
   >
     Learn more about security reviews
   </Card>
-  <Card
-    title="Code Quality Checks"
-    icon="code"
-    href="/features/code-quality"
-  >
+  <Card title="Code Quality Checks" icon="code" href="/features/code-quality">
     Learn more about code quality checks
   </Card>
   <Card
@@ -122,11 +175,7 @@ Comprehensive insights into your team's development process and code quality.
   >
     Learn more about supported languages
   </Card>
-    <Card
-    title="Command List"
-    icon="command"
-    href="/features/command-list"
-  >
+  <Card title="Command List" icon="command" href="/features/command-list">
     Learn more about supported languages
   </Card>
 </CardGroup>
@@ -154,6 +203,7 @@ MatterAI offers enterprise-grade features including:
     icon="dharmachakra"
     href="/enterprise/self-hosted-helm-chart"
   >
-    Deploy MatterAI on Kubernetes using Helm charts for production-grade environments
+    Deploy MatterAI on Kubernetes using Helm charts for production-grade
+    environments
   </Card>
 </CardGroup>

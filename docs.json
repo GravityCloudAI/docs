@@ -52,6 +52,11 @@
             "group": "Getting Started",
             "pages": [
               {
+                "group": "Axon LLM Models",
+                "icon": "gem",
+                "pages": ["axon-models", "axon-code", "axon-base", "axon-base-research"]
+              },
+              {
                 "group": "Cortex Code Reviews",
                 "icon": "rocket",
                 "pages": [
@@ -60,11 +65,6 @@
                   "quickstart-ai-code-review-atlassian-bitbucket",
                   "quickstart-ai-code-review-mcp-server"
                 ]
-              },
-              {
-                "group": "Axon LLM Models",
-                "icon": "gem",
-                "pages": ["axon-models", "axon-code", "axon-base", "axon-base-research"]
               }
             ]
           },
@@ -340,7 +340,6 @@
     "dark": "/logo/logo-dark.svg"
   },
   "background": {
-    "decoration": "gradient",
     "color": {
       "light": "#fff",
       "dark": "#05050A"
