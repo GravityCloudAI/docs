@@ -13,18 +13,25 @@ og:url: "https://docs.matterai.so/axon-base"
   <img src="/images/axon/axon-base.png" className="block" />
 </Frame>
 
-| Specification          | Value                                           |
-| ---------------------- | ----------------------------------------------- |
-| ModelID                | `axon-base`                                     |
-| Description            | `General purpose LLM Model with deep-reasoning` |
-| Region                 | `US`                                            |
-| Context Window Size    | `256K tokens`                                   |
-| Max Output Tokens      | `16,384`                                        |
-| Input Price (`<256K`)  | `$0.5/1M token`                                 |
-| Output Price (`<256K`) | `$1.0/1M tokens`                                |
-| Input Modalities       | `Text`, `Image`                                 |
-| Output Modalities      | `Text`                                          |
-| Capabilities           | `Function Calling`, `Tool Calling`, `Reasoning` |
+| Specification            | Value                                           |
+| ------------------------ | ----------------------------------------------- |
+| ModelID                  | `axon-base`                                     |
+| Description              | `General purpose LLM Model with deep-reasoning` |
+| Region                   | `US`                                            |
+| Context Window Size      | `256K tokens`                                   |
+| Max Output Tokens        | `16,384`                                        |
+| Input Price (`<256K`)    | `$0.5/1M token`                                 |
+| Output Price (`<256K`)   | `$1.0/1M tokens`                                |
+| Input Modalities         | `Text`, `Image`                                 |
+| Output Modalities        | `Text`                                          |
+| Capabilities             | `Function Calling`, `Tool Calling`, `Reasoning` |
+| Parameters               | `235B`                                          |
+| Floating Point Precision | `FP16`                                          |
+
+<Note>
+  Axon Base is based on Qwen 3 235B model, fine tuned on our proprietary dataset
+  and upgraded with deep reasoning and state machine capabilities.
+</Note>
 
 ### Key Features
 

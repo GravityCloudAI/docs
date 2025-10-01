@@ -15,18 +15,26 @@ og:url: "https://docs.matterai.so/axon-code"
   <img src="/images/axon/axon-code.png" className="block" />
 </Frame>
 
-| Specification          | Value                                           |
-| ---------------------- | ----------------------------------------------- |
-| ModelID                | `axon-code`                                     |
-| Description            | `Code-gen LLM Model with deep-reasoning`        |
-| Region                 | `US`                                            |
-| Context Window Size    | `256K tokens`                                   |
-| Max Output Tokens      | `32,768`                                        |
-| Input Price (`<256K`)  | `$1.0/1M tokens`                                |
-| Output Price (`<256K`) | `$3.0/1M tokens`                                |
-| Input Modalities       | `Text`, `Image`                                 |
-| Output Modalities      | `Text`                                          |
-| Capabilities           | `Function Calling`, `Tool Calling`, `Reasoning` |
+| Specification            | Value                                           |
+| ------------------------ | ----------------------------------------------- |
+| ModelID                  | `axon-code`                                     |
+| Description              | `Code-gen LLM Model with deep-reasoning`        |
+| Region                   | `US`                                            |
+| Context Window Size      | `256K tokens`                                   |
+| Max Output Tokens        | `32,768`                                        |
+| Input Price (`<256K`)    | `$1.0/1M tokens`                                |
+| Output Price (`<256K`)   | `$3.0/1M tokens`                                |
+| Input Modalities         | `Text`, `Image`                                 |
+| Output Modalities        | `Text`                                          |
+| Capabilities             | `Function Calling`, `Tool Calling`, `Reasoning` |
+| Parameters               | `480B`                                          |
+| Floating Point Precision | `FP16`                                          |
+
+<Note>
+  Axon Code is based on Qwen 3 480B model, fine tuned on our proprietary dataset
+  and upgraded with deep reasoning, code generation and state machine
+  capabilities.
+</Note>
 
 ### Key Features
 

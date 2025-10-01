@@ -17,16 +17,25 @@ og:url: "https://docs.matterai.so/axon-models"
 
 **Axon offers secure, production-ready AI models for both code generation and general-purpose tasks, leveraging State-of-the-Art Deep Reasoning and State Machines**
 
-<Note>
-  Axon models are currently in beta with free 5M tokens, collectively for all
-  Axon Models.
-</Note>
-
 ## Benchmarks
 
 <Frame>
   <img src="/images/axon/axon-benchmarks.png" className="block" />
 </Frame>
+
+## Architecture
+
+<Note>
+  Axon Models are based on open source models from Qwen 3 family, fine tuned on
+  our proprietary dataset and upgraded with deep reasoning and state machine
+  capabilities.
+</Note>
+
+### Mixture of Experts (MoE) architecture
+
+MoE is a technique that allows the model to dynamically select the expert model to use for a given input.
+
+This architecture enables engineering teams to build more scalable and efficient systems by routing tasks to specialized experts, reducing computational overhead while maintaining high performance across diverse workloads.
 
 ## What makes Axon different?
 
