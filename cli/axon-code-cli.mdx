@@ -1,0 +1,49 @@
+---
+title: "Axon Code CLI"
+sidebarTitle: "Get Started"
+description: "Axon Code CLI is a command line coding agent powered by Axon Code model"
+---
+
+## Get Your API Key
+
+<CardGroup cols={2}>
+  <Card title="Get API Key" icon="key" href="/management/api-keys">
+    Generate a new API key
+  </Card>
+</CardGroup>
+
+## Installation
+
+To install Axon Code CLI, you can use one of the following methods:
+
+### Quick Install
+
+```bash
+curl -fsSL https://api.matterai.so/install | bash
+```
+
+2. Once you have the API Key, set it in your environment:
+
+```bash
+export MATTERAI_API_KEY=YOUR_KEY_HERE
+```
+
+<Note>Keep your API key secure and never commit it to version control.</Note>
+
+3. Type `axoncode` in your terminal to get started.
+
+<Frame>
+  <img src="/images/cli/axon-code-cli-1.png" alt="Axon Code CLI" />
+</Frame>
+
+4. Start Coding with Axon Code
+
+<Frame>
+  <img src="/images/cli/axon-code-cli-2.png" alt="Axon Code CLI" />
+</Frame>
+
+5. You can also start with a prompt with `-p` flag.
+
+```bash
+axoncode -p "Create a PR"
+```

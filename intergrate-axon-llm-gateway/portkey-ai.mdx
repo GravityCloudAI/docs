@@ -1,0 +1,87 @@
+---
+title: "Setup Axon models with Portkey AI"
+sidebarTitle: "Portkey AI"
+description: "Setup Portkey AI to use Axon models"
+---
+
+### Get API Key
+
+<CardGroup cols={2}>
+  <Card title="Get API Key" icon="key" href="/management/api-keys">
+    Generate a new API key
+  </Card>
+</CardGroup>
+
+## Portkey AI Configuration
+
+<Steps>
+  <Step title="Create a new Provider in Model Catalog">
+    <Frame>
+      <img src="/images/ai-gateway/portkey-axon-1.png" alt="Portkey Setup" />
+    </Frame>
+  </Step>
+
+<Step title="Select OpenAI as the base provider">
+  <Frame>
+    <img src="/images/ai-gateway/portkey-axon-2.png" alt="Portkey Setup" />
+  </Frame>
+</Step>
+
+<Step title="Add Custom Host under Advanced Options">
+  <Frame>
+    <img src="/images/ai-gateway/portkey-axon-3.png" alt="Portkey Setup" />
+  </Frame>
+</Step>
+
+<Step title="Once the provider is created, Click on Models Tab">
+  <Frame>
+    <img src="/images/ai-gateway/portkey-axon-4.png" alt="Portkey Setup" />
+  </Frame>
+</Step>
+
+<Step title="Click on Manage Models">
+  <Frame>
+    <img src="/images/ai-gateway/portkey-axon-5.png" alt="Portkey Setup" />
+  </Frame>
+</Step>
+
+<Step title="Click on Add Model">
+  <Frame>
+    <img src="/images/ai-gateway/portkey-axon-6.png" alt="Portkey Setup" />
+  </Frame>
+</Step>
+
+  <Step title="Fill the below details in Add Custom Model">
+    | Field | Value |
+    | Model Slug | `axon-base` |
+    | Base Model | `gpt-4o` |
+    | Input Cost | `0.5` |
+    | Output Cost | `1.0` |
+
+    <Frame>
+      <img src="/images/ai-gateway/portkey-axon-7.png" alt="Portkey Setup" />
+    </Frame>
+
+  </Step>
+
+  <Step title="Test the setup in Getting Started">
+    <Frame>
+      <img src="/images/ai-gateway/portkey-axon-8.png" alt="Portkey Setup" />
+    </Frame>
+  </Step>
+</Steps>
+
+<Note>
+  When using Portkey AI, you need to use the `@matterai/axon-base` model slug.
+</Note>
+
+```javascript
+  const response = await portkey.chat.completions.create({
+    messages: [
+      { role: "system", content: "You are a helpful assistant" }
+      { role: "user", content: "What is Portkey" }
+    ],
+    model: "@matterai/axon-base",
+    max_tokens: 512
+  });
+```

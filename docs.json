@@ -54,7 +54,12 @@
               {
                 "group": "Axon LLM Models",
                 "icon": "gem",
-                "pages": ["axon-models", "axon-code", "axon-base", "axon-base-research"]
+                "pages": [
+                  "axon-models",
+                  "axon-code",
+                  "axon-base",
+                  "axon-base-research"
+                ]
               },
               {
                 "group": "Cortex Code Reviews",
@@ -70,9 +75,7 @@
           },
           {
             "group": "Axon APIs",
-            "pages": [
-              "axon-ai/rate-limits"
-            ]
+            "pages": ["axon-ai/rate-limits"]
           },
           {
             "group": "Cortex Features",
@@ -264,9 +267,16 @@
           },
           {
             "group": "Management",
-            "pages": [
-              "management/api-keys"
-            ]
+            "pages": ["management/api-keys"]
+          }
+        ]
+      },
+      {
+        "tab": "Axon Code CLI",
+        "pages": [
+          {
+            "group": "Axon Code CLI",
+            "pages": ["cli/axon-code-cli"]
           }
         ]
       },
@@ -294,6 +304,18 @@
           {
             "group": "CLI",
             "pages": ["coding-tools/cli/codex", "coding-tools/cli/claude-code"]
+          }
+        ]
+      },
+      {
+        "tab": "AI Gateways",
+        "pages": [
+          {
+            "group": "LLM Gateways",
+            "pages": [
+              "intergrate-axon-llm-gateway/portkey-ai",
+              "intergrate-axon-llm-gateway/litellm-sdk"
+            ]
           }
         ]
       },
