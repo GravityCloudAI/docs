@@ -75,7 +75,7 @@
           },
           {
             "group": "Axon APIs",
-            "pages": ["axon-ai/rate-limits"]
+            "pages": ["axon-ai/api-keys", "axon-ai/rate-limits"]
           },
           {
             "group": "Cortex Features",
@@ -264,10 +264,6 @@
               },
               "enterprise/rbac"
             ]
-          },
-          {
-            "group": "Management",
-            "pages": ["management/api-keys"]
           }
         ]
       },
