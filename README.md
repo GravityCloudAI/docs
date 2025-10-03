@@ -2,7 +2,7 @@
   <a href="https://matterai.so">
     <img
       src="https://matterai.so/favicon.png"
-      alt="Matter AI Logo"
+      alt="MatterAI Logo"
       height="64"
     />
   </a>
@@ -16,7 +16,7 @@
   </p>
   <p>
     <b>
-      AI Super Intelligence for Engineering
+      Universal AI Super Intelligence
     </b>
   </p>
   <p>
@@ -53,3 +53,7 @@ mintlify dev
 
 - Mintlify dev isn't running - Run `mintlify install` it'll re-install dependencies.
 - Page loads as a 404 - Make sure you are running in a folder with `docs.json`
+
+## Contribution
+
+- We are open to accept your any issues / fixes you find in the documentation
