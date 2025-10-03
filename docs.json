@@ -1,8 +1,8 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "aspen",
-  "name": "MatterAI Documentation | AI Super Intelligence for Engineering",
-  "description": "MatterAI revolutionizes coding and reviews with AI that amplifies brilliance and accelerates innovation",
+  "name": "MatterAI Documentation | Universal AI Super Intelligence",
+  "description": "MatterAI is Universal AI Super Intelligence for general purpose tasks, code generation and deep research",
   "colors": {
     "primary": "#008a4a",
     "light": "#3AFFA3",
@@ -12,17 +12,17 @@
     "family": "Geist"
   },
   "contextual": {
-    "options": ["copy", "view", "chatgpt"]
+    "options": ["copy", "view"]
   },
   "seo": {
     "metatags": {
-      "og:image": "https://res.cloudinary.com/dxvbskvxm/image/upload/v1756191766/og-image-matter_s5m5l6.webp",
-      "og:title": "MatterAI Documentation | AI Super Intelligence for Engineering",
-      "og:description": "MatterAI revolutionizes coding and reviews with AI that amplifies brilliance and accelerates innovation",
+      "og:image": "https://res.cloudinary.com/dxvbskvxm/image/upload/v1759507963/og-image-matterai_dfxhg9.webp",
+      "og:title": "MatterAI Documentation | Universal AI Super Intelligence",
+      "og:description": "MatterAI is Universal AI Super Intelligence for general purpose tasks, code generation and deep research",
       "og:url": "https://docs.matterai.so",
-      "twitter:title": "MatterAI Documentation | AI Super Intelligence for Engineering",
-      "twitter:description": "MatterAI revolutionizes coding and reviews with AI that amplifies brilliance and accelerates innovation",
-      "twitter:image": "https://res.cloudinary.com/dxvbskvxm/image/upload/v1756191766/og-image-matter_s5m5l6.webp",
+      "twitter:title": "MatterAI Documentation | Universal AI Super Intelligence",
+      "twitter:description": "MatterAI is Universal AI Super Intelligence for general purpose tasks, code generation and deep research",
+      "twitter:image": "https://res.cloudinary.com/dxvbskvxm/image/upload/v1759507963/og-image-matterai_dfxhg9.webp",
       "twitter:url": "https://x.com/matteraidev"
     }
   },
