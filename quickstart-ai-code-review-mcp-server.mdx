@@ -37,20 +37,40 @@ MatterAI MCP Server revolutionizes code reviews by bringing AI-powered analysis 
 <img src="/images/matter-ai-mcp-2.png" alt="MatterAI MCP Server" />
 </Frame>
 
-## Getting Started
+# Getting Started
 
-### 1. Create your MatterAI Account
+## 1. Create your MatterAI Account
 Visit [MatterAI](https://app.matterai.so) to create your account.
 
-### 2. IDE Setup
+## 2. IDE Setup
 
-#### For Cursor IDE:
+### For Cursor IDE:
+#### 1-click Installation
 1. Click on "Add to Cursor" button in the Get Started section
 <Frame>
 <img src="/images/matter-ai-mcp-3.png" alt="MatterAI MCP Server" />
 </Frame>
 
-#### For Cline IDE:
+#### Self-hosted Installation
+1. Click on `Cursor Settings` -> `Tools & MCP` -> `Add Custom MCP` -> `mcp.json` file
+2. Add the below JSON file
+
+```json mcp.json lines icon="json"
+{
+  "mcpServers": {
+    "matterai": {
+      "url": "https://mcp.matterai.so/sse",
+      "disabled": false,
+      "headers": {
+        "X-AUTH-TOKEN": "YOUR_MATTER_AI_API_KEY"
+      },
+      "autoApprove": []
+    }
+  }
+}
+```
+
+### For Cline IDE:
 1. Click on `Cline` -> `MCP Servers` -> `Remove Servers` -> `Edit configuration` button
 2. Add the below JSON file
 
@@ -80,7 +100,7 @@ Visit [MatterAI](https://app.matterai.so) to create your account.
 <img src="/images/mcp/cline-matterai-mcp-preview.png" alt="MatterAI MCP Server Preview for Cline" />
 </Frame>
 
-#### For Any MCP-Compatible IDE:
+### For Any MCP-Compatible IDE:
 1. Obtain your MatterAI API key from [MatterAI Settings](https://app.matterai.so/settings)
 2. Configure your MCP configuration file with the following settings:
 
@@ -101,10 +121,14 @@ Visit [MatterAI](https://app.matterai.so) to create your account.
 }
 ```
 
-### 3. Start Using in AI Agent Chats
-Use natural language to request code reviews, implementation plans, and generate pull requests directly in your IDE.
+## 3. Start Using in AI Agent Chats
+Use simple commands such as `/matter review` OR natural language to perform code reviews with solution and implementation in your IDE.
 
-## Why Choose MatterAI MCP Server?
+<Frame>
+<img src="/images/mcp/cursor-matterai-mcp-cmd.png" alt="MatterAI MCP Server Preview for Cursor" />
+</Frame>
+
+# Why Choose MatterAI MCP Server?
 
 - **Seamless Integration**: Works directly in your existing development environment
 - **Context-Aware**: Understands your codebase and provides relevant suggestions
