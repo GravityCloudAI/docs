@@ -53,7 +53,7 @@ description: "Setup Portkey AI to use Axon models"
 
   <Step title="Fill the below details in Add Custom Model">
     | Field | Value |
-    | Model Slug | `axon-base` |
+    | Model Slug | `axon` |
     | Base Model | `gpt-4o` |
     | Input Cost | `0.5` |
     | Output Cost | `1.0` |
@@ -72,7 +72,7 @@ description: "Setup Portkey AI to use Axon models"
 </Steps>
 
 <Note>
-  When using Portkey AI, you need to use the `@matterai/axon-base` model slug.
+  When using Portkey AI, you need to use the `@matterai/axon` model slug.
 </Note>
 
 ```javascript
@@ -81,7 +81,7 @@ description: "Setup Portkey AI to use Axon models"
       { role: "system", content: "You are a helpful assistant" }
       { role: "user", content: "What is Portkey" }
     ],
-    model: "@matterai/axon-base",
+    model: "@matterai/axon",
     max_tokens: 512
   });
 ```

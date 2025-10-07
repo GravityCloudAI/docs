@@ -1,35 +1,38 @@
 ---
-title: "Axon Base"
+title: "Axon 1"
 icon: "brain-circuit"
-description: "Super Intelligent model for general purpose with deep reasoning"
+description: "Super Intelligent model for general purpose with deep reasoning for high-effort day to day tasks"
 tag: "NEW"
-og:title: "Axon Base Model By MatterAI | MatterAI Documentation"
-og:description: "Axon Base Model By MatterAI is a super intelligent model for general purpose with deep reasoning"
-og:image: "https://res.cloudinary.com/dxvbskvxm/image/upload/v1758261129/axon-base_auegfz.png"
-og:url: "https://docs.matterai.so/axon-base"
+og:title: "Axon 1 Model By MatterAI | MatterAI Documentation"
+og:description: "Axon 1 Model By MatterAI is a super intelligent model for general purpose with deep reasoning for high-effort day to day tasks"
+og:image: "https://res.cloudinary.com/dxvbskvxm/image/upload/v1759820111/axon_o2xgho.webp"
+og:url: "https://docs.matterai.so/axon"
 ---
 
 <Frame>
-  <img src="/images/axon/axon-base.png" className="block" />
+  <img
+    src="https://res.cloudinary.com/dxvbskvxm/image/upload/v1759820111/axon_o2xgho.webp"
+    className="block"
+  />
 </Frame>
 
 | Specification            | Value                                           |
 | ------------------------ | ----------------------------------------------- |
-| ModelID                  | `axon-base`                                     |
+| ModelID                  | `axon`                                          |
 | Description              | `General purpose LLM Model with deep-reasoning` |
 | Region                   | `US`                                            |
 | Context Window Size      | `256K tokens`                                   |
-| Max Output Tokens        | `16,384`                                        |
-| Input Price (`<256K`)    | `$0.5/1M token`                                 |
-| Output Price (`<256K`)   | `$1.0/1M tokens`                                |
+| Max Output Tokens        | `32,768`                                        |
+| Input Price (`<256K`)    | `$1.0/1M tokens`                                |
+| Output Price (`<256K`)   | `$3.0/1M tokens`                                |
 | Input Modalities         | `Text`, `Image`                                 |
 | Output Modalities        | `Text`                                          |
 | Capabilities             | `Function Calling`, `Tool Calling`, `Reasoning` |
-| Parameters               | `235B`                                          |
+| Parameters               | `480B`                                          |
 | Floating Point Precision | `FP16`                                          |
 
 <Note>
-  Axon Base is based on Qwen 3 235B model, fine tuned on our proprietary dataset
+  Axon 1 is based on Qwen 3 480B model, fine tuned on our proprietary dataset
   and upgraded with deep reasoning and state machine capabilities.
 </Note>
 
@@ -53,7 +56,7 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header 'Authorization: Bearer MATTER_API_KEY' \
   --data '{
-  "model": "axon-base",
+  "model": "axon",
   "messages": [
     {
       "role": "system",
@@ -61,7 +64,7 @@ curl --request POST \
     },
     {
       "role": "user",
-      "content": "What is Rust?"
+      "content": "What is 9,387 * 8,145?"
     }
   ],
   "stream": false,
@@ -88,7 +91,7 @@ const openai = new OpenAI({
 
 async function main() {
   const response = await openai.chat.completions.create({
-    model: "axon-base",
+    model: "axon",
     messages: [
       {
         role: "system",
@@ -127,7 +130,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-  model='axon-base',
+  model='axon',
   messages=[
     {
       'role': 'system',

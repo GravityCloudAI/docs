@@ -1,0 +1,172 @@
+---
+title: "Axon Nano 1"
+icon: "microchip"
+description: "Super Intelligent model for general purpose with deep reasoning for low-effort day to day tasks"
+tag: "NEW"
+og:title: "Axon Nano 1 Model By MatterAI | MatterAI Documentation"
+og:description: "Axon Nano 1 Model By MatterAI is a super intelligent model for general purpose with deep reasoning for low-effort day to day tasks"
+og:image: "https://res.cloudinary.com/dxvbskvxm/image/upload/v1759820111/axon-nano_c0c2xd.webp"
+og:url: "https://docs.matterai.so/axon-nano"
+---
+
+<Frame>
+  <img
+    src="https://res.cloudinary.com/dxvbskvxm/image/upload/v1759820111/axon-nano_c0c2xd.webp"
+    className="block"
+  />
+</Frame>
+
+| Specification            | Value                                           |
+| ------------------------ | ----------------------------------------------- |
+| ModelID                  | `axon-nano`                                     |
+| Description              | `General purpose LLM Model with deep-reasoning` |
+| Region                   | `US`                                            |
+| Context Window Size      | `256K tokens`                                   |
+| Max Output Tokens        | `16,384`                                        |
+| Input Price (`<256K`)    | `$0.5/1M token`                                 |
+| Output Price (`<256K`)   | `$1.0/1M tokens`                                |
+| Input Modalities         | `Text`, `Image`                                 |
+| Output Modalities        | `Text`                                          |
+| Capabilities             | `Function Calling`, `Tool Calling`, `Reasoning` |
+| Parameters               | `235B`                                          |
+| Floating Point Precision | `FP16`                                          |
+
+<Note>
+  Axon Nano 1 is based on Qwen 3 235B model, fine tuned on our proprietary
+  dataset and upgraded with deep reasoning and state machine capabilities.
+</Note>
+
+### Key Features
+
+- **Advanced Reasoning**: Deep understanding and strategic planning
+- **Security**: Robust protection and threat mitigation
+- **Organizational Learning**: Adapts to enterprise-specific knowledge
+- **Data Privacy**: Client data isolation and secure handling
+- **Platform Integration**: Jira, GitHub, GitLab connectivity
+- **Deep Reasoner**: Deep Reasoner Engine with search and web fetch tool calling
+- **State Machine**: Manages complex workflows and transitions
+
+### API & SDK Integration
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://api.matterai.so/v1/chat/completions \
+  --header 'Content-Type: application/json' \
+  --header 'Authorization: Bearer MATTER_API_KEY' \
+  --data '{
+  "model": "axon-nano",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "What is the capital of India?"
+    }
+  ],
+  "stream": false,
+  "max_tokens": 1000,
+  "reasoning": {
+    "effort": "high",
+    "summary": "none"
+  },
+  "response_format": {
+    "type": "text"
+  },
+  "temperature": 0,
+  "top_p": 1
+}'
+```
+
+```javascript OpenAI NodeJS SDK
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: "MATTER_API_KEY",
+  baseURL: "https://api.matterai.so/v1",
+});
+
+async function main() {
+  const response = await openai.chat.completions.create({
+    model: "axon-nano",
+    messages: [
+      {
+        role: "system",
+        content: "You are a helpful assistant.",
+      },
+      {
+        role: "user",
+        content: "What is Rust?",
+      },
+    ],
+    stream: false,
+    max_tokens: 1000,
+    reasoning: {
+      effort: "high",
+      summary: "none",
+    },
+    response_format: {
+      type: "text",
+    },
+    temperature: 0,
+    top_p: 1,
+  });
+
+  console.log(response.choices[0].message.content);
+}
+
+main();
+```
+
+```python OpenAI Python SDK
+from openai import OpenAI
+
+client = OpenAI(
+  api_key='MATTER_API_KEY',
+  base_url='https://api.matterai.so/v1'
+)
+
+response = client.chat.completions.create(
+  model='axon-nano',
+  messages=[
+    {
+      'role': 'system',
+      'content': 'You are a helpful assistant.'
+    },
+    {
+      'role': 'user',
+      'content': 'What is Rust?'
+    }
+  ],
+  stream=False,
+  max_tokens=1000,
+  reasoning={
+    'effort': 'high',
+    'summary': 'none'
+  },
+  response_format={
+    'type': 'text'
+  },
+  temperature=0,
+  top_p=1
+)
+
+print(response.choices[0].message.content)
+```
+
+</CodeGroup>
+
+## Model Family
+
+<CardGroup cols={1}>
+  <Card
+    href="/axon-models"
+    title="Axon Models Overview"
+    img="https://res.cloudinary.com/dxvbskvxm/image/upload/v1758381085/axon-family_ykqtva.png"
+  >
+    Learn about the core technologies and general integration of Axon models.
+  </Card>
+</CardGroup>
