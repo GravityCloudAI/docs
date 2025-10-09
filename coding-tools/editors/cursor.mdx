@@ -17,7 +17,19 @@ og:url: "https://docs.matterai.so/coding-tools/editors/cursor"
 
 ## Configuration
 
-To integrate Cursir with Axon, configure the following settings in Cursors Model's Configuration:
+To integrate Cursor with Axon, configure the following settings in Cursors Model's Configuration:
+
+### Add axon-code Model to Cursor
+
+<Frame>
+  <img
+    className="block"
+    src="/images/axon/add-axon-model-cursor.png"
+    alt="Axon Cursor Setup"
+  />
+</Frame>
+
+### Configure MatterAI as API Provider
 
 <Frame>
   <img
@@ -30,14 +42,9 @@ To integrate Cursir with Axon, configure the following settings in Cursors Model
 ### API Provider Settings
 
 - **API Provider**: OpenAI Compatible
-- **Base URL**: `https://api.matterai.so/v1`
-- **Model ID**: `gpt-4o`
-
-<Note>
-  Cursor routes LLM calls via thier internal backend and only OpenAI model name
-  are valid, using `gpt-4o` is equal to `axon-code`. Do not use any other model
-  name, it will result into 401 error from Cursor.
-</Note>
+- **Base URL**: `https://api.matterai.so/v1/web`
+- **API Key**: `Your MatterAI API Key from above`
+- **Model ID**: `axon-code`
 
 ### Authentication
 
