@@ -1,40 +1,42 @@
 ---
 icon: sliders
-title: 'Configurations'
-description: 'Configurations and AI Review settings for MatterAI'
+title: "Configurations"
+description: "Configurations and AI Review settings for MatterAI"
 og:title: "Code Review Configurations | MatterAI Documentation"
 og:description: "Configurations and AI Review settings for MatterAI"
 ---
 
-<Note>
-Configurations are available on all plans.
-</Note>
+<Note>Configurations are available on all plans.</Note>
 
 <Frame>
-<img src="/images/features/configurations.png" alt="Configurations" />
+  <img src="/images/features/configurations.png" alt="Configurations" />
 </Frame>
 
-## AI Code Review Configurations
+## AI Review Settings
 
 MatterAI offers several configuration options to customize your AI code review experience. These settings allow you to tailor the AI review process to your team's specific needs and workflow preferences.
 
 ### Available Configurations
 
-#### Review Configs
+#### Enable PR Review Comments
 
-| Configuration | Description |
-| ------------- | ----------- |
-| Enable PR Review Comments | Allows AI to add inline comments on specific code sections in pull requests |
-| Enable PR Review on commits | Triggers AI code review automatically when new commits are pushed |
-| Enable RuleSets in Code Review | Applies custom rule sets to guide the AI review process |
-| Enable Cursor Rules in Code Review | Detects and applies Cursor Rules set in your code repositories for code reviews |
+Controls whether AI can add inline comments on specific code sections in pull requests.
 
-#### Summary Configs
+**Sub-options:**
 
-| Configuration | Description |
-| ------------- | ----------- |
-| Enable PR Description Updates | Allows AI to update the PR description with review findings |
-| Enable PR Description as Comment | Posts the PR description as a pinned comment for better visibility |
-| Enable Quality Recommendations in Summary | Includes code quality improvement suggestions in the review summary |
-| Enable Sequence Diagram in Summary | Generates and includes sequence diagrams in the review summary for better visualization of code flow |
-| Enable Tanka Poem in Summary | A tanka is a 5-line Japanese poem with a 5-7-5-7-7 syllable pattern, often expressing emotion or reflection. |
+- **Enable PR Review on commits** - Triggers AI code review automatically when new commits are pushed
+- **Disable PR Review Skip Reminders** - Controls whether to show reminders when PR reviews are skipped
+- **Enable Cursor Rules in Code Review** - Detects and applies Cursor Rules set in your code repositories for code reviews
+- **Enable Fix in Cursor Button** - Adds a button to open and fix issues directly in Cursor IDE
+- **Review Comments Priority** - Set the priority level for review comments (ALL, Medium and above, Only HIGH)
+
+#### Enable PR Description Generation
+
+Controls whether AI can generate and update PR descriptions.
+
+**Sub-options:**
+
+- **Enable PR Description as Comment** - Posts the PR description as a pinned comment for better visibility
+- **Enable Quality Recommendations in Summary** - Includes code quality improvement suggestions in the review summary
+- **Enable Sequence Diagram in Summary** - Generates and includes sequence diagrams in the review summary for better visualization of code flow
+- **Enable Tanka Poem in Summary** - Adds a creative tanka poem (5-line Japanese poem with a 5-7-5-7-7 syllable pattern) to the summary for a touch of poetry
