@@ -1,30 +1,30 @@
 ---
-title: "Axon Nano 1"
+title: "Axon Mini 1"
 icon: "microchip"
 description: "Super Intelligent model for general purpose with deep reasoning for low-effort day to day tasks"
 tag: "NEW"
-og:title: "Axon Nano 1 Model By MatterAI | MatterAI Documentation"
-og:description: "Axon Nano 1 Model By MatterAI is a super intelligent model for general purpose with deep reasoning for low-effort day to day tasks"
-og:image: "https://res.cloudinary.com/dxvbskvxm/image/upload/v1759829902/axon-nano_donkvy.webp"
-og:url: "https://docs.matterai.so/axon-nano"
+og:title: "Axon Mini 1 Model By MatterAI | MatterAI Documentation"
+og:description: "Axon Mini 1 Model By MatterAI is a super intelligent model for general purpose with deep reasoning for low-effort day to day tasks"
+og:image: "https://res.cloudinary.com/dxvbskvxm/image/upload/v1760447490/axon-mini_jjac8i.webp"
+og:url: "https://docs.matterai.so/axon-mini"
 ---
 
 <Frame>
   <img
-    src="https://res.cloudinary.com/dxvbskvxm/image/upload/v1759829902/axon-nano_donkvy.webp"
+    src="https://res.cloudinary.com/dxvbskvxm/image/upload/v1760447490/axon-mini_jjac8i.webp"
     className="block"
   />
 </Frame>
 
 | Specification            | Value                                           |
 | ------------------------ | ----------------------------------------------- |
-| ModelID                  | `axon-nano`                                     |
+| ModelID                  | `axon-mini`                                     |
 | Description              | `General purpose LLM Model with deep-reasoning` |
 | Region                   | `US`                                            |
 | Context Window Size      | `256K tokens`                                   |
 | Max Output Tokens        | `16,384`                                        |
-| Input Price (`<256K`)    | `$0.5/1M token`                                 |
-| Output Price (`<256K`)   | `$1.0/1M tokens`                                |
+| Input Price (`<256K`)    | `$0.4/1M token`                                 |
+| Output Price (`<256K`)   | `$2.0/1M tokens`                                |
 | Input Modalities         | `Text`, `Image`                                 |
 | Output Modalities        | `Text`                                          |
 | Capabilities             | `Function Calling`, `Tool Calling`, `Reasoning` |
@@ -32,7 +32,7 @@ og:url: "https://docs.matterai.so/axon-nano"
 | Floating Point Precision | `FP16`                                          |
 
 <Note>
-  Axon Nano 1 is based on Qwen 3 235B model, fine tuned on our proprietary
+  Axon Mini 1 is based on Qwen 3 235B model, fine tuned on our proprietary
   dataset and upgraded with deep reasoning and state machine capabilities.
 </Note>
 
@@ -56,7 +56,7 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header 'Authorization: Bearer MATTER_API_KEY' \
   --data '{
-  "model": "axon-nano",
+  "model": "axon-mini",
   "messages": [
     {
       "role": "system",
@@ -91,7 +91,7 @@ const openai = new OpenAI({
 
 async function main() {
   const response = await openai.chat.completions.create({
-    model: "axon-nano",
+    model: "axon-mini",
     messages: [
       {
         role: "system",
@@ -130,7 +130,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-  model='axon-nano',
+  model='axon-mini',
   messages=[
     {
       'role': 'system',
