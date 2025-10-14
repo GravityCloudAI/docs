@@ -54,7 +54,7 @@
               {
                 "group": "Axon LLM Models",
                 "icon": "gem",
-                "pages": ["axon-models", "axon", "axon-nano", "axon-code"]
+                "pages": ["axon-models", "axon", "axon-mini", "axon-code"]
               },
               {
                 "group": "Cortex Code Reviews",
