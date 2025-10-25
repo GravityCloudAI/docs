@@ -1,57 +1,62 @@
 ---
-title: 'Setup MatterAI MCP Server'
-icon: "code"
-description: 'AI-powered code reviews and development workflow directly in your IDE'
+title: "AI Code Review MCP"
+icon: "server"
+description: "AI-powered code reviews and development workflow directly in your IDE"
 ---
 
-<Note>
-MatterAI MCP Server is currently in beta and subject to change.
-</Note>
+<Note>MatterAI MCP Server is currently in beta and subject to change.</Note>
 
 ## Overview
 
 MatterAI MCP Server revolutionizes code reviews by bringing AI-powered analysis directly into your development workflow. By leveraging the Model Context Protocol (MCP), it provides seamless integration with modern IDEs to enhance code quality and developer productivity.
 
 <Frame>
-<img src="/images/matter-ai-mcp-1.png" alt="MatterAI MCP Server" />
+  <img src="/images/matter-ai-mcp-1.png" alt="MatterAI MCP Server" />
 </Frame>
 
 ## Key Features
 
 ### 🔍 Comprehensive Code Reviews
+
 - Review individual files or full git diffs with a single command
 - Identify potential bugs, security vulnerabilities, and performance issues
 - Get suggestions for code improvements and best practices
 
 ### 🧠 Implementation Planning
+
 - Generate detailed implementation plans for AI agents
 - Break down complex features into manageable tasks
 - Align implementation with architectural best practices
 
 ### 🚀 Pull Request Generation
+
 - Create pull requests with auto-generated titles and descriptions
 - Highlight key changes and their impact
 - Save time on PR documentation
 
 <Frame>
-<img src="/images/matter-ai-mcp-2.png" alt="MatterAI MCP Server" />
+  <img src="/images/matter-ai-mcp-2.png" alt="MatterAI MCP Server" />
 </Frame>
 
 # Getting Started
 
 ## 1. Create your MatterAI Account
+
 Visit [MatterAI](https://app.matterai.so) to create your account.
 
 ## 2. IDE Setup
 
 ### For Cursor IDE:
+
 #### 1-click Installation
+
 1. Click on "Add to Cursor" button in the Get Started section
-<Frame>
-<img src="/images/matter-ai-mcp-3.png" alt="MatterAI MCP Server" />
-</Frame>
+   <Frame>
+     <img src="/images/matter-ai-mcp-3.png" alt="MatterAI MCP Server" />
+   </Frame>
 
 #### Self-hosted Installation
+
 1. Click on `Cursor Settings` -> `Tools & MCP` -> `Add Custom MCP` -> `mcp.json` file
 2. Add the below JSON file
 
@@ -71,6 +76,7 @@ Visit [MatterAI](https://app.matterai.so) to create your account.
 ```
 
 ### For Cline IDE:
+
 1. Click on `Cline` -> `MCP Servers` -> `Remove Servers` -> `Edit configuration` button
 2. Add the below JSON file
 
@@ -90,17 +96,24 @@ Visit [MatterAI](https://app.matterai.so) to create your account.
 ```
 
 <Frame>
-<img src="/images/mcp/cline-matterai-mcp-setup.png" alt="MatterAI MCP Server Setup for Cline" />
+  <img
+    src="/images/mcp/cline-matterai-mcp-setup.png"
+    alt="MatterAI MCP Server Setup for Cline"
+  />
 </Frame>
 
 3. On save, it will load all the available tools
 4. Request Cline to perform code review using matterai by saying `perform code review with matterai`
 
 <Frame>
-<img src="/images/mcp/cline-matterai-mcp-preview.png" alt="MatterAI MCP Server Preview for Cline" />
+  <img
+    src="/images/mcp/cline-matterai-mcp-preview.png"
+    alt="MatterAI MCP Server Preview for Cline"
+  />
 </Frame>
 
 ### For Any MCP-Compatible IDE:
+
 1. Obtain your MatterAI API key from [MatterAI Settings](https://app.matterai.so/settings)
 2. Configure your MCP configuration file with the following settings:
 
@@ -122,10 +135,14 @@ Visit [MatterAI](https://app.matterai.so) to create your account.
 ```
 
 ## 3. Start Using in AI Agent Chats
+
 Use simple commands such as `/matter review` OR natural language to perform code reviews with solution and implementation in your IDE.
 
 <Frame>
-<img src="/images/mcp/cursor-matterai-mcp-cmd.png" alt="MatterAI MCP Server Preview for Cursor" />
+  <img
+    src="/images/mcp/cursor-matterai-mcp-cmd.png"
+    alt="MatterAI MCP Server Preview for Cursor"
+  />
 </Frame>
 
 # Why Choose MatterAI MCP Server?

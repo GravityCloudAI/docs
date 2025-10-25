@@ -45,185 +45,204 @@
         "tab": "Documentation",
         "groups": [
           {
-            "group": "Introduction",
-            "pages": ["introduction"]
-          },
-          {
             "group": "Getting Started",
+            "icon": "rocket",
+            "pages": ["introduction", "quick-start"]
+          },
+          {
+            "group": "LLM Models and Pricing",
+            "icon": "brain-circuit",
             "pages": [
+              "axon-overview",
               {
-                "group": "Axon LLM Models",
-                "icon": "gem",
-                "pages": ["axon-models", "axon", "axon-mini", "axon-code"]
+                "group": "Models List",
+                "pages": ["axon", "axon-mini", "axon-code"]
               },
-              {
-                "group": "Cortex Code Reviews",
-                "icon": "rocket",
-                "pages": [
-                  "quickstart-ai-code-review-agent",
-                  "quickstart-ai-code-review-gitlab",
-                  "quickstart-ai-code-review-atlassian-bitbucket",
-                  "quickstart-ai-code-review-mcp-server"
-                ]
-              }
+              "Pricing",
+              "axon-ai/api-keys",
+              "axon-ai/rate-limits"
             ]
           },
           {
-            "group": "Axon APIs",
-            "pages": ["axon-ai/api-keys", "axon-ai/rate-limits"]
-          },
-          {
-            "group": "Cortex Features",
+            "group": "AI Code Reviews",
+            "icon": "code-pull-request",
             "pages": [
-              "features/security-analysis",
-              "features/code-quality",
-              "features/codebase-learnings",
-              "features/similarity-search",
-              "features/agentic-chat",
-              "features/auto-resolve",
-              "features/rulesets",
-              "features/memories",
-              "features/analytics",
-              "features/command-list",
-              "features/configurations"
-            ]
-          },
-          {
-            "group": "Patterns",
-            "pages": [
+              "quickstart-ai-code-review-agent",
+              "quickstart-ai-code-review-gitlab",
+              "quickstart-ai-code-review-atlassian-bitbucket",
+              "quickstart-ai-code-review-mcp-server",
               {
-                "group": "Languages",
-                "icon": "message-code",
+                "group": "Features",
                 "pages": [
-                  "languages/supported-languages",
-                  "languages/python",
-                  "languages/java",
-                  "languages/javascript",
-                  "languages/typescript",
-                  "languages/nodejs",
-                  "languages/react",
-                  "languages/fastify",
-                  "languages/next-js",
-                  "languages/terraform",
-                  "languages/csharp",
-                  "languages/cpp",
-                  "languages/c",
-                  "languages/go",
-                  "languages/rust",
-                  "languages/swift",
-                  "languages/react-native",
-                  "languages/springboot",
-                  "languages/kotlin",
-                  "languages/flutter",
-                  "languages/ruby",
-                  "languages/php",
-                  "languages/scala",
-                  "languages/perl",
-                  "languages/r",
-                  "languages/dart",
-                  "languages/elixir",
-                  "languages/erlang",
-                  "languages/haskell",
-                  "languages/lua",
-                  "languages/julia",
-                  "languages/clojure",
-                  "languages/groovy",
-                  "languages/fortran",
-                  "languages/cobol",
-                  "languages/pascal",
-                  "languages/assembly",
-                  "languages/bash",
-                  "languages/powershell",
-                  "languages/sql",
-                  "languages/plsql",
-                  "languages/tsql",
-                  "languages/matlab",
-                  "languages/objective-c",
-                  "languages/vba",
-                  "languages/abap",
-                  "languages/apex",
-                  "languages/camel",
-                  "languages/crystal",
-                  "languages/d",
-                  "languages/delphi",
-                  "languages/elm",
-                  "languages/f-sharp",
-                  "languages/hack",
-                  "languages/lisp",
-                  "languages/ocaml",
-                  "languages/prolog",
-                  "languages/racket",
-                  "languages/scheme",
-                  "languages/solidity",
-                  "languages/verilog",
-                  "languages/vhdl",
-                  "languages/zig",
-                  "languages/mongodb",
-                  "languages/clickhouse",
-                  "languages/mysql",
-                  "languages/graphql",
-                  "languages/redis",
-                  "languages/cassandra",
-                  "languages/elasticsearch"
+                  "features/security-analysis",
+                  "features/code-quality",
+                  "features/codebase-learnings",
+                  "features/similarity-search",
+                  "features/agentic-chat",
+                  "features/auto-resolve",
+                  "features/rulesets",
+                  "features/memories",
+                  "features/analytics",
+                  "features/command-list",
+                  "features/configurations"
                 ]
               },
               {
-                "group": "Security",
-                "icon": "shield-quartered",
+                "group": "Patterns",
                 "pages": [
-                  "security/injection",
-                  "security/authentication",
-                  "security/authorization",
-                  "security/cryptography",
-                  "security/data-protection",
-                  "security/input-validation",
-                  "security/session-management",
-                  "security/error-handling",
-                  "security/logging",
-                  "security/configuration",
-                  "security/file-handling",
-                  "security/memory-management",
-                  "security/api-security",
-                  "security/cross-site-scripting",
-                  "security/cross-site-request-forgery",
-                  "security/insecure-deserialization",
-                  "security/security-misconfiguration",
-                  "security/broken-access-control",
-                  "security/sensitive-data-exposure",
-                  "security/xml-vulnerabilities",
-                  "security/regex-denial-of-service"
+                  {
+                    "group": "Languages",
+                    "icon": "message-code",
+                    "pages": [
+                      "languages/supported-languages",
+                      "languages/python",
+                      "languages/java",
+                      "languages/javascript",
+                      "languages/typescript",
+                      "languages/nodejs",
+                      "languages/react",
+                      "languages/fastify",
+                      "languages/next-js",
+                      "languages/terraform",
+                      "languages/csharp",
+                      "languages/cpp",
+                      "languages/c",
+                      "languages/go",
+                      "languages/rust",
+                      "languages/swift",
+                      "languages/react-native",
+                      "languages/springboot",
+                      "languages/kotlin",
+                      "languages/flutter",
+                      "languages/ruby",
+                      "languages/php",
+                      "languages/scala",
+                      "languages/perl",
+                      "languages/r",
+                      "languages/dart",
+                      "languages/elixir",
+                      "languages/erlang",
+                      "languages/haskell",
+                      "languages/lua",
+                      "languages/julia",
+                      "languages/clojure",
+                      "languages/groovy",
+                      "languages/fortran",
+                      "languages/cobol",
+                      "languages/pascal",
+                      "languages/assembly",
+                      "languages/bash",
+                      "languages/powershell",
+                      "languages/sql",
+                      "languages/plsql",
+                      "languages/tsql",
+                      "languages/matlab",
+                      "languages/objective-c",
+                      "languages/vba",
+                      "languages/abap",
+                      "languages/apex",
+                      "languages/camel",
+                      "languages/crystal",
+                      "languages/d",
+                      "languages/delphi",
+                      "languages/elm",
+                      "languages/f-sharp",
+                      "languages/hack",
+                      "languages/lisp",
+                      "languages/ocaml",
+                      "languages/prolog",
+                      "languages/racket",
+                      "languages/scheme",
+                      "languages/solidity",
+                      "languages/verilog",
+                      "languages/vhdl",
+                      "languages/zig",
+                      "languages/mongodb",
+                      "languages/clickhouse",
+                      "languages/mysql",
+                      "languages/graphql",
+                      "languages/redis",
+                      "languages/cassandra",
+                      "languages/elasticsearch"
+                    ]
+                  },
+                  {
+                    "group": "Security",
+                    "icon": "shield-quartered",
+                    "pages": [
+                      "security/injection",
+                      "security/authentication",
+                      "security/authorization",
+                      "security/cryptography",
+                      "security/data-protection",
+                      "security/input-validation",
+                      "security/session-management",
+                      "security/error-handling",
+                      "security/logging",
+                      "security/configuration",
+                      "security/file-handling",
+                      "security/memory-management",
+                      "security/api-security",
+                      "security/cross-site-scripting",
+                      "security/cross-site-request-forgery",
+                      "security/insecure-deserialization",
+                      "security/security-misconfiguration",
+                      "security/broken-access-control",
+                      "security/sensitive-data-exposure",
+                      "security/xml-vulnerabilities",
+                      "security/regex-denial-of-service"
+                    ]
+                  },
+                  {
+                    "group": "Performance",
+                    "icon": "bolt",
+                    "pages": [
+                      "performance/cpu-intensive-operations",
+                      "performance/memory-leaks",
+                      "performance/inefficient-algorithms",
+                      "performance/database-performance",
+                      "performance/network-bottlenecks",
+                      "performance/resource-contention",
+                      "performance/inefficient-data-structures",
+                      "performance/excessive-object-creation",
+                      "performance/synchronization-issues",
+                      "performance/io-bottlenecks",
+                      "performance/string-manipulation",
+                      "performance/inefficient-loops",
+                      "performance/lazy-loading-issues",
+                      "performance/caching-problems",
+                      "performance/ui-rendering-bottlenecks",
+                      "performance/serialization-overhead",
+                      "performance/logging-overhead",
+                      "performance/reflection-misuse",
+                      "performance/thread-pool-issues",
+                      "performance/garbage-collection-issues"
+                    ]
+                  }
                 ]
               },
               {
-                "group": "Performance",
-                "icon": "bolt",
+                "group": "Enterprise",
                 "pages": [
-                  "performance/cpu-intensive-operations",
-                  "performance/memory-leaks",
-                  "performance/inefficient-algorithms",
-                  "performance/database-performance",
-                  "performance/network-bottlenecks",
-                  "performance/resource-contention",
-                  "performance/inefficient-data-structures",
-                  "performance/excessive-object-creation",
-                  "performance/synchronization-issues",
-                  "performance/io-bottlenecks",
-                  "performance/string-manipulation",
-                  "performance/inefficient-loops",
-                  "performance/lazy-loading-issues",
-                  "performance/caching-problems",
-                  "performance/ui-rendering-bottlenecks",
-                  "performance/serialization-overhead",
-                  "performance/logging-overhead",
-                  "performance/reflection-misuse",
-                  "performance/thread-pool-issues",
-                  "performance/garbage-collection-issues"
+                  "enterprise/get-started",
+                  "enterprise/configure",
+                  "enterprise/observabilty-and-fallbacks",
+                  "enterprise/create-your-own-github-app",
+                  {
+                    "group": "Self-Hosting Options",
+                    "pages": [
+                      "enterprise/self-hosted-docker-compose",
+                      "enterprise/self-hosted-helm-chart"
+                    ]
+                  },
+                  "enterprise/rbac"
                 ]
               }
             ]
           },
           {
             "group": "Integrations",
+            "icon": "screwdriver-wrench",
             "pages": [
               {
                 "group": "Code Repositories",
@@ -241,23 +260,6 @@
                 "group": "Ticketing",
                 "pages": ["connectors/Linear", "connectors/Jira"]
               }
-            ]
-          },
-          {
-            "group": "Enterprise",
-            "pages": [
-              "enterprise/get-started",
-              "enterprise/configure",
-              "enterprise/observabilty-and-fallbacks",
-              "enterprise/create-your-own-github-app",
-              {
-                "group": "Self-Hosting Options",
-                "pages": [
-                  "enterprise/self-hosted-docker-compose",
-                  "enterprise/self-hosted-helm-chart"
-                ]
-              },
-              "enterprise/rbac"
             ]
           }
         ]

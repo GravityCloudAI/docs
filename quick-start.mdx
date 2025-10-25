@@ -1,0 +1,127 @@
+---
+title: "Quick Start"
+description: "Quick Start Guide for Axon Models"
+---
+
+## Prerequisites
+
+1. You need to have a MatterAI account on [https://app.matterai.so](https://app.matterai.so)
+2. You need to have API Key for your MatterAI account. You can generate API Key in [https://app.matterai.so/api-keys](https://app.matterai.so/api-keys)
+
+Export an environment variable on macOS or Linux systems
+
+```bash
+export MATTERAI_API_KEY=YOUR_API_KEY
+```
+
+Install the OpenAI SDK and Run an API Call
+
+<CodeGroup>
+```javascript OpenAI NodeJS SDK
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+apiKey: "MATTERAI_API_KEY",
+baseURL: "https://api.matterai.so/v1",
+});
+
+async function main() {
+const response = await openai.chat.completions.create({
+    "model": "axon",
+    "messages": [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant."
+        },
+        {
+            "role": "user",
+            "content": "What is Rust?"
+        }
+    ],
+    "stream": false,
+    "max_tokens": 1000,
+    "reasoning": {
+        "effort": "high",
+        "summary": "none"
+    },
+    "response_format": {
+        "type": "text"
+    },
+    "temperature": 0,
+    "top_p": 1
+});
+
+console.log(response.choices[0].message.content);
+}
+
+main();
+````
+
+```python OpenAI Python SDK
+from openai import OpenAI
+
+client = OpenAI(
+  api_key='MATTER_API_KEY',
+  base_url='https://api.matterai.so/v1'
+)
+
+response = client.chat.completions.create(
+  model='axon',
+  messages=[
+    {
+      'role': 'system',
+      'content': 'You are a helpful assistant.'
+    },
+    {
+      'role': 'user',
+      'content': 'What is Rust?'
+    }
+  ],
+  stream=False,
+  max_tokens=1000,
+  reasoning={
+    'effort': 'high',
+    'summary': 'none'
+  },
+  response_format={
+    'type': 'text'
+  },
+  temperature=0,
+  top_p=1
+)
+
+print(response.choices[0].message.content)
+````
+
+```bash cURL
+curl --request POST \
+  --url https://api.matterai.so/v1/chat/completions \
+  --header 'Content-Type: application/json' \
+  --header 'Authorization: Bearer MATTER_API_KEY' \
+  --data '{
+  "model": "axon",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "What is 9,387 * 8,145?"
+    }
+  ],
+  "stream": false,
+  "max_tokens": 1000,
+  "reasoning": {
+    "effort": "high",
+    "summary": "none"
+  },
+  "response_format": {
+    "type": "text"
+  },
+  "temperature": 0,
+  "top_p": 1
+}'
+```
+
+</CodeGroup>

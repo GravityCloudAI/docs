@@ -1,7 +1,7 @@
 ---
-title: Install MatterAI On GitLab
+title: GitLab Code Reviews
 icon: "gitlab"
-description: 'Install MatterAI on GitLab for AI Code Reviews and more'
+description: "Install MatterAI on GitLab for AI Code Reviews and more"
 ---
 
 <Note>All Pricing and Features are same on GitLab as on Github</Note>
@@ -34,7 +34,10 @@ We recommend creating a dedicated service account for MatterAI with these best p
 5. Ensure this user has at least **Developer access** to your target repositories
 
 <Frame>
-  <img src="/images/connectors/gitlab/gitlab-user.png" alt="Setting up MatterAI service account" />
+  <img
+    src="/images/connectors/gitlab/gitlab-user.png"
+    alt="Setting up MatterAI service account"
+  />
 </Frame>
 
 ## Step 3: Generate Your Personal Access Token
@@ -50,21 +53,25 @@ We recommend creating a dedicated service account for MatterAI with these best p
 9. Save the token securely (it will only be displayed once)
 
 <Frame>
-  <img src="/images/connectors/gitlab/gitlab-pat.png" alt="Generating Personal Access Token" />
+  <img
+    src="/images/connectors/gitlab/gitlab-pat.png"
+    alt="Generating Personal Access Token"
+  />
 </Frame>
 
 <Frame>
-  <img src="/images/connectors/gitlab/gitlab-pat-scopes.png" alt="Generating Personal Access Token" />
+  <img
+    src="/images/connectors/gitlab/gitlab-pat-scopes.png"
+    alt="Generating Personal Access Token"
+  />
 </Frame>
 
-<Note>
-Remember that personal access tokens have expiration dates
-</Note>
+<Note>Remember that personal access tokens have expiration dates</Note>
 
 ### Alternative: Using Group Access Tokens
 
 <Warning>
-GitLab restricts this option to users on the Premium or Ultimate tiers.
+  GitLab restricts this option to users on the Premium or Ultimate tiers.
 </Warning>
 
 For GitLab Premium or Ultimate users, Group Access Tokens provide a streamlined option:
@@ -76,21 +83,31 @@ For GitLab Premium or Ultimate users, Group Access Tokens provide a streamlined 
 5. Ensure Developer Access is granted
 
 <Note>
-  Group Access Tokens are limited to the specific group where created. For multiple groups, you'll need separate tokens for each.
+  Group Access Tokens are limited to the specific group where created. For
+  multiple groups, you'll need separate tokens for each.
 </Note>
 
 <Frame>
-  <img src="/images/connectors/gitlab/gitlab-gat.png" alt="Generating Group Access Token" />
+  <img
+    src="/images/connectors/gitlab/gitlab-gat.png"
+    alt="Generating Group Access Token"
+  />
 </Frame>
 
 <Frame>
-  <img src="/images/connectors/gitlab/gitlab-gat-scopes.png" alt="Generating Group Access Token" />
+  <img
+    src="/images/connectors/gitlab/gitlab-gat-scopes.png"
+    alt="Generating Group Access Token"
+  />
 </Frame>
 
 ## Step 4: Setup MatterAI Webhook
+
 ### GitLab Configuration
+
 <Warning>
-GitLab restricts Project-level Webhooks to users on the Premium or Ultimate tiers.
+  GitLab restricts Project-level Webhooks to users on the Premium or Ultimate
+  tiers.
 </Warning>
 
 1. Navigate to GitLab Webhooks for your Project. **GitLab** -> **Projects** -> **Your Project** -> **Settings** -> **Webhooks**
@@ -98,18 +115,25 @@ GitLab restricts Project-level Webhooks to users on the Premium or Ultimate tier
 3. Enter the webhook name and description. We recommend adding name as **matterai** and description as **MatterAI Webhook for AI Code Reviews**
 4. Enter the following URL: **https://api.matterai.so/api/v1/gitlab/webhook**
 5. Generate a **Secret Token** and copy it, this will be used to store in MatterAI Connectors
-6. Select the **T**riggers for the Webhook**, MatterAI requires three triggers: **Push events**, **Merge Request events** and **Comments**
+6. Select the **T**riggers for the Webhook**, MatterAI requires three triggers: **Push events**, **Merge Request events** and **Comments\*\*
 7. Save the Webhook
 
 <Frame>
-  <img src="/images/connectors/gitlab/gitlab-webhook.png" alt="Setting up MatterAI service account" />
+  <img
+    src="/images/connectors/gitlab/gitlab-webhook.png"
+    alt="Setting up MatterAI service account"
+  />
 </Frame>
 
 <Frame>
-  <img src="/images/connectors/gitlab/gitlab-webhook-scope.png" alt="Setting up MatterAI service account" />
+  <img
+    src="/images/connectors/gitlab/gitlab-webhook-scope.png"
+    alt="Setting up MatterAI service account"
+  />
 </Frame>
 
 ### MatterAI Configuration
+
 1. Navigate to **MatterAI** -> **Connectors** -> **GitLab** and click on **Connect**. Console URL: [https://app.matterai.so/connectors](https://app.matterai.so/connectors)
 2. Enter the **GitLab Access Token** and **Webhook Secret Token** in the form.
 3. If you have self-hosted GitLab, enter then add **Self-Hosted GitLab URL** in the form. MatterAI IPs can be whitelisted in your network.
@@ -118,7 +142,10 @@ GitLab restricts Project-level Webhooks to users on the Premium or Ultimate tier
 6. Your GitLab integration is now ready to use!
 
 <Frame>
-<img src="/images/connectors/gitlab/matterai-gitlab.png" alt="Setting up MatterAI service account" />
+  <img
+    src="/images/connectors/gitlab/matterai-gitlab.png"
+    alt="Setting up MatterAI service account"
+  />
 </Frame>
 
 ## GitLab Code Reviews
@@ -128,7 +155,10 @@ GitLab restricts Project-level Webhooks to users on the Premium or Ultimate tier
 Get PR summaries in your GitLab merge requests, always upto date on all the commits.
 
 <Frame>
-  <img src="/images/connectors/gitlab/gitlab-merge-request-summary.png" alt="Setting up MatterAI service account" />
+  <img
+    src="/images/connectors/gitlab/gitlab-merge-request-summary.png"
+    alt="Setting up MatterAI service account"
+  />
 </Frame>
 
 ### AI Merge Review Threads
@@ -136,8 +166,8 @@ Get PR summaries in your GitLab merge requests, always upto date on all the comm
 Get PR summaries in your GitLab merge requests with issues, fix and code fix suggestion that you can apply with 1-click.
 
 <Frame>
-  <img src="/images/connectors/gitlab/gitlab-merge-request-thread.png" alt="Setting up MatterAI service account" />
+  <img
+    src="/images/connectors/gitlab/gitlab-merge-request-thread.png"
+    alt="Setting up MatterAI service account"
+  />
 </Frame>
-
-
-
