@@ -1,0 +1,20 @@
+---
+title: Model Pricing
+og:title: "Axon AI Model Pricing | MatterAI Documentation"
+description: "Pricing for Axon AI models"
+---
+
+## Pricing and Comparison
+
+| Model | Input Price (per 1M tokens) | Output Price (per 1M tokens) | Context Window Size | Max Output Tokens |
+|-------|-----------------------------|-----------------------------|--------------------|------------------|
+| Axon 1 | $1.0 | $4.0 | 256K tokens | 32,768 |
+| Axon Mini 1 | $0.25 | $1.0 | 256K tokens | 16,384 |
+| Axon Code 1 | $1.0 | $4.0 | 256K tokens | 32,768 |
+
+<Note>
+  Pricing for reasoning output tokens is calculated based on pricing per 1M tokens. For example, if the Axon Mini 1 model generates 100,000 output tokens (50000 output + 50000 reasoning), the cost will be 
+  $$
+  ($0.25 * 50000/1000000) + ($0.25 * 50000/1000000) = $0.02
+  $$
+</Note>

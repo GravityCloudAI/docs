@@ -58,7 +58,7 @@
                 "group": "Models List",
                 "pages": ["axon", "axon-mini", "axon-code"]
               },
-              "Pricing",
+              "axon-ai/pricing",
               "axon-ai/api-keys",
               "axon-ai/rate-limits"
             ]
