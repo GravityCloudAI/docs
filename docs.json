@@ -316,10 +316,10 @@
         "tab": "Changelog",
         "groups": [
           {
-            "group": "Product Updates",
+            "group": "MatterAI Product Updates",
             "pages": [
-              "changelog/cortex-product-updates",
-              "changelog/axon-product-updates"
+              "changelog/axon-models-changelog",
+              "changelog/ai-code-reviews-changelog"
             ]
           }
         ]
