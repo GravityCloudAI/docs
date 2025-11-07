@@ -369,7 +369,7 @@
         },
         {
           "anchor": "Github",
-          "href": "https://github.com/gravitycloudai/matter-ai",
+          "href": "https://github.com/MatterAIOrg/matter-ai",
           "icon": "github"
         },
         {
@@ -398,7 +398,7 @@
       },
       {
         "label": "Github",
-        "href": "https://github.com/GravityCloudAI/matter-ai"
+        "href": "https://github.com/MatterAIOrg/matter-ai"
       }
     ],
     "primary": {
@@ -411,7 +411,7 @@
     "socials": {
       "website": "https://matterai.so",
       "x": "https://x.com/matteraidev",
-      "github": "https://github.com/gravitycloudai",
+      "github": "https://github.com/MatterAIOrg",
       "linkedin": "https://www.linkedin.com/company/matter-ai-dev"
     }
   }
