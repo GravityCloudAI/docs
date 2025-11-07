@@ -12,7 +12,10 @@
     "family": "Geist"
   },
   "contextual": {
-    "options": ["copy", "view"]
+    "options": [
+      "copy",
+      "view"
+    ]
   },
   "seo": {
     "metatags": {
@@ -47,7 +50,10 @@
           {
             "group": "Getting Started",
             "icon": "rocket",
-            "pages": ["introduction", "quick-start"]
+            "pages": [
+              "introduction",
+              "quick-start"
+            ]
           },
           {
             "group": "LLM Models and Pricing",
@@ -56,7 +62,11 @@
               "axon-overview",
               {
                 "group": "Models List",
-                "pages": ["axon", "axon-mini", "axon-code"]
+                "pages": [
+                  "axon",
+                  "axon-mini",
+                  "axon-code"
+                ]
               },
               "axon-ai/pricing",
               "axon-ai/api-keys",
@@ -254,11 +264,17 @@
               },
               {
                 "group": "Team Messengers",
-                "pages": ["connectors/slack", "connectors/ms-teams"]
+                "pages": [
+                  "connectors/slack",
+                  "connectors/ms-teams"
+                ]
               },
               {
                 "group": "Ticketing",
-                "pages": ["connectors/Linear", "connectors/Jira"]
+                "pages": [
+                  "connectors/Linear",
+                  "connectors/Jira"
+                ]
               }
             ]
           }
@@ -269,7 +285,9 @@
         "pages": [
           {
             "group": "Axon Code CLI",
-            "pages": ["cli/axon-code-cli"]
+            "pages": [
+              "cli/axon-code-cli"
+            ]
           }
         ]
       },
@@ -278,7 +296,16 @@
         "pages": [
           {
             "group": "Inference",
-            "pages": ["api-reference/endpoint/completions"]
+            "pages": [
+              "api-reference/endpoint/completions"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api-reference/endpoint/models",
+              "api-reference/endpoint/model"
+            ]
           }
         ]
       },
@@ -296,7 +323,10 @@
           },
           {
             "group": "CLI",
-            "pages": ["coding-tools/cli/codex", "coding-tools/cli/claude-code"]
+            "pages": [
+              "coding-tools/cli/codex",
+              "coding-tools/cli/claude-code"
+            ]
           }
         ]
       },
